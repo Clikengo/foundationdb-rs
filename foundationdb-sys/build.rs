@@ -3,6 +3,12 @@ extern crate bindgen;
 use std::env;
 use std::path::PathBuf;
 
+#[cfg(target_os = "linux")]
+const INCLUDE_PATH: &str = "-I/usr/include/foundationdb/";
+
+#[cfg(target_os = "macos")]
+const INCLUDE_PATH: &str = "-I/usr/local/include/foundationdb/";
+
 fn main() {
     // Tell cargo to tell rustc to link the system bzip2
     // shared library.
@@ -11,7 +17,7 @@ fn main() {
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
     // the resulting bindings.
-    let bindings = bindgen::Builder::default()
+    let bindings = bindgen::Builder::default().clang_arg(INCLUDE_PATH)
         // The input header we would like to generate
         // bindings for.
         .header("wrapper.h")
