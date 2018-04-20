@@ -1,16 +1,16 @@
 [package]
 name = "foundationdb"
-version = "0.0.0"
+version = "0.0.1"
 authors = ["Benjamin Fry <benjaminfry@me.com>"]
 
 description = """
 Bindings to the C api for FoundationDB
 """
 
-repository = "https://github.com/bluejekyll/foundation-rs"
+repository = "https://github.com/bluejekyll/foundationdb-rs"
 license = "MIT/Apache-2.0"
 
 [dependencies]
 failure = "0.1"
 failure_derive = "0.1"
-foundationdb-sys = { version = "0.0.1", path = "../foundationdb-sys" }
+foundationdb-sys = { version = "0.0.2", path = "../foundationdb-sys" }
