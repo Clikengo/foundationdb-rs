@@ -1,0 +1,7 @@
+[package]
+name = "foundationdb"
+version = "0.0.0"
+authors = ["Benjamin Fry <benjaminfry@me.com>"]
+
+[dependencies]
+foundationdb-sys = { version = "0.0", path = "../foundationdb-sys" }
