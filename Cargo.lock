@@ -106,12 +106,12 @@ dependencies = [
 name = "foundationdb"
 version = "0.0.0"
 dependencies = [
- "foundationdb-sys 0.1.0",
+ "foundationdb-sys 0.0.0",
 ]
 
 [[package]]
 name = "foundationdb-sys"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "bindgen 0.36.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
