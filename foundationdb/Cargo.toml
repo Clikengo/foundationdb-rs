@@ -4,4 +4,4 @@ version = "0.0.0"
 authors = ["Benjamin Fry <benjaminfry@me.com>"]
 
 [dependencies]
-foundationdb-sys = { version = "0.1", path = "../foundationdb-sys" }
+foundationdb-sys = { version = "0.0", path = "../foundationdb-sys" }
