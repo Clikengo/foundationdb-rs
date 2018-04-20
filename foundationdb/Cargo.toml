@@ -11,4 +11,4 @@ repository = "https://github.com/bluejekyll/foundation-rs"
 license = "MIT/Apache-2.0"
 
 [dependencies]
-foundationdb-sys = { version = "0.1", path = "../foundationdb-sys" }
+foundationdb-sys = { version = "0.0.1", path = "../foundationdb-sys" }
