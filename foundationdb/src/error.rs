@@ -2,9 +2,9 @@ use options;
 use std;
 use std::ffi::CStr;
 
-use foundationdb_sys as fdb;
+use foundationdb_sys as fdb_sys;
 
-pub(crate) fn eval(error_code: fdb::fdb_error_t) -> Result<()> {
+pub(crate) fn eval(error_code: fdb_sys::fdb_error_t) -> Result<()> {
     let rust_code = error_code as i32;
     if rust_code == 0 {
         Ok(())
@@ -23,8 +23,8 @@ pub struct FdbError {
 pub type Result<T> = std::result::Result<T, FdbError>;
 
 impl FdbError {
-    pub fn from(error_code: fdb::fdb_error_t) -> Self {
-        let error_str = unsafe { CStr::from_ptr(fdb::fdb_get_error(error_code)) };
+    pub fn from(error_code: fdb_sys::fdb_error_t) -> Self {
+        let error_str = unsafe { CStr::from_ptr(fdb_sys::fdb_get_error(error_code)) };
 
         FdbError {
             error_code: error_code as i32,
@@ -36,7 +36,7 @@ impl FdbError {
 
     pub fn is_maybe_committed(&self) -> bool {
         let check = unsafe {
-            fdb::fdb_error_predicate(
+            fdb_sys::fdb_error_predicate(
                 options::ErrorPredicate::MaybeCommitted.code() as i32,
                 self.error_code,
             ) as i32
@@ -47,7 +47,7 @@ impl FdbError {
 
     pub fn is_retryable(&self) -> bool {
         let check = unsafe {
-            fdb::fdb_error_predicate(
+            fdb_sys::fdb_error_predicate(
                 options::ErrorPredicate::Retryable.code() as i32,
                 self.error_code,
             ) as i32
@@ -58,7 +58,7 @@ impl FdbError {
 
     pub fn is_retryable_not_committed(&self) -> bool {
         let check = unsafe {
-            fdb::fdb_error_predicate(
+            fdb_sys::fdb_error_predicate(
                 options::ErrorPredicate::RetryableNotCommitted.code() as i32,
                 self.error_code,
             ) as i32
