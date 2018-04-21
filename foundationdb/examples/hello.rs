@@ -9,6 +9,7 @@ use foundationdb::error;
 use foundationdb_sys as fdb;
 
 use futures::future::*;
+use futures::Async;
 
 use error::FdbError;
 
@@ -19,9 +20,11 @@ struct FdbCluster {
     inner: Arc<FdbClusterInner>,
 }
 impl FdbCluster {
-    fn new(inner: *mut fdb::FDBCluster) -> Self {
-        Self {
-            inner: Arc::new(FdbClusterInner::new(inner)),
+    fn new(path: &str) -> FdbClusterGet {
+        let path_str = std::ffi::CString::new(path).unwrap();
+        let f = unsafe { fdb::fdb_create_cluster(path_str.as_ptr()) };
+        FdbClusterGet {
+            inner: FdbFuture::new(f),
         }
     }
 
@@ -38,6 +41,27 @@ impl FdbCluster {
                 })
         };
         Box::new(f)
+    }
+}
+
+struct FdbClusterGet {
+    inner: FdbFuture,
+}
+impl Future for FdbClusterGet {
+    type Item = FdbCluster;
+    type Error = FdbError;
+
+    fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
+        match self.inner.poll() {
+            Ok(Async::Ready(r)) => match unsafe { r.get_cluster() } {
+                Ok(c) => Ok(Async::Ready(FdbCluster {
+                    inner: Arc::new(FdbClusterInner::new(c)),
+                })),
+                Err(e) => Err(e),
+            },
+            Ok(Async::NotReady) => Ok(Async::NotReady),
+            Err(e) => Err(e),
+        }
     }
 }
 
@@ -94,6 +118,7 @@ impl Drop for FdbDatabaseInner {
     }
 }
 
+#[derive(Clone)]
 struct FdbTransaction {
     database: FdbDatabase,
     inner: Arc<FdbTransactionInner>,
@@ -101,6 +126,36 @@ struct FdbTransaction {
 impl FdbTransaction {
     fn database(&self) -> FdbDatabase {
         self.database.clone()
+    }
+
+    fn set(&self, key: &[u8], value: &[u8]) {
+        let trx = self.inner.inner;
+        unsafe {
+            fdb::fdb_transaction_set(
+                trx,
+                key.as_ptr(),
+                key.len() as i32,
+                value.as_ptr(),
+                value.len() as i32,
+            )
+        }
+    }
+
+    fn clear(&self, key: &[u8]) {
+        let trx = self.inner.inner;
+        unsafe { fdb::fdb_transaction_clear(trx, key.as_ptr(), key.len() as i32) }
+    }
+
+    fn get(self, key: &[u8]) -> FdbTrxGet {
+        let trx = self.inner.inner;
+
+        let f =
+            unsafe { fdb::fdb_transaction_get(trx, key.as_ptr() as *const _, key.len() as i32, 0) };
+        let f = FdbFuture::new(f);
+        FdbTrxGet {
+            trx: self,
+            inner: f,
+        }
     }
 }
 
@@ -116,6 +171,23 @@ impl Drop for FdbTransactionInner {
     fn drop(&mut self) {
         unsafe {
             fdb::fdb_transaction_destroy(self.inner);
+        }
+    }
+}
+
+struct FdbTrxGet {
+    trx: FdbTransaction,
+    inner: FdbFuture,
+}
+impl Future for FdbTrxGet {
+    type Item = (FdbTransaction, FdbFutureResult);
+    type Error = FdbError;
+
+    fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
+        match self.inner.poll() {
+            Ok(Async::Ready(r)) => Ok(Async::Ready((self.trx.clone(), r))),
+            Ok(Async::NotReady) => Ok(Async::NotReady),
+            Err(e) => Err(e),
         }
     }
 }
@@ -146,23 +218,25 @@ impl FdbFutureResult {
         Ok(v)
     }
 
-    unsafe fn get_value<'a>(&'a self) -> Result<Option<&'a [u8]>> {
+    fn get_value<'a>(&'a self) -> Result<Option<&'a [u8]>> {
         let mut present = 0;
         let mut out_value = std::ptr::null();
         let mut out_len = 0;
-        let err = fdb::fdb_future_get_value(
-            self.f,
-            &mut present as *mut _,
-            &mut out_value as *mut _,
-            &mut out_len as *mut _,
-        );
+        let err = unsafe {
+            fdb::fdb_future_get_value(
+                self.f,
+                &mut present as *mut _,
+                &mut out_value as *mut _,
+                &mut out_len as *mut _,
+            )
+        };
         if err != 0 {
             return Err(FdbError::from(err));
         }
         if present == 0 {
             return Ok(None);
         }
-        let slice = std::slice::from_raw_parts(out_value, out_len as usize);
+        let slice = unsafe { std::slice::from_raw_parts(out_value, out_len as usize) };
         Ok(Some(slice))
     }
 }
@@ -189,7 +263,7 @@ impl futures::Future for FdbFuture {
     type Item = FdbFutureResult;
     type Error = FdbError;
 
-    fn poll(&mut self) -> std::result::Result<futures::Async<Self::Item>, Self::Error> {
+    fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         if self.task.is_none() {
             let task = futures::task::current();
             let task = Box::new(task);
@@ -199,12 +273,12 @@ impl futures::Future for FdbFuture {
             }
             self.task = Some(task);
 
-            return Ok(futures::Async::NotReady);
+            return Ok(Async::NotReady);
         }
 
         let ready = unsafe { fdb::fdb_future_is_ready(self.f) };
         if ready == 0 {
-            return Ok(futures::Async::NotReady);
+            return Ok(Async::NotReady);
         }
 
         let err = unsafe { fdb::fdb_future_get_error(self.f) };
@@ -215,7 +289,7 @@ impl futures::Future for FdbFuture {
         let g = FdbFutureResult::new(self.f);
         self.f = std::ptr::null_mut();
 
-        Ok(futures::Async::Ready(g))
+        Ok(Async::Ready(g))
     }
 }
 
@@ -231,7 +305,7 @@ extern "C" fn fdb_future_callback(
 fn main() {
     let mut core = tokio_core::reactor::Core::new().unwrap();
 
-    unsafe {
+    let handle = unsafe {
         let version = fdb::fdb_get_max_api_version();
         let err = fdb::fdb_select_api_version_impl(version, version);
         if err != 0 {
@@ -243,51 +317,42 @@ fn main() {
             panic!("fdb_setup_network: {:?}", FdbError::from(err));
         }
 
-        let handle = std::thread::spawn(|| {
+        std::thread::spawn(|| {
             let err = fdb::fdb_run_network();
             if err != 0 {
                 panic!("fdb_run_network: {:?}", FdbError::from(err));
             }
+        })
+    };
+
+    let fut = FdbCluster::new("/etc/foundationdb/fdb.cluster")
+        .and_then(|cluster| cluster.create_database())
+        .and_then(|db| result(db.create_trx()))
+        .and_then(|trx| {
+            trx.set(b"hello", b"world");
+            trx.get(b"hello")
+        })
+        .and_then(|(trx, f)| {
+            let db = trx.database();
+            let val = f.get_value();
+            eprintln!("value: {:?}", val);
+
+            result(db.create_trx())
+        })
+        .and_then(|trx| {
+            trx.clear(b"hello");
+            trx.get(b"hello")
+        })
+        .and_then(|(_trx, f)| {
+            let val = f.get_value();
+            eprintln!("value: {:?}", val);
+            Ok(())
         });
 
-        let path_str = std::ffi::CString::new("/etc/foundationdb/fdb.cluster").unwrap();
-        let f = fdb::fdb_create_cluster(path_str.as_ptr());
-        let fut = FdbFuture::new(f)
-            .and_then(|f| result(f.get_cluster()).map(|cluter| FdbCluster::new(cluter)))
-            .and_then(|cluster| cluster.create_database())
-            .and_then(|db| result(db.create_trx()))
-            .and_then(|trx| {
-                let db = trx.database();
-                let inner = trx.inner.inner;
-                fdb::fdb_transaction_set(inner, b"hello" as *const _, 5, b"world" as *const _, 5);
+    core.run(fut).expect("failed to run");
 
-                let f = fdb::fdb_transaction_get(inner, b"hello" as *const _, 5, 0);
-                FdbFuture::new(f).map(move |f| (db, f))
-            })
-            .and_then(|(db, f)| {
-                let val = f.get_value();
-                eprintln!("value: {:?}", val);
-
-                result(db.create_trx())
-            })
-            .and_then(|trx| {
-                let db = trx.database();
-                let inner = trx.inner.inner;
-
-                fdb::fdb_transaction_clear(inner, b"hello" as *const _, 5);
-
-                let f = fdb::fdb_transaction_get(inner, b"hello" as *const _, 5, 0);
-                FdbFuture::new(f).map(move |f| (db, f))
-            })
-            .and_then(|(_db, f)| {
-                let val = f.get_value();
-                eprintln!("value: {:?}", val);
-                fdb::fdb_stop_network();
-                Ok(())
-            });
-
-        core.run(fut).expect("failed to run");
-
-        handle.join().expect("failed to join fdb thread");
+    unsafe {
+        fdb::fdb_stop_network();
     }
+    handle.join().expect("failed to join fdb thread");
 }
