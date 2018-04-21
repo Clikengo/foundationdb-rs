@@ -1,0 +1,47 @@
+sudo: required
+dist: trusty
+language: rust
+
+matrix:
+  include:
+    # optional feature variations
+    # we want full coverage, include all features...
+    - rust: stable
+      env: RUST_BACKTRACE=full
+
+    - rust: beta
+      env: RUST_BACKTRACE=full
+
+    - os: osx
+      rust: stable
+
+    - rust: nightly
+      env: RUST_BACKTRACE=full
+
+    - rust: nightly
+      env: RUST_BACKTRACE=full
+           CLIPPY=true
+      script:
+        - cargo clippy --all --all-features
+
+    - rust: nightly
+      env: RUST_BACKTRACE=full
+           RUSTFMT=true
+      script:
+        - cargo fmt --all -- --write-mode=diff
+
+  allow_failures:
+    - rust: nightly
+
+before_install:
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then scripts/install_foundationdb_linux.sh ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then scripts/install_foundationdb_macos.sh ; fi
+  - if [[ "$RUSTFMT" == "true" ]]; then cargo install rustfmt-nightly --force ; fi
+  - if [[ "$CLIPPY" == "true" ]]; then cargo install clippy --force; fi
+
+script:
+  - cargo test --manifest-path foundationdb-sys/Cargo.toml --all-features
+  # - cargo test --manifest-path foundationdb-gen/Cargo.toml --all-features
+  - cargo test --manifest-path foundationdb/Cargo.toml --all-features
+
+# after_success: cargo kcov here...
