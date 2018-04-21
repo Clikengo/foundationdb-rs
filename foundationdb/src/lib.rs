@@ -9,3 +9,4 @@ extern crate lazy_static;
 pub mod context;
 pub mod error;
 pub mod network;
+pub mod options;

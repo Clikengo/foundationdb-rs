@@ -1,3 +1,4 @@
+use options;
 use std::ffi::CStr;
 
 use foundationdb_sys as fdb;
@@ -24,7 +25,7 @@ impl FdbError {
     pub fn is_maybe_committed(&self) -> bool {
         let check = unsafe {
             fdb::fdb_error_predicate(
-                FdbErrorPredicate::MaybeCommitted.into_fdb_predicate() as i32,
+                options::ErrorPredicate::MaybeCommitted.code() as i32,
                 self.error_code,
             ) as i32
         };
@@ -35,7 +36,7 @@ impl FdbError {
     pub fn is_retryable(&self) -> bool {
         let check = unsafe {
             fdb::fdb_error_predicate(
-                FdbErrorPredicate::Retryable.into_fdb_predicate() as i32,
+                options::ErrorPredicate::Retryable.code() as i32,
                 self.error_code,
             ) as i32
         };
@@ -46,31 +47,11 @@ impl FdbError {
     pub fn is_retryable_not_committed(&self) -> bool {
         let check = unsafe {
             fdb::fdb_error_predicate(
-                FdbErrorPredicate::RetryableNotCommitted.into_fdb_predicate() as i32,
+                options::ErrorPredicate::RetryableNotCommitted.code() as i32,
                 self.error_code,
             ) as i32
         };
 
         check != 0
-    }
-}
-
-enum FdbErrorPredicate {
-    MaybeCommitted,
-    Retryable,
-    RetryableNotCommitted,
-}
-
-impl FdbErrorPredicate {
-    fn into_fdb_predicate(&self) -> fdb::FDBErrorPredicate {
-        match *self {
-            FdbErrorPredicate::MaybeCommitted => {
-                fdb::FDBErrorPredicate_FDB_ERROR_PREDICATE_MAYBE_COMMITTED
-            }
-            FdbErrorPredicate::Retryable => fdb::FDBErrorPredicate_FDB_ERROR_PREDICATE_RETRYABLE,
-            FdbErrorPredicate::RetryableNotCommitted => {
-                fdb::FDBErrorPredicate_FDB_ERROR_PREDICATE_RETRYABLE_NOT_COMMITTED
-            }
-        }
     }
 }
