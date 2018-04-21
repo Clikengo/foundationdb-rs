@@ -1,0 +1,324 @@
+extern crate inflector;
+extern crate xml;
+#[macro_use]
+extern crate failure;
+
+type Result<T> = std::result::Result<T, failure::Error>;
+
+use inflector::cases::classcase;
+use xml::attribute::OwnedAttribute;
+use xml::reader::{EventReader, XmlEvent};
+
+#[derive(Debug)]
+struct FdbScope {
+    name: String,
+    options: Vec<FdbOption>,
+}
+impl FdbScope {
+    fn gen_ty(&self) -> String {
+        let mut s = String::new();
+        s += "pub enum ";
+        s += &self.name;
+        s += "{\n";
+        for option in self.options.iter() {
+            s += &option.gen_ty();
+        }
+        s += "}\n";
+
+        s
+    }
+
+    fn gen_impl(&self) -> String {
+        let mut s = String::new();
+        s += "impl ";
+        s += &self.name;
+        s += " {\n";
+
+        s += &self.gen_code();
+        s += &self.gen_apply();
+
+        s += "}\n";
+        s
+    }
+
+    fn gen_code(&self) -> String {
+        let mut s = String::new();
+        s += &format!("pub fn code(&self) -> fdb::FDB{} {{\n", self.name);
+        s += "match *self {\n";
+
+        for option in self.options.iter() {
+            s += &format!("{}::{}", self.name, option.name);
+
+            if let Some(_ty) = option.get_ty() {
+                s += "(ref _v)"
+            }
+            s += &format!(" => {},\n", option.code);
+        }
+
+        s += "}\n}\n";
+
+        s
+    }
+
+    fn gen_apply(&self) -> String {
+        let fn_name = match self.apply_fn_name() {
+            Some(name) => name,
+            _ => return String::new(),
+        };
+
+        let first_arg = match self.apply_arg_name() {
+            Some(name) => format!(", target: *mut fdb::{}", name),
+            None => String::new(),
+        };
+
+        let mut s = String::new();
+        s += &format!(
+            "pub unsafe fn apply(&self{}) -> std::result::Result<(), error::FdbError> {{\n",
+            first_arg
+        );
+        s += "let code = self.code();\n";
+        s += "let err = match *self {\n";
+
+        let args = if first_arg.is_empty() {
+            "code"
+        } else {
+            "target, code"
+        };
+
+        for option in self.options.iter() {
+            s += &format!("{}::{}", self.name, option.name);
+
+            match option.param_type {
+                FdbOptionTy::Empty => {
+                    s += &format!(" => fdb::{}({}, std::ptr::null(), 0),\n", fn_name, args);
+                }
+                FdbOptionTy::Int => {
+                    s += "(v) => {\n";
+                    s += "let data: [u8;8] = std::mem::transmute(v as i64);\n";
+                    s += &format!(
+                        "fdb::{}({}, data.as_ptr() as *const u8, 8)\n",
+                        fn_name, args
+                    );
+                    s += "},";
+                }
+                FdbOptionTy::Bytes => {
+                    s += "(ref v) => {\n";
+                    s += &format!(
+                        "fdb::{}({}, v.as_ptr() as *const u8, v.len() as i32)\n",
+                        fn_name, args
+                    );
+                    s += "},";
+                }
+                FdbOptionTy::Str => {
+                    s += "(ref v) => {\n";
+                    s += &format!(
+                        "fdb::{}({}, v.as_ptr() as *const u8, v.len() as i32)\n",
+                        fn_name, args
+                    );
+                    s += "},";
+                }
+            }
+        }
+
+        s += "};\n";
+        s += "if err != 0 { Err(error::FdbError::from(err)) } else { Ok(()) }\n";
+        s += "}\n";
+
+        s
+    }
+
+    fn apply_arg_name(&self) -> Option<&'static str> {
+        let s = match self.name.as_str() {
+            "ClusterOption" => "FDBCluster",
+            "DatabaseOption" => "FDBDatabase",
+            "TransactionOption" => "FDBTransaction",
+            _ => return None,
+        };
+        Some(s)
+    }
+
+    fn apply_fn_name(&self) -> Option<&'static str> {
+        let s = match self.name.as_str() {
+            "NetworkOption" => "fdb_network_set_option",
+            "ClusterOption" => "fdb_cluster_set_option",
+            "DatabaseOption" => "fdb_database_set_option",
+            "TransactionOption" => "fdb_transaction_set_option",
+            _ => return None,
+        };
+        Some(s)
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum FdbOptionTy {
+    Empty,
+    Int,
+    Str,
+    Bytes,
+}
+impl std::default::Default for FdbOptionTy {
+    fn default() -> Self {
+        FdbOptionTy::Empty
+    }
+}
+
+#[derive(Default, Debug)]
+struct FdbOption {
+    name: String,
+    code: i32,
+    param_type: FdbOptionTy,
+    param_description: String,
+    description: String,
+    hidden: bool,
+}
+
+impl FdbOption {
+    fn gen_ty(&self) -> String {
+        let mut s = String::new();
+
+        if !self.param_description.is_empty() {
+            s += "/// ";
+            s += &self.param_description;
+            s += "\n///\n";
+        }
+        if !self.description.is_empty() {
+            s += "/// ";
+            s += &self.description;
+            s += "\n";
+        }
+
+        s += &self.name;
+        if let Some(ty) = self.get_ty() {
+            s += "(";
+            s += ty;
+            s += ")";
+        }
+        s += ",\n";
+        s
+    }
+
+    fn get_ty(&self) -> Option<&'static str> {
+        match self.param_type {
+            FdbOptionTy::Int => Some("u32"),
+            FdbOptionTy::Str => Some("String"),
+            FdbOptionTy::Bytes => Some("Vec<u8>"),
+            FdbOptionTy::Empty => None,
+        }
+    }
+}
+
+impl From<Vec<OwnedAttribute>> for FdbOption {
+    fn from(attrs: Vec<OwnedAttribute>) -> Self {
+        let mut opt = Self::default();
+        for attr in attrs {
+            let v = attr.value;
+            match attr.name.local_name.as_str() {
+                "name" => {
+                    opt.name = classcase::to_class_case(&v);
+                }
+                "code" => {
+                    opt.code = v.parse().unwrap();
+                }
+                "paramType" => {
+                    opt.param_type = match v.as_str() {
+                        "Int" => FdbOptionTy::Int,
+                        "String" => FdbOptionTy::Str,
+                        "Bytes" => FdbOptionTy::Bytes,
+                        "" => FdbOptionTy::Empty,
+                        ty => panic!("unexpected param_type: {}", ty),
+                    };
+                }
+                "paramDescription" => {
+                    opt.param_description = v;
+                }
+                "description" => {
+                    opt.description = v;
+                }
+                "hidden" => match v.as_str() {
+                    "true" => opt.hidden = true,
+                    "false" => opt.hidden = false,
+                    _ => panic!("unexpected boolean value: {}", v),
+                },
+                attr => {
+                    panic!("unexpected option attribute: {}", attr);
+                }
+            }
+        }
+        opt
+    }
+}
+
+fn on_scope<I>(parser: &mut I) -> Result<Vec<FdbOption>>
+where
+    I: Iterator<Item = xml::reader::Result<XmlEvent>>,
+{
+    let mut options = Vec::new();
+    while let Some(e) = parser.next() {
+        let e = e?;
+        match e {
+            XmlEvent::StartElement {
+                name, attributes, ..
+            } => {
+                ensure!(name.local_name == "Option", "unexpected token");
+
+                let option = FdbOption::from(attributes);
+                options.push(option);
+            }
+            XmlEvent::EndElement { name, .. } => {
+                if name.local_name == "Scope" {
+                    return Ok(options);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    bail!("unexpected end of token");
+}
+
+fn run() -> Result<()> {
+    let data = include_bytes!("../fdb.options");
+    let mut reader = data.as_ref();
+    let parser = EventReader::new(&mut reader);
+    let mut iter = parser.into_iter();
+    let mut scopes = Vec::new();
+
+    while let Some(e) = iter.next() {
+        match e? {
+            XmlEvent::StartElement {
+                name, attributes, ..
+            } => {
+                if name.local_name == "Scope" {
+                    let scope_name = attributes
+                        .into_iter()
+                        .find(|attr| attr.name.local_name == "name")
+                        .unwrap();
+
+                    let options = on_scope(&mut iter)?;
+                    scopes.push(FdbScope {
+                        name: scope_name.value,
+                        options,
+                    });
+                }
+            }
+            XmlEvent::EndElement { .. } => {
+                //
+            }
+            _ => {}
+        }
+    }
+
+    println!("use std;");
+    println!("use error;");
+    println!("use foundationdb_sys as fdb;\n");
+
+    for scope in scopes.iter() {
+        println!("{}", scope.gen_ty());
+        println!("{}", scope.gen_impl());
+    }
+    Ok(())
+}
+
+fn main() {
+    run().expect("failed to run");
+}
