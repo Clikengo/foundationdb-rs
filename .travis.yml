@@ -37,7 +37,7 @@ before_install:
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then scripts/install_foundationdb_linux.sh ; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then scripts/install_foundationdb_macos.sh ; fi
   - if [[ "$RUSTFMT" == "true" ]]; then cargo install rustfmt-nightly --force ; fi
-  - if [[ "$CLIPPY" == "true" ]]; then cargo install clippy --force; fi
+  - if [[ "$CLIPPY" == "true" ]]; then cargo install clippy --force ; fi
 
 script:
   - cargo test --manifest-path foundationdb-sys/Cargo.toml --all-features
