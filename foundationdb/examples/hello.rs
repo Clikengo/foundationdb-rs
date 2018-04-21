@@ -1,7 +1,6 @@
 extern crate foundationdb;
 extern crate foundationdb_sys;
 extern crate futures;
-extern crate tokio_core;
 
 use std::sync::Arc;
 
@@ -396,8 +395,6 @@ fn example_get_multi() -> Box<Future<Item = (), Error = FdbError>> {
 }
 
 fn main() {
-    let mut core = tokio_core::reactor::Core::new().unwrap();
-
     let handle = unsafe {
         let version = fdb::fdb_get_max_api_version();
         let err = fdb::fdb_select_api_version_impl(version, version);
@@ -418,8 +415,8 @@ fn main() {
         })
     };
 
-    core.run(example_set_get()).expect("failed to run");
-    core.run(example_get_multi()).expect("failed to run");
+    example_set_get().wait().expect("failed to run");
+    example_get_multi().wait().expect("failed to run");
 
     unsafe {
         fdb::fdb_stop_network();
