@@ -3,10 +3,22 @@ use std::os::raw::c_int;
 use failure::Error;
 use foundationdb_sys as fdb;
 
-struct Context {}
+// The Fdb states that setting the Client version should happen only once
+//   and is not thread-safe, thus the choice of a lazy static enforcing a single
+//   init.
+lazy_static! {
+    // TODO: how should we allow multi-versions
+    static ref CONTEXT: Context = Context::new().expect("error initializing FoundationDB");
+}
+
+pub struct Context {}
 
 impl Context {
-    /// Defaults to current API version in the sys crate
+    /// Get the singleton context, initializes FoundationDB version.
+    pub fn get() -> &'static Context {
+        &CONTEXT
+    }
+
     fn new() -> Result<Self, Error> {
         Self::init(fdb::FDB_API_VERSION as i32, fdb::FDB_API_VERSION as i32)
     }
@@ -26,6 +38,10 @@ impl Context {
             }
         }
     }
+
+    pub fn get_max_api_version() -> i32 {
+        unsafe { fdb::fdb_get_max_api_version() as i32 }
+    }
 }
 
 #[cfg(test)]
@@ -33,6 +49,7 @@ mod tests {
     use super::*;
 
     fn test_init_context() {
-        Context::new().expect("failed to initialize context");
+        // checks that the initialization occured
+        Context::get();
     }
 }
