@@ -6,6 +6,7 @@ extern crate failure;
 type Result<T> = std::result::Result<T, failure::Error>;
 
 use inflector::cases::classcase;
+use inflector::cases::screamingsnakecase;
 use xml::attribute::OwnedAttribute;
 use xml::reader::{EventReader, XmlEvent};
 
@@ -46,18 +47,43 @@ impl FdbScope {
         s += &format!("pub fn code(&self) -> fdb::FDB{} {{\n", self.name);
         s += "match *self {\n";
 
+        let enum_prefix = self.c_enum_prefix();
+
         for option in self.options.iter() {
             s += &format!("{}::{}", self.name, option.name);
 
             if let Some(_ty) = option.get_ty() {
                 s += "(ref _v)"
             }
-            s += &format!(" => {},\n", option.code);
+
+            let mut enum_name = screamingsnakecase::to_screaming_snake_case(&option.name);
+            if self.name != "MutationType" {
+                enum_name = Self::fix_enum_name(&enum_name);
+            }
+
+            s += &format!(" => fdb::{}{},\n", enum_prefix, enum_name);
         }
 
         s += "}\n}\n";
 
         s
+    }
+
+    fn fix_enum_name(name: &str) -> String {
+        let tab = [
+            ("BYTE", "BYTES"),
+            ("WATCH", "WATCHES"),
+            ("PEER", "PEERS"),
+            ("THREAD", "THREADS"),
+            ("KEY", "KEYS"),
+        ];
+
+        for (ref from, ref to) in tab.iter() {
+            if name.ends_with(from) {
+                return format!("{}{}", &name[0..(name.len() - from.len())], to);
+            }
+        }
+        name.to_owned()
     }
 
     fn gen_apply(&self) -> String {
@@ -125,6 +151,20 @@ impl FdbScope {
         s += "}\n";
 
         s
+    }
+
+    fn c_enum_prefix(&self) -> &'static str {
+        match self.name.as_str() {
+            "NetworkOption" => "FDBNetworkOption_FDB_NET_OPTION_",
+            "ClusterOption" => "FDBClusterOption_FDB_CLUSTER_OPTION_",
+            "DatabaseOption" => "FDBDatabaseOption_FDB_DB_OPTION_",
+            "TransactionOption" => "FDBTransactionOption_FDB_TR_OPTION_",
+            "StreamingMode" => "FDBStreamingMode_FDB_STREAMING_MODE_",
+            "MutationType" => "FDBMutationType_FDB_MUTATION_TYPE_",
+            "ConflictRangeType" => "FDBConflictRangeType_FDB_CONFLICT_RANGE_TYPE_",
+            "ErrorPredicate" => "FDBErrorPredicate_FDB_ERROR_PREDICATE_",
+            ty => panic!("unknown Scope name: `{}`", ty),
+        }
     }
 
     fn apply_arg_name(&self) -> Option<&'static str> {
@@ -262,7 +302,9 @@ where
                 ensure!(name.local_name == "Option", "unexpected token");
 
                 let option = FdbOption::from(attributes);
-                options.push(option);
+                if !option.hidden {
+                    options.push(option);
+                }
             }
             XmlEvent::EndElement { name, .. } => {
                 if name.local_name == "Scope" {

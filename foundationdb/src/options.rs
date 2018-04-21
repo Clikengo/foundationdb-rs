@@ -83,48 +83,67 @@ pub enum NetworkOption {
     DisableClientStatisticsLogging,
     /// Enables debugging feature to perform slow task profiling. Requires trace logging to be enabled. WARNING: this feature is not recommended for use in production.
     EnableSlowTaskProfiling,
-    /// [release version],[source version],[protocol version];...
-    ///
-    /// This option is set automatically to communicate the list of supported clients to the active client.
-    SupportedClientVersion(String),
-    /// This option is set automatically on all clients loaded externally using the multi-version API.
-    ExternalClient,
-    /// Transport ID for the child connection
-    ///
-    /// This option tells a child on a multiversion client what transport ID to use.
-    ExternalClientTransportId(u32),
 }
 
 impl NetworkOption {
     pub fn code(&self) -> fdb::FDBNetworkOption {
         match *self {
-            NetworkOption::LocalAddress(ref _v) => 10,
-            NetworkOption::ClusterFile(ref _v) => 20,
-            NetworkOption::TraceEnable(ref _v) => 30,
-            NetworkOption::TraceRollSize(ref _v) => 31,
-            NetworkOption::TraceMaxLogsSize(ref _v) => 32,
-            NetworkOption::TraceLogGroup(ref _v) => 33,
-            NetworkOption::Knob(ref _v) => 40,
-            NetworkOption::TlsPlugin(ref _v) => 41,
-            NetworkOption::TlsCertByte(ref _v) => 42,
-            NetworkOption::TlsCertPath(ref _v) => 43,
-            NetworkOption::TlsKeyByte(ref _v) => 45,
-            NetworkOption::TlsKeyPath(ref _v) => 46,
-            NetworkOption::TlsVerifyPeer(ref _v) => 47,
-            NetworkOption::BuggifyEnable => 48,
-            NetworkOption::BuggifyDisable => 49,
-            NetworkOption::BuggifySectionActivatedProbability(ref _v) => 50,
-            NetworkOption::BuggifySectionFiredProbability(ref _v) => 51,
-            NetworkOption::DisableMultiVersionClientApi => 60,
-            NetworkOption::CallbacksOnExternalThread => 61,
-            NetworkOption::ExternalClientLibrary(ref _v) => 62,
-            NetworkOption::ExternalClientDirectory(ref _v) => 63,
-            NetworkOption::DisableLocalClient => 64,
-            NetworkOption::DisableClientStatisticsLogging => 70,
-            NetworkOption::EnableSlowTaskProfiling => 71,
-            NetworkOption::SupportedClientVersion(ref _v) => 1000,
-            NetworkOption::ExternalClient => 1001,
-            NetworkOption::ExternalClientTransportId(ref _v) => 1002,
+            NetworkOption::LocalAddress(ref _v) => {
+                fdb::FDBNetworkOption_FDB_NET_OPTION_LOCAL_ADDRESS
+            }
+            NetworkOption::ClusterFile(ref _v) => fdb::FDBNetworkOption_FDB_NET_OPTION_CLUSTER_FILE,
+            NetworkOption::TraceEnable(ref _v) => fdb::FDBNetworkOption_FDB_NET_OPTION_TRACE_ENABLE,
+            NetworkOption::TraceRollSize(ref _v) => {
+                fdb::FDBNetworkOption_FDB_NET_OPTION_TRACE_ROLL_SIZE
+            }
+            NetworkOption::TraceMaxLogsSize(ref _v) => {
+                fdb::FDBNetworkOption_FDB_NET_OPTION_TRACE_MAX_LOGS_SIZE
+            }
+            NetworkOption::TraceLogGroup(ref _v) => {
+                fdb::FDBNetworkOption_FDB_NET_OPTION_TRACE_LOG_GROUP
+            }
+            NetworkOption::Knob(ref _v) => fdb::FDBNetworkOption_FDB_NET_OPTION_KNOB,
+            NetworkOption::TlsPlugin(ref _v) => fdb::FDBNetworkOption_FDB_NET_OPTION_TLS_PLUGIN,
+            NetworkOption::TlsCertByte(ref _v) => {
+                fdb::FDBNetworkOption_FDB_NET_OPTION_TLS_CERT_BYTES
+            }
+            NetworkOption::TlsCertPath(ref _v) => {
+                fdb::FDBNetworkOption_FDB_NET_OPTION_TLS_CERT_PATH
+            }
+            NetworkOption::TlsKeyByte(ref _v) => fdb::FDBNetworkOption_FDB_NET_OPTION_TLS_KEY_BYTES,
+            NetworkOption::TlsKeyPath(ref _v) => fdb::FDBNetworkOption_FDB_NET_OPTION_TLS_KEY_PATH,
+            NetworkOption::TlsVerifyPeer(ref _v) => {
+                fdb::FDBNetworkOption_FDB_NET_OPTION_TLS_VERIFY_PEERS
+            }
+            NetworkOption::BuggifyEnable => fdb::FDBNetworkOption_FDB_NET_OPTION_BUGGIFY_ENABLE,
+            NetworkOption::BuggifyDisable => fdb::FDBNetworkOption_FDB_NET_OPTION_BUGGIFY_DISABLE,
+            NetworkOption::BuggifySectionActivatedProbability(ref _v) => {
+                fdb::FDBNetworkOption_FDB_NET_OPTION_BUGGIFY_SECTION_ACTIVATED_PROBABILITY
+            }
+            NetworkOption::BuggifySectionFiredProbability(ref _v) => {
+                fdb::FDBNetworkOption_FDB_NET_OPTION_BUGGIFY_SECTION_FIRED_PROBABILITY
+            }
+            NetworkOption::DisableMultiVersionClientApi => {
+                fdb::FDBNetworkOption_FDB_NET_OPTION_DISABLE_MULTI_VERSION_CLIENT_API
+            }
+            NetworkOption::CallbacksOnExternalThread => {
+                fdb::FDBNetworkOption_FDB_NET_OPTION_CALLBACKS_ON_EXTERNAL_THREADS
+            }
+            NetworkOption::ExternalClientLibrary(ref _v) => {
+                fdb::FDBNetworkOption_FDB_NET_OPTION_EXTERNAL_CLIENT_LIBRARY
+            }
+            NetworkOption::ExternalClientDirectory(ref _v) => {
+                fdb::FDBNetworkOption_FDB_NET_OPTION_EXTERNAL_CLIENT_DIRECTORY
+            }
+            NetworkOption::DisableLocalClient => {
+                fdb::FDBNetworkOption_FDB_NET_OPTION_DISABLE_LOCAL_CLIENT
+            }
+            NetworkOption::DisableClientStatisticsLogging => {
+                fdb::FDBNetworkOption_FDB_NET_OPTION_DISABLE_CLIENT_STATISTICS_LOGGING
+            }
+            NetworkOption::EnableSlowTaskProfiling => {
+                fdb::FDBNetworkOption_FDB_NET_OPTION_ENABLE_SLOW_TASK_PROFILING
+            }
         }
     }
     pub unsafe fn apply(&self) -> std::result::Result<(), error::FdbError> {
@@ -202,14 +221,6 @@ impl NetworkOption {
             NetworkOption::EnableSlowTaskProfiling => {
                 fdb::fdb_network_set_option(code, std::ptr::null(), 0)
             }
-            NetworkOption::SupportedClientVersion(ref v) => {
-                fdb::fdb_network_set_option(code, v.as_ptr() as *const u8, v.len() as i32)
-            }
-            NetworkOption::ExternalClient => fdb::fdb_network_set_option(code, std::ptr::null(), 0),
-            NetworkOption::ExternalClientTransportId(v) => {
-                let data: [u8; 8] = std::mem::transmute(v as i64);
-                fdb::fdb_network_set_option(code, data.as_ptr() as *const u8, 8)
-            }
         };
         if err != 0 {
             Err(error::FdbError::from(err))
@@ -241,10 +252,14 @@ pub enum DatabaseOption {
 impl DatabaseOption {
     pub fn code(&self) -> fdb::FDBDatabaseOption {
         match *self {
-            DatabaseOption::LocationCacheSize(ref _v) => 10,
-            DatabaseOption::MaxWatch(ref _v) => 20,
-            DatabaseOption::MachineId(ref _v) => 21,
-            DatabaseOption::DatacenterId(ref _v) => 22,
+            DatabaseOption::LocationCacheSize(ref _v) => {
+                fdb::FDBDatabaseOption_FDB_DB_OPTION_LOCATION_CACHE_SIZE
+            }
+            DatabaseOption::MaxWatch(ref _v) => fdb::FDBDatabaseOption_FDB_DB_OPTION_MAX_WATCHES,
+            DatabaseOption::MachineId(ref _v) => fdb::FDBDatabaseOption_FDB_DB_OPTION_MACHINE_ID,
+            DatabaseOption::DatacenterId(ref _v) => {
+                fdb::FDBDatabaseOption_FDB_DB_OPTION_DATACENTER_ID
+            }
         }
     }
     pub unsafe fn apply(
@@ -339,33 +354,81 @@ pub enum TransactionOption {
 impl TransactionOption {
     pub fn code(&self) -> fdb::FDBTransactionOption {
         match *self {
-            TransactionOption::CausalWriteRisky => 10,
-            TransactionOption::CausalReadRisky => 20,
-            TransactionOption::CausalReadDisable => 21,
-            TransactionOption::NextWriteNoWriteConflictRange => 30,
-            TransactionOption::CommitOnFirstProxy => 40,
-            TransactionOption::CheckWritesEnable => 50,
-            TransactionOption::ReadYourWritesDisable => 51,
-            TransactionOption::ReadAheadDisable => 52,
-            TransactionOption::DurabilityDatacenter => 110,
-            TransactionOption::DurabilityRisky => 120,
-            TransactionOption::DurabilityDevNullIsWebScale => 130,
-            TransactionOption::PrioritySystemImmediate => 200,
-            TransactionOption::PriorityBatch => 201,
-            TransactionOption::InitializeNewDatabase => 300,
-            TransactionOption::AccessSystemKey => 301,
-            TransactionOption::ReadSystemKey => 302,
-            TransactionOption::DebugDump => 400,
-            TransactionOption::DebugRetryLogging(ref _v) => 401,
-            TransactionOption::TransactionLoggingEnable(ref _v) => 402,
-            TransactionOption::Timeout(ref _v) => 500,
-            TransactionOption::RetryLimit(ref _v) => 501,
-            TransactionOption::MaxRetryDelay(ref _v) => 502,
-            TransactionOption::SnapshotRywEnable => 600,
-            TransactionOption::SnapshotRywDisable => 601,
-            TransactionOption::LockAware => 700,
-            TransactionOption::UsedDuringCommitProtectionDisable => 701,
-            TransactionOption::ReadLockAware => 702,
+            TransactionOption::CausalWriteRisky => {
+                fdb::FDBTransactionOption_FDB_TR_OPTION_CAUSAL_WRITE_RISKY
+            }
+            TransactionOption::CausalReadRisky => {
+                fdb::FDBTransactionOption_FDB_TR_OPTION_CAUSAL_READ_RISKY
+            }
+            TransactionOption::CausalReadDisable => {
+                fdb::FDBTransactionOption_FDB_TR_OPTION_CAUSAL_READ_DISABLE
+            }
+            TransactionOption::NextWriteNoWriteConflictRange => {
+                fdb::FDBTransactionOption_FDB_TR_OPTION_NEXT_WRITE_NO_WRITE_CONFLICT_RANGE
+            }
+            TransactionOption::CommitOnFirstProxy => {
+                fdb::FDBTransactionOption_FDB_TR_OPTION_COMMIT_ON_FIRST_PROXY
+            }
+            TransactionOption::CheckWritesEnable => {
+                fdb::FDBTransactionOption_FDB_TR_OPTION_CHECK_WRITES_ENABLE
+            }
+            TransactionOption::ReadYourWritesDisable => {
+                fdb::FDBTransactionOption_FDB_TR_OPTION_READ_YOUR_WRITES_DISABLE
+            }
+            TransactionOption::ReadAheadDisable => {
+                fdb::FDBTransactionOption_FDB_TR_OPTION_READ_AHEAD_DISABLE
+            }
+            TransactionOption::DurabilityDatacenter => {
+                fdb::FDBTransactionOption_FDB_TR_OPTION_DURABILITY_DATACENTER
+            }
+            TransactionOption::DurabilityRisky => {
+                fdb::FDBTransactionOption_FDB_TR_OPTION_DURABILITY_RISKY
+            }
+            TransactionOption::DurabilityDevNullIsWebScale => {
+                fdb::FDBTransactionOption_FDB_TR_OPTION_DURABILITY_DEV_NULL_IS_WEB_SCALE
+            }
+            TransactionOption::PrioritySystemImmediate => {
+                fdb::FDBTransactionOption_FDB_TR_OPTION_PRIORITY_SYSTEM_IMMEDIATE
+            }
+            TransactionOption::PriorityBatch => {
+                fdb::FDBTransactionOption_FDB_TR_OPTION_PRIORITY_BATCH
+            }
+            TransactionOption::InitializeNewDatabase => {
+                fdb::FDBTransactionOption_FDB_TR_OPTION_INITIALIZE_NEW_DATABASE
+            }
+            TransactionOption::AccessSystemKey => {
+                fdb::FDBTransactionOption_FDB_TR_OPTION_ACCESS_SYSTEM_KEYS
+            }
+            TransactionOption::ReadSystemKey => {
+                fdb::FDBTransactionOption_FDB_TR_OPTION_READ_SYSTEM_KEYS
+            }
+            TransactionOption::DebugDump => fdb::FDBTransactionOption_FDB_TR_OPTION_DEBUG_DUMP,
+            TransactionOption::DebugRetryLogging(ref _v) => {
+                fdb::FDBTransactionOption_FDB_TR_OPTION_DEBUG_RETRY_LOGGING
+            }
+            TransactionOption::TransactionLoggingEnable(ref _v) => {
+                fdb::FDBTransactionOption_FDB_TR_OPTION_TRANSACTION_LOGGING_ENABLE
+            }
+            TransactionOption::Timeout(ref _v) => fdb::FDBTransactionOption_FDB_TR_OPTION_TIMEOUT,
+            TransactionOption::RetryLimit(ref _v) => {
+                fdb::FDBTransactionOption_FDB_TR_OPTION_RETRY_LIMIT
+            }
+            TransactionOption::MaxRetryDelay(ref _v) => {
+                fdb::FDBTransactionOption_FDB_TR_OPTION_MAX_RETRY_DELAY
+            }
+            TransactionOption::SnapshotRywEnable => {
+                fdb::FDBTransactionOption_FDB_TR_OPTION_SNAPSHOT_RYW_ENABLE
+            }
+            TransactionOption::SnapshotRywDisable => {
+                fdb::FDBTransactionOption_FDB_TR_OPTION_SNAPSHOT_RYW_DISABLE
+            }
+            TransactionOption::LockAware => fdb::FDBTransactionOption_FDB_TR_OPTION_LOCK_AWARE,
+            TransactionOption::UsedDuringCommitProtectionDisable => {
+                fdb::FDBTransactionOption_FDB_TR_OPTION_USED_DURING_COMMIT_PROTECTION_DISABLE
+            }
+            TransactionOption::ReadLockAware => {
+                fdb::FDBTransactionOption_FDB_TR_OPTION_READ_LOCK_AWARE
+            }
         }
     }
     pub unsafe fn apply(
@@ -493,13 +556,13 @@ pub enum StreamingMode {
 impl StreamingMode {
     pub fn code(&self) -> fdb::FDBStreamingMode {
         match *self {
-            StreamingMode::WantAll => -2,
-            StreamingMode::Iterator => -1,
-            StreamingMode::Exact => 0,
-            StreamingMode::Small => 1,
-            StreamingMode::Medium => 2,
-            StreamingMode::Large => 3,
-            StreamingMode::Serial => 4,
+            StreamingMode::WantAll => fdb::FDBStreamingMode_FDB_STREAMING_MODE_WANT_ALL,
+            StreamingMode::Iterator => fdb::FDBStreamingMode_FDB_STREAMING_MODE_ITERATOR,
+            StreamingMode::Exact => fdb::FDBStreamingMode_FDB_STREAMING_MODE_EXACT,
+            StreamingMode::Small => fdb::FDBStreamingMode_FDB_STREAMING_MODE_SMALL,
+            StreamingMode::Medium => fdb::FDBStreamingMode_FDB_STREAMING_MODE_MEDIUM,
+            StreamingMode::Large => fdb::FDBStreamingMode_FDB_STREAMING_MODE_LARGE,
+            StreamingMode::Serial => fdb::FDBStreamingMode_FDB_STREAMING_MODE_SERIAL,
         }
     }
 }
@@ -562,19 +625,23 @@ pub enum MutationType {
 impl MutationType {
     pub fn code(&self) -> fdb::FDBMutationType {
         match *self {
-            MutationType::Add(ref _v) => 2,
-            MutationType::And(ref _v) => 6,
-            MutationType::BitAnd(ref _v) => 6,
-            MutationType::Or(ref _v) => 7,
-            MutationType::BitOr(ref _v) => 7,
-            MutationType::Xor(ref _v) => 8,
-            MutationType::BitXor(ref _v) => 8,
-            MutationType::Max(ref _v) => 12,
-            MutationType::Min(ref _v) => 13,
-            MutationType::SetVersionstampedKey(ref _v) => 14,
-            MutationType::SetVersionstampedValue(ref _v) => 15,
-            MutationType::ByteMin(ref _v) => 16,
-            MutationType::ByteMax(ref _v) => 17,
+            MutationType::Add(ref _v) => fdb::FDBMutationType_FDB_MUTATION_TYPE_ADD,
+            MutationType::And(ref _v) => fdb::FDBMutationType_FDB_MUTATION_TYPE_AND,
+            MutationType::BitAnd(ref _v) => fdb::FDBMutationType_FDB_MUTATION_TYPE_BIT_AND,
+            MutationType::Or(ref _v) => fdb::FDBMutationType_FDB_MUTATION_TYPE_OR,
+            MutationType::BitOr(ref _v) => fdb::FDBMutationType_FDB_MUTATION_TYPE_BIT_OR,
+            MutationType::Xor(ref _v) => fdb::FDBMutationType_FDB_MUTATION_TYPE_XOR,
+            MutationType::BitXor(ref _v) => fdb::FDBMutationType_FDB_MUTATION_TYPE_BIT_XOR,
+            MutationType::Max(ref _v) => fdb::FDBMutationType_FDB_MUTATION_TYPE_MAX,
+            MutationType::Min(ref _v) => fdb::FDBMutationType_FDB_MUTATION_TYPE_MIN,
+            MutationType::SetVersionstampedKey(ref _v) => {
+                fdb::FDBMutationType_FDB_MUTATION_TYPE_SET_VERSIONSTAMPED_KEY
+            }
+            MutationType::SetVersionstampedValue(ref _v) => {
+                fdb::FDBMutationType_FDB_MUTATION_TYPE_SET_VERSIONSTAMPED_VALUE
+            }
+            MutationType::ByteMin(ref _v) => fdb::FDBMutationType_FDB_MUTATION_TYPE_BYTE_MIN,
+            MutationType::ByteMax(ref _v) => fdb::FDBMutationType_FDB_MUTATION_TYPE_BYTE_MAX,
         }
     }
 }
@@ -589,8 +656,8 @@ pub enum ConflictRangeType {
 impl ConflictRangeType {
     pub fn code(&self) -> fdb::FDBConflictRangeType {
         match *self {
-            ConflictRangeType::Read => 0,
-            ConflictRangeType::Write => 1,
+            ConflictRangeType::Read => fdb::FDBConflictRangeType_FDB_CONFLICT_RANGE_TYPE_READ,
+            ConflictRangeType::Write => fdb::FDBConflictRangeType_FDB_CONFLICT_RANGE_TYPE_WRITE,
         }
     }
 }
@@ -607,9 +674,13 @@ pub enum ErrorPredicate {
 impl ErrorPredicate {
     pub fn code(&self) -> fdb::FDBErrorPredicate {
         match *self {
-            ErrorPredicate::Retryable => 50000,
-            ErrorPredicate::MaybeCommitted => 50001,
-            ErrorPredicate::RetryableNotCommitted => 50002,
+            ErrorPredicate::Retryable => fdb::FDBErrorPredicate_FDB_ERROR_PREDICATE_RETRYABLE,
+            ErrorPredicate::MaybeCommitted => {
+                fdb::FDBErrorPredicate_FDB_ERROR_PREDICATE_MAYBE_COMMITTED
+            }
+            ErrorPredicate::RetryableNotCommitted => {
+                fdb::FDBErrorPredicate_FDB_ERROR_PREDICATE_RETRYABLE_NOT_COMMITTED
+            }
         }
     }
 }
