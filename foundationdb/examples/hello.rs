@@ -38,8 +38,17 @@ fn example_set_get() -> Box<Future<Item = (), Error = FdbError>> {
     Box::new(fut)
 }
 
+#[cfg(target_os = "linux")]
+fn default_config_path() -> &'static str {
+    "/etc/foundationdb/fdb.cluster"
+}
+#[cfg(target_os = "macos")]
+fn default_config_path() -> &'static str {
+    "/usr/local/etc/foundationdb/fdb.cluster"
+}
+
 fn example_get_multi() -> Box<Future<Item = (), Error = FdbError>> {
-    let fut = Cluster::new("/etc/foundationdb/fdb.cluster")
+    let fut = Cluster::new(default_config_path())
         .and_then(|cluster| cluster.create_database())
         .and_then(|db| result(db.create_trx()))
         .and_then(|trx| {
