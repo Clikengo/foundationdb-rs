@@ -3,7 +3,7 @@ use std;
 use std::sync::Arc;
 
 use cluster::*;
-use error::*;
+use error::{self, *};
 use transaction::*;
 
 #[derive(Clone)]
@@ -19,10 +19,10 @@ impl Database {
     pub fn create_trx(&self) -> Result<Transaction> {
         unsafe {
             let mut trx: *mut fdb::FDBTransaction = std::ptr::null_mut();
-            let err = fdb::fdb_database_create_transaction(self.inner.inner, &mut trx as *mut _);
-            if err != 0 {
-                return Err(FdbError::from(err));
-            }
+            error::eval(fdb::fdb_database_create_transaction(
+                self.inner.inner,
+                &mut trx as *mut _,
+            ))?;
             Ok(Transaction::new(self.clone(), trx))
         }
     }

@@ -4,6 +4,15 @@ use std::ffi::CStr;
 
 use foundationdb_sys as fdb;
 
+pub(crate) fn eval(error_code: fdb::fdb_error_t) -> Result<()> {
+    let rust_code = error_code as i32;
+    if rust_code == 0 {
+        Ok(())
+    } else {
+        Err(FdbError::from(error_code))
+    }
+}
+
 #[derive(Debug, Fail)]
 #[fail(display = "FoundationDB error({}): {}", error_code, error_str)]
 pub struct FdbError {

@@ -1,6 +1,4 @@
-use std::os::raw::c_int;
-
-use failure::Error;
+use error::{self, Result};
 use foundationdb_sys as fdb;
 
 // The Fdb states that setting the Client version should happen only once
@@ -19,24 +17,19 @@ impl Context {
         &CONTEXT
     }
 
-    fn new() -> Result<Self, Error> {
+    fn new() -> Result<Self> {
         Self::init(fdb::FDB_API_VERSION as i32, fdb::FDB_API_VERSION as i32)
     }
 
-    fn init(runtime_version: i32, header_version: i32) -> Result<Self, Error> {
+    fn init(runtime_version: i32, header_version: i32) -> Result<Self> {
         unsafe {
-            let error_code = fdb::fdb_select_api_version_impl(runtime_version, header_version);
-            if error_code != 0 {
-                Err(format_err!(
-                    "invalid runtime_version: {} or header_version: {} code: {}",
-                    runtime_version,
-                    header_version,
-                    error_code
-                ))
-            } else {
-                Ok(Context {})
-            }
+            error::eval(fdb::fdb_select_api_version_impl(
+                runtime_version,
+                header_version,
+            ))?;
         }
+
+        Ok(Context {})
     }
 
     pub fn get_max_api_version() -> i32 {
@@ -48,6 +41,7 @@ impl Context {
 mod tests {
     use super::*;
 
+    #[test]
     fn test_init_context() {
         // checks that the initialization occured
         Context::get();
