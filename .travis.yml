@@ -43,5 +43,6 @@ script:
   - cargo test --manifest-path foundationdb-sys/Cargo.toml --all-features
   - cargo test --manifest-path foundationdb-gen/Cargo.toml --all-features
   - cargo test --manifest-path foundationdb/Cargo.toml --all-features
+  - cargo run --manifest-path foundationdb/Cargo.toml --all-features --example hello
 
 # after_success: cargo kcov here...
