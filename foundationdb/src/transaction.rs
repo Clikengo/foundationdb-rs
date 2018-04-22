@@ -118,7 +118,6 @@ pub struct TrxCommit {
     inner: FdbFuture,
 }
 impl Future for TrxCommit {
-    //should be ()?
     type Item = Transaction;
     type Error = FdbError;
 
