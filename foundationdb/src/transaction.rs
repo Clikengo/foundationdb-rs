@@ -16,7 +16,7 @@ use std;
 use std::sync::Arc;
 
 use database::*;
-use error::*;
+use error::{self, *};
 use future::*;
 use options;
 
@@ -131,6 +131,71 @@ impl Transaction {
             inner: f,
         }
     }
+
+    /// Cancels the transaction. All pending or future uses of the transaction will return a
+    /// transaction_cancelled error. The transaction can be used again after it is reset.
+    ///
+    /// # Warning
+    ///
+    /// * Be careful if you are using fdb_transaction_reset() and fdb_transaction_cancel()
+    /// concurrently with the same transaction. Since they negate each other’s effects, a race
+    /// condition between these calls will leave the transaction in an unknown state.
+    ///
+    /// * If your program attempts to cancel a transaction after fdb_transaction_commit() has been
+    /// called but before it returns, unpredictable behavior will result. While it is guaranteed
+    /// that the transaction will eventually end up in a cancelled state, the commit may or may not
+    /// occur. Moreover, even if the call to fdb_transaction_commit() appears to return a
+    /// transaction_cancelled error, the commit may have occurred or may occur in the future. This
+    /// can make it more difficult to reason about the order in which transactions occur.
+    pub fn cancel(self) {
+        let trx = self.inner.inner;
+        unsafe { fdb::fdb_transaction_cancel(trx) }
+    }
+
+    /// Retrieves the database version number at which a given transaction was committed.
+    /// fdb_transaction_commit() must have been called on transaction and the resulting future must
+    /// be ready and not an error before this function is called, or the behavior is undefined.
+    /// Read-only transactions do not modify the database when committed and will have a committed
+    /// version of -1. Keep in mind that a transaction which reads keys and then sets them to their
+    /// current values may be optimized to a read-only transaction.
+    ///
+    /// Note that database versions are not necessarily unique to a given transaction and so cannot
+    /// be used to determine in what order two transactions completed. The only use for this
+    /// function is to manually enforce causal consistency when calling
+    /// fdb_transaction_set_read_version() on another subsequent transaction.
+    ///
+    /// Most applications will not call this function.
+    pub fn committed_version(&self) -> Result<i64> {
+        let trx = self.inner.inner;
+
+        let mut version: i64 = 0;
+        let e = unsafe { fdb::fdb_transaction_get_committed_version(trx, &mut version as *mut _) };
+        error::eval(e)?;
+        Ok(version)
+    }
+
+    /// Returns a list of public network addresses as strings, one for each of the storage servers
+    /// responsible for storing key_name and its associated value.
+    ///
+    /// Returns an FDBFuture which will be set to an array of strings. You must first wait for the
+    /// FDBFuture to be ready, check for errors, call fdb_future_get_string_array() to extract the
+    /// string array, and then destroy the FDBFuture with fdb_future_destroy().
+    pub fn get_addresses_for_key(&self, key: &[u8]) -> TrxGetAddressesForKey {
+        let trx = self.inner.inner;
+
+        let f = unsafe {
+            fdb::fdb_transaction_get_addresses_for_key(
+                trx,
+                key.as_ptr() as *const _,
+                key.len() as i32,
+            )
+        };
+        let f = FdbFuture::new(f);
+        TrxGetAddressesForKey {
+            trx: self.clone(),
+            inner: f,
+        }
+    }
 }
 
 struct TransactionInner {
@@ -202,6 +267,44 @@ impl Future for TrxCommit {
             Ok(Async::Ready(_r)) => Ok(Async::Ready(
                 self.trx.take().expect("should not poll after ready"),
             )),
+            Ok(Async::NotReady) => Ok(Async::NotReady),
+            Err(e) => Err(e),
+        }
+    }
+}
+
+/// Represents the data of a `Transaction::get_addresses_for_key`
+pub struct GetAddressResult {
+    trx: Transaction,
+    inner: FdbFutureResult,
+}
+impl GetAddressResult {
+    /// Returns a clone of the Transaction this get is a part of
+    pub fn transaction(&self) -> Transaction {
+        self.trx.clone()
+    }
+
+    /// Returns the addresses for the key
+    pub fn address(&self) -> Result<Vec<&[u8]>> {
+        self.inner.get_string_array()
+    }
+}
+
+/// A future result of a `Transaction::get_addresses_for_key`
+pub struct TrxGetAddressesForKey {
+    trx: Transaction,
+    inner: FdbFuture,
+}
+impl Future for TrxGetAddressesForKey {
+    type Item = GetAddressResult;
+    type Error = FdbError;
+
+    fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
+        match self.inner.poll() {
+            Ok(Async::Ready(r)) => Ok(Async::Ready(GetAddressResult {
+                trx: self.trx.clone(),
+                inner: r,
+            })),
             Ok(Async::NotReady) => Ok(Async::NotReady),
             Err(e) => Err(e),
         }
