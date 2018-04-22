@@ -78,7 +78,7 @@ impl FdbScope {
             ("KEY", "KEYS"),
         ];
 
-        for (ref from, ref to) in tab.iter() {
+        for &(ref from, ref to) in tab.iter() {
             if name.ends_with(from) {
                 return format!("{}{}", &name[0..(name.len() - from.len())], to);
             }
