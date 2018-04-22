@@ -23,6 +23,10 @@ impl futures::Future for FdbFuture {
     type Error = FdbError;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
+        if self.f == std::ptr::null_mut() {
+            panic!("cannot poll after resolve")
+        }
+
         if self.task.is_none() {
             let task = futures::task::current();
             let task = Box::new(task);
@@ -45,6 +49,7 @@ impl futures::Future for FdbFuture {
             return Err(FdbError::from(err));
         }
 
+        // The result is taking ownership of fdb::FDBFuture
         let g = FdbFutureResult::new(self.f);
         self.f = std::ptr::null_mut();
 
@@ -52,6 +57,8 @@ impl futures::Future for FdbFuture {
     }
 }
 
+// The callback from fdb C API can be called from multiple threads. so this callback should be
+// thread-safe.
 extern "C" fn fdb_future_callback(
     _f: *mut fdb::FDBFuture,
     callback_parameter: *mut ::std::os::raw::c_void,
@@ -105,6 +112,10 @@ impl FdbFutureResult {
         if present == 0 {
             return Ok(None);
         }
+
+        // A value from `fdb_future_get_value` will alive until `fdb_future_destroy` is called and
+        // `fdb_future_destory` is called on `Self::drop`, so a lifetime of the value matches with
+        // `self`
         let slice = unsafe { std::slice::from_raw_parts(out_value, out_len as usize) };
         Ok(Some(slice))
     }

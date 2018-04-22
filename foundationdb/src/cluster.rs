@@ -54,6 +54,7 @@ impl Future for ClusterGet {
     }
 }
 
+//TODO: should check if `fdb::FDBCluster` is thread-safe.
 struct ClusterInner {
     inner: *mut fdb::FDBCluster,
 }
