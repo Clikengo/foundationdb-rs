@@ -1,4 +1,5 @@
 use options;
+use std;
 use std::ffi::CStr;
 
 use foundationdb_sys as fdb;
@@ -9,6 +10,8 @@ pub struct FdbError {
     error_code: i32,
     error_str: &'static str,
 }
+
+pub type Result<T> = std::result::Result<T, FdbError>;
 
 impl FdbError {
     pub fn from(error_code: fdb::fdb_error_t) -> Self {

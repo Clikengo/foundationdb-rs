@@ -16,7 +16,5 @@ license = "MIT/Apache-2.0"
 failure = "0.1"
 failure_derive = "0.1"
 foundationdb-sys = { version = "0.0.2", path = "../foundationdb-sys" }
-lazy_static = "1.0"
-
-[dev-dependencies]
 futures = "0.1"
+lazy_static = "1.0"
