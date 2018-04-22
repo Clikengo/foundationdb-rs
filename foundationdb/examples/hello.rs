@@ -1,3 +1,10 @@
+// Copyright 2018 foundationdb-rs developers, https://github.com/bluejekyll/foundationdb-rs/graphs/contributors
+//
+// Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
+// http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
+// http://opensource.org/licenses/MIT>, at your option. This file may not be
+// copied, modified, or distributed except according to those terms.
+
 extern crate foundationdb;
 extern crate foundationdb_sys;
 extern crate futures;
@@ -8,18 +15,9 @@ use futures::future::*;
 
 use error::FdbError;
 
-#[cfg(target_os = "linux")]
-fn default_config_path() -> &'static str {
-    "/etc/foundationdb/fdb.cluster"
-}
-#[cfg(target_os = "macos")]
-fn default_config_path() -> &'static str {
-    "/usr/local/etc/foundationdb/fdb.cluster"
-}
-
 //TODO: impl Future
 fn example_set_get() -> Box<Future<Item = (), Error = FdbError>> {
-    let fut = Cluster::new(default_config_path())
+    let fut = Cluster::new(foundationdb::default_config_path())
         .and_then(|cluster| cluster.create_database())
         .and_then(|db| result(db.create_trx()))
         .and_then(|trx| {
@@ -47,7 +45,7 @@ fn example_set_get() -> Box<Future<Item = (), Error = FdbError>> {
 }
 
 fn example_get_multi() -> Box<Future<Item = (), Error = FdbError>> {
-    let fut = Cluster::new(default_config_path())
+    let fut = Cluster::new(foundationdb::default_config_path())
         .and_then(|cluster| cluster.create_database())
         .and_then(|db| result(db.create_trx()))
         .and_then(|trx| {
