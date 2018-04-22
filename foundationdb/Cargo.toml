@@ -12,6 +12,14 @@ This is in progress and under active development.
 repository = "https://github.com/bluejekyll/foundationdb-rs"
 license = "MIT/Apache-2.0"
 
+readme = "README.md"
+keywords = ["foundationdb", "kv"]
+categories = ["database"]
+
+[badges]
+travis-ci = { repository = "bluejekyll/foundationdb-rs" }
+# codecov = { repository = "bluejekyll/foundationdb-rs", branch = "master", service = "github" }
+
 [dependencies]
 failure = "0.1"
 failure_derive = "0.1"
