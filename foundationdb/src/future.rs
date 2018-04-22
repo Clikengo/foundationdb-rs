@@ -82,6 +82,44 @@ extern "C" fn fdb_future_callback(
     task.notify();
 }
 
+/// Represents the output of fdb_future_get_keyvalue_array().
+pub struct KeyValues<'a> {
+    keyvalues: &'a [KeyValue<'a>],
+    more: bool,
+}
+impl<'a> KeyValues<'a> {
+    /// Returns true if (but not necessarily only if) values remain in the key range requested
+    /// (possibly beyond the limits requested).
+    pub fn more(&self) -> bool {
+        self.more
+    }
+}
+impl<'a> AsRef<[KeyValue<'a>]> for KeyValues<'a> {
+    fn as_ref(&self) -> &[KeyValue<'a>] {
+        self.keyvalues
+    }
+}
+
+/// Represents a single key-value pair in the output of fdb_future_get_keyvalue_array().
+#[repr(C)]
+pub struct KeyValue<'a> {
+    key: *const u8,
+    key_len: u32,
+    value: *const u8,
+    value_len: u32,
+    _dummy: std::marker::PhantomData<&'a u8>,
+}
+impl<'a> KeyValue<'a> {
+    /// key
+    pub fn key(&'a self) -> &'a [u8] {
+        unsafe { std::slice::from_raw_parts(self.key, self.key_len as usize) }
+    }
+    /// value
+    pub fn value(&'a self) -> &'a [u8] {
+        unsafe { std::slice::from_raw_parts(self.value, self.value_len as usize) }
+    }
+}
+
 /// The Result of an FdbFuture from which query results can be gottent, etc.
 pub struct FdbFutureResult {
     f: *mut fdb::FDBFuture,
@@ -101,6 +139,26 @@ impl FdbFutureResult {
         let mut v: *mut fdb::FDBDatabase = std::ptr::null_mut();
         error::eval(fdb::fdb_future_get_database(self.f, &mut v as *mut _))?;
         Ok(v)
+    }
+
+    #[allow(unused)]
+    pub(crate) fn get_key<'a>(&'a self) -> Result<Option<&'a [u8]>> {
+        let mut out_value = std::ptr::null();
+        let mut out_len = 0;
+
+        unsafe {
+            error::eval(fdb::fdb_future_get_key(
+                self.f,
+                &mut out_value as *mut _,
+                &mut out_len as *mut _,
+            ))?
+        }
+
+        // A value from `fdb_future_get_value` will alive until `fdb_future_destroy` is called and
+        // `fdb_future_destory` is called on `Self::drop`, so a lifetime of the value matches with
+        // `self`
+        let slice = unsafe { std::slice::from_raw_parts(out_value, out_len as usize) };
+        Ok(Some(slice))
     }
 
     pub(crate) fn get_value<'a>(&'a self) -> Result<Option<&'a [u8]>> {
@@ -126,6 +184,58 @@ impl FdbFutureResult {
         // `self`
         let slice = unsafe { std::slice::from_raw_parts(out_value, out_len as usize) };
         Ok(Some(slice))
+    }
+
+    #[allow(unused)]
+    pub(crate) fn get_string_array(&self) -> Result<Vec<&[u8]>> {
+        use std::os::raw::c_char;
+
+        let mut out_strings: *mut *const c_char = std::ptr::null_mut();
+        let mut out_len = 0;
+
+        unsafe {
+            error::eval(fdb::fdb_future_get_string_array(
+                self.f,
+                &mut out_strings as *mut _,
+                &mut out_len as *mut _,
+            ))?
+        }
+
+        let out_len = out_len as usize;
+        let out_strings: &[*const c_char] =
+            unsafe { std::slice::from_raw_parts(out_strings, out_len) };
+
+        let mut v = Vec::with_capacity(out_len);
+        for i in 0..out_len {
+            let cstr = unsafe { std::ffi::CStr::from_ptr(out_strings[i]) };
+            v.push(cstr.to_bytes());
+        }
+        Ok(v)
+    }
+
+    #[allow(unused)]
+    pub(crate) fn get_keyvalue_array<'a>(&'a self) -> Result<KeyValues<'a>> {
+        let mut out_keyvalues = std::ptr::null();
+        let mut out_len = 0;
+        let mut more = 0;
+
+        unsafe {
+            error::eval(fdb::fdb_future_get_keyvalue_array(
+                self.f,
+                &mut out_keyvalues as *mut _,
+                &mut out_len as *mut _,
+                &mut more as *mut _,
+            ))?
+        }
+
+        let out_len = out_len as usize;
+        let out_keyvalues: &[fdb::keyvalue] =
+            unsafe { std::slice::from_raw_parts(out_keyvalues, out_len) };
+        let out_keyvalues: &[KeyValue] = unsafe { std::mem::transmute(out_keyvalues) };
+        Ok(KeyValues {
+            keyvalues: out_keyvalues,
+            more: (more != 0),
+        })
     }
 }
 
