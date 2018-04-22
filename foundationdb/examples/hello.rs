@@ -68,33 +68,27 @@ fn example_get_multi() -> Box<Future<Item = (), Error = FdbError>> {
 }
 
 fn main() {
-    let handle = unsafe {
-        //TODO: switch to safe API
-        let version = fdb_sys::fdb_get_max_api_version();
-        let err = fdb_sys::fdb_select_api_version_impl(version, version);
-        if err != 0 {
-            panic!("fdb_select_api_version: {:?}", FdbError::from(err));
-        }
+    use fdb_api::FdbApiBuilder;
+    use network::NetworkBuilder;
 
-        let err = fdb_sys::fdb_setup_network();
-        if err != 0 {
-            panic!("fdb_setup_network: {:?}", FdbError::from(err));
-        }
+    let api = FdbApiBuilder::default()
+        .build()
+        .expect("failed to init api");
+    let network = NetworkBuilder::new(api)
+        .build()
+        .expect("failed to init network");
 
-        std::thread::spawn(|| {
-            let err = fdb_sys::fdb_run_network();
-            if err != 0 {
-                panic!("fdb_run_network: {:?}", FdbError::from(err));
-            }
-        })
-    };
+    let handle = std::thread::spawn(move || {
+        let error = network.run();
+
+        if let Err(error) = error {
+            panic!("fdb_run_network: {}", error);
+        }
+    });
 
     example_set_get().wait().expect("failed to run");
     example_get_multi().wait().expect("failed to run");
 
-    unsafe {
-        //TODO: switch to safe API
-        fdb_sys::fdb_stop_network();
-    }
+    network.stop().expect("failed to stop network");
     handle.join().expect("failed to join fdb thread");
 }

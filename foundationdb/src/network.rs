@@ -11,6 +11,7 @@ use options::{self, NetworkOption};
 //     static ref NETWORK: Network = Network::new().build().expect("error initializing FoundationDB");
 // }
 
+#[derive(Clone, Copy)]
 pub struct Network {}
 
 impl Network {
