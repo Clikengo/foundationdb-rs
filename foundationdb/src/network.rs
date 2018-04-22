@@ -1,7 +1,7 @@
 use error::{self, Result};
 use fdb_api::FdbApi;
 use foundationdb_sys as fdb_sys;
-use options::NetworkOption;
+use options::{self, NetworkOption};
 
 // The Fdb states that setting the Client version should happen only once
 //   and is not thread-safe, thus the choice of a lazy static enforcing a single
@@ -36,35 +36,7 @@ impl NetworkBuilder {
     }
 
     pub fn set_option(self, option: NetworkOption) -> Result<Self> {
-        use self::NetworkOption::*;
-
-        let fdb_option = match option {
-            LocalAddress(s) => (),
-            ClusterFile(s) => (),
-            TraceEnable(s) => (),
-            TraceRollSize(size) => (),
-            TraceMaxLogsSize(size) => (),
-            TraceLogGroup(s) => (),
-            Knob(s) => (),
-            TlsPlugin(s) => (),
-            TlsCertByte(bytes) => (),
-            TlsCertPath(s) => (),
-            TlsKeyByte(bytes) => (),
-            TlsKeyPath(s) => (),
-            TlsVerifyPeer(bytes) => (),
-            BuggifyEnable => (),
-            BuggifyDisable => (),
-            BuggifySectionActivatedProbability(probability) => (),
-            BuggifySectionFiredProbability(probability) => (),
-            DisableMultiVersionClientApi => (),
-            CallbacksOnExternalThread => (),
-            ExternalClientLibrary(s) => (),
-            ExternalClientDirectory(s) => (),
-            DisableLocalClient => (),
-            DisableClientStatisticsLogging => (),
-            EnableSlowTaskProfiling => (),
-        };
-
+        unsafe { option.apply()? };
         Ok(self)
     }
 
