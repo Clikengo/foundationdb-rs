@@ -6,6 +6,7 @@ use std::sync::Arc;
 use database::*;
 use error::*;
 use future::*;
+use options;
 
 #[derive(Clone)]
 pub struct Transaction {
@@ -16,6 +17,10 @@ impl Transaction {
     pub(crate) fn new(database: Database, trx: *mut fdb::FDBTransaction) -> Self {
         let inner = Arc::new(TransactionInner::new(trx));
         Self { database, inner }
+    }
+
+    pub fn set_option(&self, opt: options::TransactionOption) -> Result<()> {
+        unsafe { opt.apply(self.inner.inner) }
     }
 
     pub fn database(&self) -> Database {
