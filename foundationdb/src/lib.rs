@@ -1,9 +1,8 @@
+#[macro_use]
 extern crate failure;
 #[macro_use]
 extern crate failure_derive;
 extern crate foundationdb_sys;
-#[macro_use]
-extern crate lazy_static;
 extern crate futures;
 
 pub mod cluster;
@@ -19,3 +18,15 @@ pub mod transaction;
 pub use cluster::Cluster;
 pub use database::Database;
 pub use transaction::Transaction;
+
+pub fn init() -> error::Result<network::Network> {
+    fdb_api::FdbApiBuilder::default().build()?.network().build()
+}
+
+pub fn default_api() -> error::Result<network::NetworkBuilder> {
+    Ok(fdb_api::FdbApiBuilder::default().build()?.network())
+}
+
+pub fn builder() -> fdb_api::FdbApiBuilder {
+    fdb_api::FdbApiBuilder::default()
+}
