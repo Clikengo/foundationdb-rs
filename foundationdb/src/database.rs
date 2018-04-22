@@ -5,6 +5,10 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
+//! Implementations of the FDBDatabase C API
+//!
+//! https://apple.github.io/foundationdb/api-c.html#database
+
 use foundationdb_sys as fdb;
 use std;
 use std::sync::Arc;
@@ -14,6 +18,9 @@ use error::{self, *};
 use options;
 use transaction::*;
 
+/// Represents a FoundationDB database — a mutable, lexicographically ordered mapping from binary keys to binary values.
+///
+/// Modifications to a database are performed via transactions.
 #[derive(Clone)]
 pub struct Database {
     cluster: Cluster,
@@ -25,10 +32,12 @@ impl Database {
         Self { cluster, inner }
     }
 
+    /// Called to set an option an on `Database`.
     pub fn set_option(&self, opt: options::DatabaseOption) -> Result<()> {
         unsafe { opt.apply(self.inner.inner) }
     }
 
+    /// Creates a new transaction on the given database.
     pub fn create_trx(&self) -> Result<Transaction> {
         unsafe {
             let mut trx: *mut fdb::FDBTransaction = std::ptr::null_mut();

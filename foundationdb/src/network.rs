@@ -5,6 +5,10 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
+//! Implementations of the Network related functions for FoundationDB
+//!
+//! see https://apple.github.io/foundationdb/api-c.html#network
+
 use std;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
@@ -21,28 +25,40 @@ use options::NetworkOption;
 //   init.
 static HAS_BEEN_RUN: AtomicBool = AtomicBool::new(false);
 
-// lazy_static! {
-//     // TODO: how do we configure the network?
-//     static ref NETWORK: Network = Network::new().build().expect("error initializing FoundationDB");
-// }
-
+/// The FoundationDB client library performs most tasks on a singleton thread (which usually will be a different thread than your application runs on).
+///
+/// These functions are used to configure, start and stop the FoundationDB event loop on this thread.
+///
+/// *NOTE* Networks may only be constructed from an initalized `fdb_api::FdbApi`
 #[derive(Clone, Copy)]
-pub struct Network {}
+pub struct Network(private::PrivateNetwork);
+
+// forces the construction to be private to this module
+mod private {
+    #[derive(Clone, Copy)]
+    pub(super) struct PrivateNetwork;
+}
 
 impl Network {
-    /// This will block the current thread
+    /// Must be called before any asynchronous functions in this API can be expected to complete.
     ///
-    /// It must be run from a separate thread
+    /// Unless your program is entirely event-driven based on results of asynchronous functions in this API and has no event loop of its own, you will want to invoke this function on an auxiliary thread (which it is your responsibility to create).
+    ///
+    /// This function will not return until `Network::stop` is called by you or a serious error occurs. You must not invoke `run` concurrently or reentrantly while it is already running.
     pub fn run(&self) -> std::result::Result<(), failure::Error> {
         if HAS_BEEN_RUN.compare_and_swap(false, true, Ordering::AcqRel) {
             return Err(format_err!("the network can only be run once per process"));
         }
 
+        // TODO: before running, we may want to register a thread destroyed notification, not sure
+        //   what we'd need that for ATM, see: https://apple.github.io/foundationdb/api-c.html#network
+        //   and fdb_add_network_thread_completion_hook
+
         unsafe { error::eval(fdb_sys::fdb_run_network())? }
         Ok(())
     }
 
-    /// Wait for run to have started
+    /// Waits for run to have started
     pub fn wait(&self) {
         // TODO: rather than a hot loop, consider a condvar here...
         while !HAS_BEEN_RUN.load(Ordering::Acquire) {
@@ -50,6 +66,33 @@ impl Network {
         }
     }
 
+    /// Signals the event loop invoked by `Network::run` to terminate.
+    ///
+    /// You must call this function and wait for fdb_run_network() to return before allowing your program to exit, or else the behavior is undefined.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use std::thread;
+    /// use foundationdb;
+    ///
+    /// let network = foundationdb::init().expect("failed to initialize Fdb");
+    ///
+    /// let handle = std::thread::spawn(move || {
+    ///     let error = network.run();
+    ///
+    ///     if let Err(error) = error {
+    ///         panic!("fdb_run_network: {}", error);
+    ///     }
+    /// });
+    ///
+    /// network.wait();
+    ///
+    /// // do some interesting things with the API...
+    ///
+    /// network.stop().expect("failed to stop network");
+    /// handle.join().expect("failed to join fdb thread");
+    /// ```
     pub fn stop(&self) -> std::result::Result<(), failure::Error> {
         if !HAS_BEEN_RUN.load(Ordering::Acquire) {
             return Err(format_err!(
@@ -62,22 +105,27 @@ impl Network {
     }
 }
 
-pub struct NetworkBuilder {}
+/// Allow `NetworkOption`s to be associated with the Fdb Network
+pub struct NetworkBuilder(private::PrivateNetwork);
 
 impl NetworkBuilder {
-    pub fn new(_api: FdbApi) -> Self {
-        NetworkBuilder {}
-    }
-
+    /// Called to set network options.
     pub fn set_option(self, option: NetworkOption) -> Result<Self> {
         unsafe { option.apply()? };
         Ok(self)
     }
 
+    /// Finalizes the construction of the Network
     pub fn build(self) -> Result<Network> {
         unsafe { error::eval(fdb_sys::fdb_setup_network())? }
 
-        Ok(Network {})
+        Ok(Network(private::PrivateNetwork))
+    }
+}
+
+impl From<FdbApi> for NetworkBuilder {
+    fn from(_api: FdbApi) -> Self {
+        NetworkBuilder(private::PrivateNetwork)
     }
 }
 
@@ -90,12 +138,13 @@ mod tests {
 
     use super::*;
 
+    // TODO: this test will break other integration tests...
     #[test]
     fn test_run() {
         let api = FdbApiBuilder::default()
             .build()
             .expect("could not initialize api");
-        let network = NetworkBuilder::new(api)
+        let network = NetworkBuilder::from(api)
             .build()
             .expect("could not initialize network");
 

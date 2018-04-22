@@ -5,6 +5,14 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
+//! Most functions in the FoundationDB API are asynchronous, meaning that they may return to the caller before actually delivering their result.
+//!
+//! These functions always return FDBFuture*. An FDBFuture object represents a result value or error to be delivered at some future time. You can wait for a Future to be “ready” – to have a value or error delivered – by setting a callback function, or by blocking a thread, or by polling. Once a Future is ready, you can extract either an error code or a value of the appropriate type (the documentation for the original function will tell you which fdb_future_get_*() function you should call).
+//!
+//! Futures make it easy to do multiple operations in parallel, by calling several asynchronous functions before waiting for any of the results. This can be important for reducing the latency of transactions.
+//!
+//! The Rust API Client has been implemented to use the Rust futures crate, and should work within that ecosystem (suchas Tokio). See Rust [futures](https://docs.rs/crate/futures/0.1.21) documentation.
+
 use std;
 
 use foundationdb_sys as fdb;
@@ -13,6 +21,7 @@ use futures::Async;
 
 use error::{self, FdbError, Result};
 
+/// An opaque type that represents a Future in the FoundationDB C API.
 pub struct FdbFuture {
     //
     f: *mut fdb::FDBFuture,
@@ -72,6 +81,7 @@ extern "C" fn fdb_future_callback(
     task.notify();
 }
 
+/// The Result of an FdbFuture from which query results can be gottent, etc.
 pub struct FdbFutureResult {
     f: *mut fdb::FDBFuture,
 }
