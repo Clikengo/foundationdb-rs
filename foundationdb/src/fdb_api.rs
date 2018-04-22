@@ -1,5 +1,6 @@
 use error::{self, Result};
 use foundationdb_sys as fdb_sys;
+use network::NetworkBuilder;
 
 pub fn get_max_api_version() -> i32 {
     unsafe { fdb_sys::fdb_get_max_api_version() as i32 }
@@ -10,6 +11,12 @@ pub struct FdbApi(private::PrivateFdbApi);
 // forces the FdnApi construction to be private to this module
 mod private {
     pub(super) struct PrivateFdbApi;
+}
+
+impl FdbApi {
+    pub fn network(self) -> NetworkBuilder {
+        NetworkBuilder::new(self)
+    }
 }
 
 pub struct FdbApiBuilder {

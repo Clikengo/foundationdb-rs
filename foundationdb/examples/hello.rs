@@ -3,7 +3,6 @@ extern crate foundationdb_sys;
 extern crate futures;
 
 use foundationdb::*;
-use foundationdb_sys as fdb_sys;
 
 use futures::future::*;
 
@@ -69,12 +68,11 @@ fn example_get_multi() -> Box<Future<Item = (), Error = FdbError>> {
 
 fn main() {
     use fdb_api::FdbApiBuilder;
-    use network::NetworkBuilder;
 
-    let api = FdbApiBuilder::default()
+    let network = FdbApiBuilder::default()
         .build()
-        .expect("failed to init api");
-    let network = NetworkBuilder::new(api)
+        .expect("failed to init api")
+        .network()
         .build()
         .expect("failed to init network");
 
@@ -85,6 +83,8 @@ fn main() {
             panic!("fdb_run_network: {}", error);
         }
     });
+
+    network.wait();
 
     example_set_get().wait().expect("failed to run");
     example_get_multi().wait().expect("failed to run");
