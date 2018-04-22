@@ -4,7 +4,7 @@ use foundationdb_sys as fdb;
 use futures;
 use futures::Async;
 
-use error::{FdbError, Result};
+use error::{self, FdbError, Result};
 
 pub struct FdbFuture {
     //
@@ -44,10 +44,7 @@ impl futures::Future for FdbFuture {
             return Ok(Async::NotReady);
         }
 
-        let err = unsafe { fdb::fdb_future_get_error(self.f) };
-        if err != 0 {
-            return Err(FdbError::from(err));
-        }
+        unsafe { error::eval(fdb::fdb_future_get_error(self.f))? };
 
         // The result is taking ownership of fdb::FDBFuture
         let g = FdbFutureResult::new(self.f);
@@ -78,19 +75,13 @@ impl FdbFutureResult {
 
     pub(crate) unsafe fn get_cluster(&self) -> Result<*mut fdb::FDBCluster> {
         let mut v: *mut fdb::FDBCluster = std::ptr::null_mut();
-        let err = fdb::fdb_future_get_cluster(self.f, &mut v as *mut _);
-        if err != 0 {
-            return Err(FdbError::from(err));
-        }
+        error::eval(fdb::fdb_future_get_cluster(self.f, &mut v as *mut _))?;
         Ok(v)
     }
 
     pub(crate) unsafe fn get_database(&self) -> Result<*mut fdb::FDBDatabase> {
         let mut v: *mut fdb::FDBDatabase = std::ptr::null_mut();
-        let err = fdb::fdb_future_get_database(self.f, &mut v as *mut _);
-        if err != 0 {
-            return Err(FdbError::from(err));
-        }
+        error::eval(fdb::fdb_future_get_database(self.f, &mut v as *mut _))?;
         Ok(v)
     }
 
@@ -98,17 +89,16 @@ impl FdbFutureResult {
         let mut present = 0;
         let mut out_value = std::ptr::null();
         let mut out_len = 0;
-        let err = unsafe {
-            fdb::fdb_future_get_value(
+
+        unsafe {
+            error::eval(fdb::fdb_future_get_value(
                 self.f,
                 &mut present as *mut _,
                 &mut out_value as *mut _,
                 &mut out_len as *mut _,
-            )
-        };
-        if err != 0 {
-            return Err(FdbError::from(err));
+            ))?
         }
+
         if present == 0 {
             return Ok(None);
         }
