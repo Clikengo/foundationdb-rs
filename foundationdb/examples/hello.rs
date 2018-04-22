@@ -18,7 +18,7 @@ fn example_set_get() -> Box<Future<Item = (), Error = FdbError>> {
             trx.set(b"hello", b"world");
             trx.commit()
         })
-        .and_then(|db| result(db.create_trx()))
+        .and_then(|trx| result(trx.database().create_trx()))
         .and_then(|trx| trx.get(b"hello"))
         .and_then(|res| {
             let val = res.value();
@@ -28,7 +28,7 @@ fn example_set_get() -> Box<Future<Item = (), Error = FdbError>> {
             trx.clear(b"hello");
             trx.commit()
         })
-        .and_then(|db| result(db.create_trx()))
+        .and_then(|trx| result(trx.database().create_trx()))
         .and_then(|trx| trx.get(b"hello"))
         .and_then(|res| {
             eprintln!("value: {:?}", res.value());

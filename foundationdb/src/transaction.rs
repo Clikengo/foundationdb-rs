@@ -58,7 +58,7 @@ impl Transaction {
         let f = unsafe { fdb::fdb_transaction_commit(trx) };
         let f = FdbFuture::new(f);
         TrxCommit {
-            trx: self,
+            trx: Some(self),
             inner: f,
         }
     }
@@ -114,17 +114,19 @@ impl Future for TrxGet {
 }
 
 pub struct TrxCommit {
-    trx: Transaction,
+    trx: Option<Transaction>,
     inner: FdbFuture,
 }
 impl Future for TrxCommit {
     //should be ()?
-    type Item = Database;
+    type Item = Transaction;
     type Error = FdbError;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         match self.inner.poll() {
-            Ok(Async::Ready(_r)) => Ok(Async::Ready(self.trx.database.clone())),
+            Ok(Async::Ready(_r)) => Ok(Async::Ready(
+                self.trx.take().expect("should not poll after ready"),
+            )),
             Ok(Async::NotReady) => Ok(Async::NotReady),
             Err(e) => Err(e),
         }
