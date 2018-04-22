@@ -5,6 +5,10 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
+//! Implementations of the FDBCluster C API
+//!
+//! https://apple.github.io/foundationdb/api-c.html#cluster
+
 use foundationdb_sys as fdb;
 use future::*;
 use futures::{Async, Future};
@@ -14,11 +18,19 @@ use std::sync::Arc;
 use database::*;
 use error::*;
 
+/// An opaque type that represents a Cluster in the FoundationDB C API.
 #[derive(Clone)]
 pub struct Cluster {
     inner: Arc<ClusterInner>,
 }
 impl Cluster {
+    /// Returns an FdbFuture which will be set to an FDBCluster object.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - A string giving a local path of a cluster file (often called ‘fdb.cluster’) which contains connection information for the FoundationDB cluster. See `foundationdb::default_config_path()`
+    ///
+    /// TODO: implement Default for Cluster where: If cluster_file_path is NULL or an empty string, then a default cluster file will be used. see
     pub fn new(path: &str) -> ClusterGet {
         let path_str = std::ffi::CString::new(path).unwrap();
         let f = unsafe { fdb::fdb_create_cluster(path_str.as_ptr()) };
@@ -27,7 +39,11 @@ impl Cluster {
         }
     }
 
-    //TODO: impl Future
+    // TODO: fdb_cluster_set_option impl
+
+    /// Returns an `FdbFuture` which will be set to an `Database` object.
+    ///
+    /// TODO: impl Future
     pub fn create_database(&self) -> Box<Future<Item = Database, Error = FdbError>> {
         let f = unsafe {
             let f_db = fdb::fdb_cluster_create_database(self.inner.inner, b"DB" as *const _, 2);
@@ -40,6 +56,7 @@ impl Cluster {
     }
 }
 
+/// A future result of the `Cluster::new`
 pub struct ClusterGet {
     inner: FdbFuture,
 }

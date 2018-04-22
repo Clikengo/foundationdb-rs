@@ -5,6 +5,8 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
+//! Error types for the Fdb crate
+
 use options;
 use std;
 use std::ffi::CStr;
@@ -20,6 +22,7 @@ pub(crate) fn eval(error_code: fdb_sys::fdb_error_t) -> Result<()> {
     }
 }
 
+/// An error from Fdb with associated code and message
 #[derive(Debug, Fail)]
 #[fail(display = "FoundationDB error({}): {}", error_code, error_str)]
 pub struct FdbError {
@@ -27,9 +30,11 @@ pub struct FdbError {
     error_str: &'static str,
 }
 
+/// An Fdb Result type
 pub type Result<T> = std::result::Result<T, FdbError>;
 
 impl FdbError {
+    /// Converts from the raw Fdb error code into an `FdbError`
     pub fn from(error_code: fdb_sys::fdb_error_t) -> Self {
         let error_str = unsafe { CStr::from_ptr(fdb_sys::fdb_get_error(error_code)) };
 
@@ -41,6 +46,7 @@ impl FdbError {
         }
     }
 
+    /// Indicates the transaction may have succeeded, though not in a way the system can verify.
     pub fn is_maybe_committed(&self) -> bool {
         let check = unsafe {
             fdb_sys::fdb_error_predicate(
@@ -52,6 +58,7 @@ impl FdbError {
         check != 0
     }
 
+    /// Indicates the operations in the transactions should be retried because of transient error.
     pub fn is_retryable(&self) -> bool {
         let check = unsafe {
             fdb_sys::fdb_error_predicate(
@@ -63,6 +70,7 @@ impl FdbError {
         check != 0
     }
 
+    /// Indicates the transaction has not committed, though in a way that can be retried.
     pub fn is_retryable_not_committed(&self) -> bool {
         let check = unsafe {
             fdb_sys::fdb_error_predicate(

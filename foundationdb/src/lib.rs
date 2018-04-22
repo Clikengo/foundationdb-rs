@@ -104,6 +104,8 @@
 //!
 //! *WARNING* Until the 1.0 release of this library, the API may be in constant flux.
 
+#![deny(missing_docs)]
+
 #[macro_use]
 extern crate failure;
 #[macro_use]
@@ -117,6 +119,7 @@ pub mod error;
 pub mod fdb_api;
 pub mod future;
 pub mod network;
+#[allow(missing_docs)]
 pub mod options;
 pub mod transaction;
 
