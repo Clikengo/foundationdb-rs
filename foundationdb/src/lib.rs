@@ -7,9 +7,9 @@ extern crate lazy_static;
 extern crate futures;
 
 pub mod cluster;
-pub mod context;
 pub mod database;
 pub mod error;
+pub mod fdb_api;
 pub mod future;
 pub mod network;
 pub mod options;
