@@ -571,77 +571,77 @@ pub enum MutationType {
     /// addend
     ///
     /// Performs an addition of little-endian integers. If the existing value in the database is not present or shorter than ``param``, it is first extended to the length of ``param`` with zero bytes.  If ``param`` is shorter than the existing value in the database, the existing value is truncated to match the length of ``param``. The integers to be added must be stored in a little-endian representation.  They can be signed in two's complement representation or unsigned. You can add to an integer at a known offset in the value by prepending the appropriate number of zero bytes to ``param`` and padding with zero bytes to match the length of the value. However, this offset technique requires that you know the addition will not cause the integer field within the value to overflow.
-    Add(Vec<u8>),
+    Add,
     /// value with which to perform bitwise and
     ///
     /// Deprecated
-    And(Vec<u8>),
+    And,
     /// value with which to perform bitwise and
     ///
     /// Performs a bitwise ``and`` operation.  If the existing value in the database is not present, then ``param`` is stored in the database. If the existing value in the database is shorter than ``param``, it is first extended to the length of ``param`` with zero bytes.  If ``param`` is shorter than the existing value in the database, the existing value is truncated to match the length of ``param``.
-    BitAnd(Vec<u8>),
+    BitAnd,
     /// value with which to perform bitwise or
     ///
     /// Deprecated
-    Or(Vec<u8>),
+    Or,
     /// value with which to perform bitwise or
     ///
     /// Performs a bitwise ``or`` operation.  If the existing value in the database is not present or shorter than ``param``, it is first extended to the length of ``param`` with zero bytes.  If ``param`` is shorter than the existing value in the database, the existing value is truncated to match the length of ``param``.
-    BitOr(Vec<u8>),
+    BitOr,
     /// value with which to perform bitwise xor
     ///
     /// Deprecated
-    Xor(Vec<u8>),
+    Xor,
     /// value with which to perform bitwise xor
     ///
     /// Performs a bitwise ``xor`` operation.  If the existing value in the database is not present or shorter than ``param``, it is first extended to the length of ``param`` with zero bytes.  If ``param`` is shorter than the existing value in the database, the existing value is truncated to match the length of ``param``.
-    BitXor(Vec<u8>),
+    BitXor,
     /// value to check against database value
     ///
     /// Performs a little-endian comparison of byte strings. If the existing value in the database is not present or shorter than ``param``, it is first extended to the length of ``param`` with zero bytes.  If ``param`` is shorter than the existing value in the database, the existing value is truncated to match the length of ``param``. The larger of the two values is then stored in the database.
-    Max(Vec<u8>),
+    Max,
     /// value to check against database value
     ///
     /// Performs a little-endian comparison of byte strings. If the existing value in the database is not present, then ``param`` is stored in the database. If the existing value in the database is shorter than ``param``, it is first extended to the length of ``param`` with zero bytes.  If ``param`` is shorter than the existing value in the database, the existing value is truncated to match the length of ``param``. The smaller of the two values is then stored in the database.
-    Min(Vec<u8>),
+    Min,
     /// value to which to set the transformed key
     ///
     /// Transforms ``key`` using a versionstamp for the transaction. Sets the transformed key in the database to ``param``. A versionstamp is a 10 byte, unique, monotonically (but not sequentially) increasing value for each committed transaction. The first 8 bytes are the committed version of the database. The last 2 bytes are monotonic in the serialization order for transactions. WARNING: At this time versionstamps are compatible with the Tuple layer only in the Java and Python bindings. Note that this implies versionstamped keys may not be used with the Subspace and Directory layers except in those languages.
-    SetVersionstampedKey(Vec<u8>),
+    SetVersionstampedKey,
     /// value to versionstamp and set
     ///
     /// Transforms ``param`` using a versionstamp for the transaction. Sets ``key`` in the database to the transformed parameter. A versionstamp is a 10 byte, unique, monotonically (but not sequentially) increasing value for each committed transaction. The first 8 bytes are the committed version of the database. The last 2 bytes are monotonic in the serialization order for transactions. WARNING: At this time versionstamped values are not compatible with the Tuple layer.
-    SetVersionstampedValue(Vec<u8>),
+    SetVersionstampedValue,
     /// value to check against database value
     ///
     /// Performs lexicographic comparison of byte strings. If the existing value in the database is not present, then ``param`` is stored. Otherwise the smaller of the two values is then stored in the database.
-    ByteMin(Vec<u8>),
+    ByteMin,
     /// value to check against database value
     ///
     /// Performs lexicographic comparison of byte strings. If the existing value in the database is not present, then ``param`` is stored. Otherwise the larger of the two values is then stored in the database.
-    ByteMax(Vec<u8>),
+    ByteMax,
 }
 
 impl MutationType {
     pub fn code(&self) -> fdb::FDBMutationType {
         match *self {
-            MutationType::Add(ref _v) => fdb::FDBMutationType_FDB_MUTATION_TYPE_ADD,
-            MutationType::And(ref _v) => fdb::FDBMutationType_FDB_MUTATION_TYPE_AND,
-            MutationType::BitAnd(ref _v) => fdb::FDBMutationType_FDB_MUTATION_TYPE_BIT_AND,
-            MutationType::Or(ref _v) => fdb::FDBMutationType_FDB_MUTATION_TYPE_OR,
-            MutationType::BitOr(ref _v) => fdb::FDBMutationType_FDB_MUTATION_TYPE_BIT_OR,
-            MutationType::Xor(ref _v) => fdb::FDBMutationType_FDB_MUTATION_TYPE_XOR,
-            MutationType::BitXor(ref _v) => fdb::FDBMutationType_FDB_MUTATION_TYPE_BIT_XOR,
-            MutationType::Max(ref _v) => fdb::FDBMutationType_FDB_MUTATION_TYPE_MAX,
-            MutationType::Min(ref _v) => fdb::FDBMutationType_FDB_MUTATION_TYPE_MIN,
-            MutationType::SetVersionstampedKey(ref _v) => {
+            MutationType::Add => fdb::FDBMutationType_FDB_MUTATION_TYPE_ADD,
+            MutationType::And => fdb::FDBMutationType_FDB_MUTATION_TYPE_AND,
+            MutationType::BitAnd => fdb::FDBMutationType_FDB_MUTATION_TYPE_BIT_AND,
+            MutationType::Or => fdb::FDBMutationType_FDB_MUTATION_TYPE_OR,
+            MutationType::BitOr => fdb::FDBMutationType_FDB_MUTATION_TYPE_BIT_OR,
+            MutationType::Xor => fdb::FDBMutationType_FDB_MUTATION_TYPE_XOR,
+            MutationType::BitXor => fdb::FDBMutationType_FDB_MUTATION_TYPE_BIT_XOR,
+            MutationType::Max => fdb::FDBMutationType_FDB_MUTATION_TYPE_MAX,
+            MutationType::Min => fdb::FDBMutationType_FDB_MUTATION_TYPE_MIN,
+            MutationType::SetVersionstampedKey => {
                 fdb::FDBMutationType_FDB_MUTATION_TYPE_SET_VERSIONSTAMPED_KEY
             }
-            MutationType::SetVersionstampedValue(ref _v) => {
+            MutationType::SetVersionstampedValue => {
                 fdb::FDBMutationType_FDB_MUTATION_TYPE_SET_VERSIONSTAMPED_VALUE
             }
-            MutationType::ByteMin(ref _v) => fdb::FDBMutationType_FDB_MUTATION_TYPE_BYTE_MIN,
-            MutationType::ByteMax(ref _v) => fdb::FDBMutationType_FDB_MUTATION_TYPE_BYTE_MAX,
+            MutationType::ByteMin => fdb::FDBMutationType_FDB_MUTATION_TYPE_BYTE_MIN,
+            MutationType::ByteMax => fdb::FDBMutationType_FDB_MUTATION_TYPE_BYTE_MAX,
         }
     }
 }
