@@ -108,6 +108,37 @@ impl Transaction {
         }
     }
 
+    /// Modify the database snapshot represented by transaction to perform the operation indicated
+    /// by operationType with operand param to the value stored by the given key.
+    ///
+    /// An atomic operation is a single database command that carries out several logical steps:
+    /// reading the value of a key, performing a transformation on that value, and writing the
+    /// result. Different atomic operations perform different transformations. Like other database
+    /// operations, an atomic operation is used within a transaction; however, its use within a
+    /// transaction will not cause the transaction to conflict.
+    ///
+    /// Atomic operations do not expose the current value of the key to the client but simply send
+    /// the database the transformation to apply. In regard to conflict checking, an atomic
+    /// operation is equivalent to a write without a read. It can only cause other transactions
+    /// performing reads of the key to conflict.
+    ///
+    /// By combining these logical steps into a single, read-free operation, FoundationDB can
+    /// guarantee that the transaction will not conflict due to the operation. This makes atomic
+    /// operations ideal for operating on keys that are frequently modified. A common example is
+    /// the use of a key-value pair as a counter.
+    pub fn atomic_op(&self, key: &[u8], param: &[u8], op_type: options::MutationType) {
+        let trx = self.inner.inner;
+        unsafe {
+            fdb::fdb_transaction_atomic_op(
+                trx,
+                key.as_ptr() as *const _,
+                key.len() as i32,
+                param.as_ptr() as *const _,
+                param.len() as i32,
+                op_type.code(),
+            )
+        }
+    }
     /// Attempts to commit the sets and clears previously applied to the database snapshot represented by transaction to the actual database.
     ///
     /// The commit may or may not succeed – in particular, if a conflicting transaction previously committed, then the commit must fail in order to preserve transactional isolation. If the commit does succeed, the transaction is durably committed to the database and all subsequently started transactions will observe its effects.

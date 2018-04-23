@@ -21,8 +21,10 @@ impl FdbScope {
         s += "pub enum ";
         s += &self.name;
         s += "{\n";
+
+        let with_ty = self.with_ty();
         for option in self.options.iter() {
-            s += &option.gen_ty();
+            s += &option.gen_ty(with_ty);
         }
         s += "}\n";
 
@@ -48,12 +50,15 @@ impl FdbScope {
         s += "match *self {\n";
 
         let enum_prefix = self.c_enum_prefix();
+        let with_ty = self.with_ty();
 
         for option in self.options.iter() {
             s += &format!("{}::{}", self.name, option.name);
 
-            if let Some(_ty) = option.get_ty() {
-                s += "(ref _v)"
+            if with_ty {
+                if let Some(_ty) = option.get_ty() {
+                    s += "(ref _v)"
+                }
             }
 
             let mut enum_name = screamingsnakecase::to_screaming_snake_case(&option.name);
@@ -153,6 +158,10 @@ impl FdbScope {
         s
     }
 
+    fn with_ty(&self) -> bool {
+        self.apply_fn_name().is_some()
+    }
+
     fn c_enum_prefix(&self) -> &'static str {
         match self.name.as_str() {
             "NetworkOption" => "FDBNetworkOption_FDB_NET_OPTION_",
@@ -213,7 +222,7 @@ struct FdbOption {
 }
 
 impl FdbOption {
-    fn gen_ty(&self) -> String {
+    fn gen_ty(&self, with_ty: bool) -> String {
         let mut s = String::new();
 
         if !self.param_description.is_empty() {
@@ -228,10 +237,12 @@ impl FdbOption {
         }
 
         s += &self.name;
-        if let Some(ty) = self.get_ty() {
-            s += "(";
-            s += ty;
-            s += ")";
+        if with_ty {
+            if let Some(ty) = self.get_ty() {
+                s += "(";
+                s += ty;
+                s += ")";
+            }
         }
         s += ",\n";
         s
