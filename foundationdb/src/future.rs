@@ -98,10 +98,11 @@ pub struct KeyValues<'a> {
 impl<'a> KeyValues<'a> {
     /// Returns true if (but not necessarily only if) values remain in the key range requested
     /// (possibly beyond the limits requested).
-    pub fn more(&self) -> bool {
+    pub(crate) fn more(&self) -> bool {
         self.more
     }
 }
+//TODO: maybe `as_slice()` for just `keyvalues()`? `as_ref()` is not intuitive in this case...
 impl<'a> AsRef<[KeyValue<'a>]> for KeyValues<'a> {
     fn as_ref(&self) -> &[KeyValue<'a>] {
         self.keyvalues
@@ -109,7 +110,9 @@ impl<'a> AsRef<[KeyValue<'a>]> for KeyValues<'a> {
 }
 
 /// Represents a single key-value pair in the output of fdb_future_get_keyvalue_array().
-#[repr(C)]
+// Uses repr(packed) because c API uses 4-byte alignment for this struct
+// TODO: field reordering might change a struct layout...
+#[repr(packed)]
 pub struct KeyValue<'a> {
     key: *const u8,
     key_len: u32,
@@ -157,7 +160,7 @@ impl FdbFutureResult {
     }
 
     #[allow(unused)]
-    pub(crate) fn get_key<'a>(&'a self) -> Result<Option<&'a [u8]>> {
+    pub(crate) fn get_key<'a>(&'a self) -> Result<&'a [u8]> {
         let mut out_value = std::ptr::null();
         let mut out_len = 0;
 
@@ -173,7 +176,7 @@ impl FdbFutureResult {
         // `fdb_future_destroy` is called on `Self::drop`, so a lifetime of the value matches with
         // `self`
         let slice = unsafe { std::slice::from_raw_parts(out_value, out_len as usize) };
-        Ok(Some(slice))
+        Ok(slice)
     }
 
     pub(crate) fn get_value<'a>(&'a self) -> Result<Option<&'a [u8]>> {
@@ -251,5 +254,13 @@ impl FdbFutureResult {
             keyvalues: out_keyvalues,
             more: (more != 0),
         })
+    }
+}
+
+#[allow(unused)]
+fn test_keyvalue_size() {
+    unsafe {
+        // compile-time test for struct size
+        std::mem::transmute::<KeyValue, fdb::keyvalue>(std::mem::uninitialized());
     }
 }

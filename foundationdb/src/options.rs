@@ -2,6 +2,7 @@ use error;
 use foundationdb_sys as fdb;
 use std;
 
+#[derive(Clone, Debug)]
 pub enum NetworkOption {
     /// IP:PORT
     ///
@@ -230,6 +231,7 @@ impl NetworkOption {
     }
 }
 
+#[derive(Clone, Debug)]
 pub enum DatabaseOption {
     /// Max location cache entries
     ///
@@ -291,6 +293,7 @@ impl DatabaseOption {
     }
 }
 
+#[derive(Clone, Debug)]
 pub enum TransactionOption {
     /// The transaction, if not self-conflicting, may be committed a second time after commit succeeds, in the event of a fault
     CausalWriteRisky,
@@ -536,6 +539,7 @@ impl TransactionOption {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
 pub enum StreamingMode {
     /// Client intends to consume the entire range and would like it all transferred as early as possible.
     WantAll,
@@ -567,6 +571,7 @@ impl StreamingMode {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
 pub enum MutationType {
     /// addend
     ///
@@ -646,6 +651,7 @@ impl MutationType {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
 pub enum ConflictRangeType {
     /// Used to add a read conflict range
     Read,
@@ -662,6 +668,7 @@ impl ConflictRangeType {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
 pub enum ErrorPredicate {
     /// Returns ``true`` if the error indicates the operations in the transactions should be retried because of transient error.
     Retryable,

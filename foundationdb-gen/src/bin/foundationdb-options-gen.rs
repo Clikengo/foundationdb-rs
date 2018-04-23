@@ -18,6 +18,13 @@ struct FdbScope {
 impl FdbScope {
     fn gen_ty(&self) -> String {
         let mut s = String::new();
+        let with_ty = self.with_ty();
+
+        if with_ty {
+            s += "#[derive(Clone,Debug)]\n";
+        } else {
+            s += "#[derive(Clone,Copy,Debug)]\n";
+        }
         s += "pub enum ";
         s += &self.name;
         s += "{\n";

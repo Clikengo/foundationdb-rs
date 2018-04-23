@@ -25,7 +25,7 @@ fn example_set_get() -> Box<Future<Item = (), Error = FdbError>> {
             trx.commit()
         })
         .and_then(|trx| result(trx.database().create_trx()))
-        .and_then(|trx| trx.get(b"hello"))
+        .and_then(|trx| trx.get(b"hello", false))
         .and_then(|res| {
             let val = res.value();
             eprintln!("value: {:?}", val);
@@ -35,7 +35,7 @@ fn example_set_get() -> Box<Future<Item = (), Error = FdbError>> {
             trx.commit()
         })
         .and_then(|trx| result(trx.database().create_trx()))
-        .and_then(|trx| trx.get(b"hello"))
+        .and_then(|trx| trx.get(b"hello", false))
         .and_then(|res| {
             eprintln!("value: {:?}", res.value());
             Ok(())
@@ -51,7 +51,7 @@ fn example_get_multi() -> Box<Future<Item = (), Error = FdbError>> {
         .and_then(|trx| {
             let keys: &[&[u8]] = &[b"hello", b"world", b"foo", b"bar"];
 
-            let futs = keys.iter().map(|k| trx.get(k)).collect::<Vec<_>>();
+            let futs = keys.iter().map(|k| trx.get(k, false)).collect::<Vec<_>>();
             join_all(futs)
         })
         .and_then(|results| {
