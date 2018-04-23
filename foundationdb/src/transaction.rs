@@ -196,6 +196,41 @@ impl Transaction {
             inner: f,
         }
     }
+
+    /// A watch’s behavior is relative to the transaction that created it. A watch will report a
+    /// change in relation to the key’s value as readable by that transaction. The initial value
+    /// used for comparison is either that of the transaction’s read version or the value as
+    /// modified by the transaction itself prior to the creation of the watch. If the value changes
+    /// and then changes back to its initial value, the watch might not report the change.
+    ///
+    /// Until the transaction that created it has been committed, a watch will not report changes
+    /// made by other transactions. In contrast, a watch will immediately report changes made by
+    /// the transaction itself. Watches cannot be created if the transaction has set the
+    /// READ_YOUR_WRITES_DISABLE transaction option, and an attempt to do so will return an
+    /// watches_disabled error.
+    ///
+    /// If the transaction used to create a watch encounters an error during commit, then the watch
+    /// will be set with that error. A transaction whose commit result is unknown will set all of
+    /// its watches with the commit_unknown_result error. If an uncommitted transaction is reset or
+    /// destroyed, then any watches it created will be set with the transaction_cancelled error.
+    ///
+    /// Returns an FDBFuture representing an empty value that will be set once the watch has
+    /// detected a change to the value at the specified key. You must first wait for the FDBFuture
+    /// to be ready, check for errors, and then destroy the FDBFuture with fdb_future_destroy().
+    ///
+    /// By default, each database connection can have no more than 10,000 watches that have not yet
+    /// reported a change. When this number is exceeded, an attempt to create a watch will return a
+    /// too_many_watches error. This limit can be changed using the MAX_WATCHES database option.
+    /// Because a watch outlives the transaction that creates it, any watch that is no longer
+    /// needed should be cancelled by calling fdb_future_cancel() on its returned future.
+    pub fn watch(&self, key: &[u8]) -> TrxWatch {
+        let trx = self.inner.inner;
+
+        let f =
+            unsafe { fdb::fdb_transaction_watch(trx, key.as_ptr() as *const _, key.len() as i32) };
+        let f = FdbFuture::new(f);
+        TrxWatch { inner: f }
+    }
 }
 
 struct TransactionInner {
@@ -305,6 +340,23 @@ impl Future for TrxGetAddressesForKey {
                 trx: self.trx.clone(),
                 inner: r,
             })),
+            Ok(Async::NotReady) => Ok(Async::NotReady),
+            Err(e) => Err(e),
+        }
+    }
+}
+
+/// A future result of a `Transaction::watch`
+pub struct TrxWatch {
+    inner: FdbFuture,
+}
+impl Future for TrxWatch {
+    type Item = ();
+    type Error = FdbError;
+
+    fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
+        match self.inner.poll() {
+            Ok(Async::Ready(_r)) => Ok(Async::Ready(())),
             Ok(Async::NotReady) => Ok(Async::NotReady),
             Err(e) => Err(e),
         }
