@@ -155,7 +155,7 @@ impl FdbFutureResult {
         }
 
         // A value from `fdb_future_get_value` will alive until `fdb_future_destroy` is called and
-        // `fdb_future_destory` is called on `Self::drop`, so a lifetime of the value matches with
+        // `fdb_future_destroy` is called on `Self::drop`, so a lifetime of the value matches with
         // `self`
         let slice = unsafe { std::slice::from_raw_parts(out_value, out_len as usize) };
         Ok(Some(slice))
@@ -180,7 +180,7 @@ impl FdbFutureResult {
         }
 
         // A value from `fdb_future_get_value` will alive until `fdb_future_destroy` is called and
-        // `fdb_future_destory` is called on `Self::drop`, so a lifetime of the value matches with
+        // `fdb_future_destroy` is called on `Self::drop`, so a lifetime of the value matches with
         // `self`
         let slice = unsafe { std::slice::from_raw_parts(out_value, out_len as usize) };
         Ok(Some(slice))
