@@ -54,6 +54,8 @@
 //! extern crate futures;
 //! extern crate foundationdb;
 //!
+//! # fn main() {
+//!
 //! use std::thread;
 //! use futures::future::*;
 //! use foundationdb::{self, *};
@@ -98,6 +100,8 @@
 //! // cleanly shutdown the client
 //! network.stop().expect("failed to stop Fdb client");
 //! handle.join();
+//!
+//! # }
 //! ```
 //!
 //! ## API stability
