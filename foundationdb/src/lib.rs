@@ -123,6 +123,7 @@ pub mod error;
 pub mod fdb_api;
 pub mod future;
 pub mod network;
+/// Generated configuration types for use with the various `set_option` functions
 #[allow(missing_docs)]
 pub mod options;
 pub mod transaction;
