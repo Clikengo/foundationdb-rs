@@ -1,12 +1,10 @@
 [package]
 name = "foundationdb"
-version = "0.0.1"
+version = "0.1.0"
 authors = ["Benjamin Fry <benjaminfry@me.com>"]
 
 description = """
 High level client bindings for FoundationDB.
-
-This is in progress and under active development.
 """
 
 repository = "https://github.com/bluejekyll/foundationdb-rs"
@@ -23,6 +21,6 @@ travis-ci = { repository = "bluejekyll/foundationdb-rs" }
 [dependencies]
 failure = "0.1"
 failure_derive = "0.1"
-foundationdb-sys = { version = "0.0.2", path = "../foundationdb-sys" }
+foundationdb-sys = { version = "0.1.0", path = "../foundationdb-sys" }
 futures = "0.1"
 lazy_static = "1.0"
