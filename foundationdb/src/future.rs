@@ -24,14 +24,26 @@ use error::{self, FdbError, Result};
 
 /// An opaque type that represents a Future in the FoundationDB C API.
 pub struct FdbFuture {
-    //
-    f: *mut fdb::FDBFuture,
+    f: Option<*mut fdb::FDBFuture>,
     task: Option<Box<futures::task::Task>>,
 }
 
 impl FdbFuture {
     pub(crate) fn new(f: *mut fdb::FDBFuture) -> Self {
-        Self { f, task: None }
+        Self {
+            f: Some(f),
+            task: None,
+        }
+    }
+}
+
+impl Drop for FdbFuture {
+    fn drop(&mut self) {
+        if let Some(f) = self.f.take() {
+            // `fdb_future_destory` cancels the future, so we don't need to call
+            // `fdb_future_cancel` explicitly.
+            unsafe { fdb::fdb_future_destroy(f) }
+        }
     }
 }
 
@@ -40,33 +52,29 @@ impl futures::Future for FdbFuture {
     type Error = FdbError;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
-        if self.f == std::ptr::null_mut() {
-            panic!("cannot poll after resolve")
-        }
+        let f = self.f.expect("cannot poll after resolve");
 
         if self.task.is_none() {
             let task = futures::task::current();
             let task = Box::new(task);
             let task_ptr = task.as_ref() as *const _;
             unsafe {
-                fdb::fdb_future_set_callback(self.f, Some(fdb_future_callback), task_ptr as *mut _);
+                fdb::fdb_future_set_callback(f, Some(fdb_future_callback), task_ptr as *mut _);
             }
             self.task = Some(task);
 
             return Ok(Async::NotReady);
         }
 
-        let ready = unsafe { fdb::fdb_future_is_ready(self.f) };
+        let ready = unsafe { fdb::fdb_future_is_ready(f) };
         if ready == 0 {
             return Ok(Async::NotReady);
         }
 
-        unsafe { error::eval(fdb::fdb_future_get_error(self.f))? };
+        unsafe { error::eval(fdb::fdb_future_get_error(f))? };
 
         // The result is taking ownership of fdb::FDBFuture
-        let g = FdbFutureResult::new(self.f);
-        self.f = std::ptr::null_mut();
-
+        let g = FdbFutureResult::new(self.f.take().unwrap());
         Ok(Async::Ready(g))
     }
 }
@@ -124,6 +132,13 @@ impl<'a> KeyValue<'a> {
 pub struct FdbFutureResult {
     f: *mut fdb::FDBFuture,
 }
+
+impl Drop for FdbFutureResult {
+    fn drop(&mut self) {
+        unsafe { fdb::fdb_future_destroy(self.f) }
+    }
+}
+
 impl FdbFutureResult {
     pub(crate) fn new(f: *mut fdb::FDBFuture) -> Self {
         Self { f }
@@ -236,11 +251,5 @@ impl FdbFutureResult {
             keyvalues: out_keyvalues,
             more: (more != 0),
         })
-    }
-}
-
-impl Drop for FdbFutureResult {
-    fn drop(&mut self) {
-        unsafe { fdb::fdb_future_destroy(self.f) }
     }
 }
