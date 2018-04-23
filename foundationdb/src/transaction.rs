@@ -11,13 +11,14 @@
 //! https://apple.github.io/foundationdb/api-c.html#transaction
 
 use foundationdb_sys as fdb;
-use futures::{Async, Future};
+use futures::{Async, Future, Stream};
 use std;
 use std::sync::Arc;
 
 use database::*;
 use error::{self, *};
 use future::*;
+use keyselector::*;
 use options;
 
 /// In FoundationDB, a transaction is a mutable snapshot of a database.
@@ -33,6 +34,104 @@ use options;
 pub struct Transaction {
     database: Database,
     inner: Arc<TransactionInner>,
+}
+
+/// Converts Rust `bool` into `fdb::fdb_bool_t`
+fn fdb_bool(v: bool) -> fdb::fdb_bool_t {
+    if v {
+        1
+    } else {
+        0
+    }
+}
+
+/// Foundationdb API uses `c_int` type as a length of a value, while Rust uses `usize` for. Rust
+/// inteface uses `usize` if it represents length or size of something. Those `usize` values should
+/// be converted to `c_int` before passed to ffi, because naive casting with `v as i32` will
+/// convert some `usize` values to unsigned one.
+/// TODO: check if inverse function is needed, `cint_to_usize(v: c_int) -> usize`?
+fn usize_trunc(v: usize) -> std::os::raw::c_int {
+    if v > std::i32::MAX as usize {
+        std::i32::MAX
+    } else {
+        v as i32
+    }
+}
+
+/// TBD
+pub struct RangeOption<'a> {
+    begin: KeySelector<'a>,
+    end: KeySelector<'a>,
+    limit: usize,
+    target_bytes: usize,
+    mode: options::StreamingMode,
+    //TODO: move snapshot out from `RangeOption`, as other methods like `Transaction::get` do?
+    snapshot: bool,
+    reverse: bool,
+}
+
+impl<'a> Default for RangeOption<'a> {
+    fn default() -> Self {
+        Self {
+            begin: KeySelector::first_greater_or_equal(&[0]),
+            end: KeySelector::first_greater_or_equal(&[0]),
+            limit: std::usize::MAX,
+            target_bytes: 0,
+            mode: options::StreamingMode::Iterator,
+            snapshot: false,
+            reverse: false,
+        }
+    }
+}
+
+/// TBD
+pub struct RangeOptionBuilder<'a>(RangeOption<'a>);
+impl<'a> RangeOptionBuilder<'a> {
+    /// TBD
+    pub fn new(begin: KeySelector<'a>, end: KeySelector<'a>) -> Self {
+        let mut opt = RangeOption::default();
+        opt.begin = begin;
+        opt.end = end;
+        RangeOptionBuilder(opt)
+    }
+
+    /// If non-zero, indicates the maximum number of key-value pairs to return.
+    pub fn limit(mut self, limit: usize) -> Self {
+        self.0.limit = limit;
+        self
+    }
+
+    /// If non-zero, indicates a (soft) cap on the combined number of bytes of keys and values to
+    /// return for each item.
+    pub fn target_bytes(mut self, target_bytes: usize) -> Self {
+        self.0.target_bytes = target_bytes;
+        self
+    }
+
+    /// One of the options::StreamingMode values indicating how the caller would like the data in
+    /// the range returned.
+    pub fn mode(mut self, mode: options::StreamingMode) -> Self {
+        self.0.mode = mode;
+        self
+    }
+
+    /// Non-zero if this is a snapshot read.
+    pub fn snapshot(mut self, snapshot: bool) -> Self {
+        self.0.snapshot = snapshot;
+        self
+    }
+
+    /// If non-zero, key-value pairs will be returned in reverse lexicographical order beginning at
+    /// the end of the range.
+    pub fn reverse(mut self, reverse: bool) -> Self {
+        self.0.reverse = reverse;
+        self
+    }
+
+    /// Finalizes the construction of the RangeOption
+    pub fn build(self) -> RangeOption<'a> {
+        self.0
+    }
 }
 
 // TODO: many implementations left
@@ -96,11 +195,17 @@ impl Transaction {
     /// * `key_name` - the name of the key to be looked up in the database
     ///
     /// TODO: implement: snapshot Non-zero if this is a snapshot read.
-    pub fn get(&self, key: &[u8]) -> TrxGet {
+    pub fn get(&self, key: &[u8], snapshot: bool) -> TrxGet {
         let trx = self.inner.inner;
 
-        let f =
-            unsafe { fdb::fdb_transaction_get(trx, key.as_ptr() as *const _, key.len() as i32, 0) };
+        let f = unsafe {
+            fdb::fdb_transaction_get(
+                trx,
+                key.as_ptr() as *const _,
+                key.len() as i32,
+                fdb_bool(snapshot),
+            )
+        };
         let f = FdbFuture::new(f);
         TrxGet {
             trx: self.clone(),
@@ -139,6 +244,124 @@ impl Transaction {
             )
         }
     }
+
+    /// Resolves a key selector against the keys in the database snapshot represented by
+    /// transaction.
+    ///
+    /// Returns an FDBFuture which will be set to the key in the database matching the key
+    /// selector. You must first wait for the FDBFuture to be ready, check for errors, call
+    /// fdb_future_get_key() to extract the key, and then destroy the FDBFuture with
+    /// fdb_future_destroy().
+    pub fn get_key(&self, selector: KeySelector, snapshot: bool) -> TrxGetKey {
+        let trx = self.inner.inner;
+
+        let key = selector.key();
+
+        let f = unsafe {
+            fdb::fdb_transaction_get_key(
+                trx,
+                key.as_ptr() as *const _,
+                key.len() as i32,
+                fdb_bool(selector.or_equal()),
+                selector.offset() as i32,
+                fdb_bool(snapshot),
+            )
+        };
+        let f = FdbFuture::new(f);
+        TrxGetKey {
+            trx: self.clone(),
+            inner: f,
+        }
+    }
+
+    /// TBD
+    //TODO: proper naming
+    pub fn get_range(&self, opt: RangeOption) -> KeyValuesStream {
+        let iteration = 0;
+
+        let mut stream = KeyValuesStream {
+            begin: opt.begin.to_owned(),
+            end: opt.end.to_owned(),
+            limit: opt.limit,
+            target_bytes: opt.target_bytes,
+            mode: opt.mode,
+            iteration,
+            snapshot: opt.snapshot,
+            reverse: opt.reverse,
+
+            trx: self.clone(),
+            inner: None,
+            index: 0,
+        };
+        stream.update_inner();
+        stream
+    }
+
+    //TODO: should we expose safe low-level API?
+    //TODO: should we accepts `RangeOption` for the API?
+    #[allow(unused)]
+    fn get_range_inner(
+        &self,
+        begin: KeySelector,
+        end: KeySelector,
+        limit: usize,
+        target_bytes: usize,
+        mode: options::StreamingMode,
+        iteration: usize,
+        snapshot: bool,
+        reverse: bool,
+    ) -> TrxGetRange {
+        let trx = self.inner.inner;
+
+        let key_begin = begin.key();
+        let key_end = end.key();
+
+        let f = unsafe {
+            fdb::fdb_transaction_get_range(
+                trx,
+                key_begin.as_ptr() as *const _,
+                key_begin.len() as i32,
+                fdb_bool(begin.or_equal()),
+                begin.offset() as i32,
+                key_end.as_ptr() as *const _,
+                key_end.len() as i32,
+                fdb_bool(end.or_equal()),
+                end.offset() as i32,
+                usize_trunc(limit),
+                usize_trunc(target_bytes),
+                mode.code(),
+                iteration as i32,
+                fdb_bool(snapshot),
+                fdb_bool(reverse),
+            )
+        };
+
+        let f = FdbFuture::new(f);
+        TrxGetRange {
+            trx: self.clone(),
+            inner: f,
+        }
+    }
+
+    /// Modify the database snapshot represented by transaction to remove all keys (if any) which
+    /// are lexicographically greater than or equal to the given begin key and lexicographically
+    /// less than the given end_key.
+    ///
+    /// The modification affects the actual database only if transaction is later committed with
+    /// `Tranasction::commit`.
+    pub fn clear_range(&self, begin: &[u8], end: &[u8]) {
+        let trx = self.inner.inner;
+        unsafe {
+            fdb::fdb_transaction_clear_range(
+                trx,
+                begin.as_ptr() as *const _,
+                begin.len() as i32,
+                end.as_ptr() as *const _,
+                end.len() as i32,
+            )
+        }
+    }
+
     /// Attempts to commit the sets and clears previously applied to the database snapshot represented by transaction to the actual database.
     ///
     /// The commit may or may not succeed – in particular, if a conflicting transaction previously committed, then the commit must fail in order to preserve transactional isolation. If the commit does succeed, the transaction is durably committed to the database and all subsequently started transactions will observe its effects.
@@ -313,6 +536,167 @@ impl Future for TrxGet {
                 inner: r,
             })),
             Ok(Async::NotReady) => Ok(Async::NotReady),
+            Err(e) => Err(e),
+        }
+    }
+}
+
+/// Represents the data of a `Transaction::get_key`
+pub struct GetKeyResult {
+    trx: Transaction,
+    inner: FdbFutureResult,
+}
+impl GetKeyResult {
+    /// Returns a clone of the Transaction this get is a part of
+    pub fn transaction(&self) -> Transaction {
+        self.trx.clone()
+    }
+
+    /// Returns the values associated with this get
+    pub fn value(&self) -> Result<&[u8]> {
+        self.inner.get_key()
+    }
+}
+
+/// A future results of a `get_key` operation
+pub struct TrxGetKey {
+    trx: Transaction,
+    inner: FdbFuture,
+}
+impl Future for TrxGetKey {
+    type Item = GetKeyResult;
+    type Error = FdbError;
+
+    fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
+        match self.inner.poll() {
+            Ok(Async::Ready(r)) => Ok(Async::Ready(GetKeyResult {
+                trx: self.trx.clone(),
+                inner: r,
+            })),
+            Ok(Async::NotReady) => Ok(Async::NotReady),
+            Err(e) => Err(e),
+        }
+    }
+}
+
+/// Represents the data of a `Transaction::get_range`
+pub struct GetRangeResult {
+    trx: Transaction,
+    inner: FdbFutureResult,
+}
+impl GetRangeResult {
+    /// Returns a clone of the Transaction this get is a part of
+    pub fn transaction(&self) -> Transaction {
+        self.trx.clone()
+    }
+
+    /// Returns the values associated with this get
+    pub fn keyvalues(&self) -> Result<KeyValues> {
+        self.inner.get_keyvalue_array()
+    }
+}
+
+/// A future results of a `get_range` operation
+struct TrxGetRange {
+    trx: Transaction,
+    inner: FdbFuture,
+}
+impl Future for TrxGetRange {
+    type Item = GetRangeResult;
+    type Error = FdbError;
+
+    fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
+        match self.inner.poll() {
+            Ok(Async::Ready(r)) => Ok(Async::Ready(GetRangeResult {
+                trx: self.trx.clone(),
+                inner: r,
+            })),
+            Ok(Async::NotReady) => Ok(Async::NotReady),
+            Err(e) => Err(e),
+        }
+    }
+}
+
+/// TODO
+pub struct KeyValuesStream {
+    //TODO: use `RangeOption` instead?
+    begin: OwnedKeySelector,
+    end: OwnedKeySelector,
+
+    limit: usize,
+    target_bytes: usize,
+    mode: options::StreamingMode,
+    iteration: usize,
+    snapshot: bool,
+    reverse: bool,
+
+    trx: Transaction,
+    inner: Option<TrxGetRange>,
+    index: usize,
+}
+
+impl KeyValuesStream {
+    fn update_inner(&mut self) {
+        self.iteration += 1;
+        self.inner = Some(self.trx.get_range_inner(
+            self.begin.as_selector(),
+            self.end.as_selector(),
+            self.limit - self.index,
+            self.target_bytes,
+            self.mode,
+            self.iteration,
+            self.snapshot,
+            self.reverse,
+        ));
+    }
+
+    fn advance(&mut self, res: &GetRangeResult) -> Result<()> {
+        let kvs = res.keyvalues()?;
+        let more = kvs.more();
+
+        if !more {
+            return Ok(());
+        }
+
+        let slice = kvs.as_ref();
+        if slice.is_empty() {
+            return Ok(());
+        }
+        self.index += slice.len();
+
+        let last = slice.last().unwrap();
+        let last_key = last.key();
+
+        if self.reverse {
+            self.end = KeySelector::first_greater_or_equal(last_key).to_owned();
+        } else {
+            self.begin = KeySelector::first_greater_than(last_key).to_owned();
+        }
+
+        self.update_inner();
+        Ok(())
+    }
+}
+
+impl<'a> Stream for KeyValuesStream {
+    type Item = GetRangeResult;
+    type Error = FdbError;
+
+    fn poll(&mut self) -> std::result::Result<Async<Option<Self::Item>>, Self::Error> {
+        if self.inner.is_none() {
+            return Ok(Async::Ready(None));
+        }
+
+        let mut inner = self.inner.take().unwrap();
+        match inner.poll() {
+            Ok(Async::NotReady) => {
+                self.inner = Some(inner);
+                Ok(Async::NotReady)
+            }
+            Ok(Async::Ready(res)) => {
+                self.advance(&res)?;
+                Ok(Async::Ready(Some(res)))
+            }
             Err(e) => Err(e),
         }
     }

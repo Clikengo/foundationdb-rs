@@ -88,7 +88,7 @@
 //!
 //! // read a value
 //! let trx = db.create_trx().expect("failed to create transaction");
-//! let result = trx.get(b"hello").wait().expect("failed to read world from hello");
+//! let result = trx.get(b"hello", false).wait().expect("failed to read world from hello");
 //!
 //! let value: &[u8] = result.value()
 //!     .expect("failed to get value from result") // unwrap the error
@@ -122,6 +122,8 @@ pub mod database;
 pub mod error;
 pub mod fdb_api;
 pub mod future;
+#[allow(missing_docs)]
+pub mod keyselector;
 pub mod network;
 /// Generated configuration types for use with the various `set_option` functions
 #[allow(missing_docs)]
