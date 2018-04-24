@@ -1,11 +1,13 @@
-#!/bin/bash -e -x
+#!/bin/bash -e
+
+set -x
 
 trust_dns_dir=$(dirname $0)/..
 cd ${trust_dns_dir:?}
 
 case $(uname) in
   Darwin) exit 0;;
-  Linux)      KCOV=true;;
+  Linux) KCOV=true;;
 esac
 
 # don't run on nightly or beta
