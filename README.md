@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.org/bluejekyll/foundationdb-rs.svg?branch=master)](https://travis-ci.org/bluejekyll/foundationdb-rs)
+[![codecov](https://codecov.io/gh/bluejekyll/foundationdb-rs/branch/master/graph/badge.svg)](https://codecov.io/gh/bluejekyll/foundationdb-rs)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE-MIT)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](LICENSE-APACHE)
 

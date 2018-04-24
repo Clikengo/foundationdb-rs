@@ -16,7 +16,7 @@ categories = ["database"]
 
 [badges]
 travis-ci = { repository = "bluejekyll/foundationdb-rs" }
-# codecov = { repository = "bluejekyll/foundationdb-rs", branch = "master", service = "github" }
+codecov = { repository = "bluejekyll/foundationdb-rs", branch = "master", service = "github" }
 
 [dependencies]
 failure = "0.1"
