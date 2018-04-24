@@ -96,9 +96,7 @@ impl Network {
     /// ```
     pub fn stop(&self) -> std::result::Result<(), failure::Error> {
         if !HAS_BEEN_RUN.load(Ordering::Acquire) {
-            return Err(format_err!(
-                "the network must be runn before trying to stop"
-            ));
+            return Err(format_err!("the network must be run before trying to stop"));
         }
 
         unsafe { error::eval(fdb_sys::fdb_stop_network())? }

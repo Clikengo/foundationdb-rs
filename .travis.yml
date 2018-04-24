@@ -45,4 +45,9 @@ script:
   - cargo test --manifest-path foundationdb/Cargo.toml --all-features
   - cargo run --manifest-path foundationdb/Cargo.toml --all-features --example hello
 
-# after_success: cargo kcov here...
+after_success:
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]];    \
+      cargo install cargo-kcov                \
+      cargo kcov --all                        \
+      bash <(curl -s https://codecov.io/bash) \
+    fi
