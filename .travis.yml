@@ -14,6 +14,7 @@ matrix:
 
     - os: osx
       rust: stable
+      env: RUST_BACKTRACE=full
 
     - rust: nightly
       env: RUST_BACKTRACE=full
@@ -46,8 +47,8 @@ script:
   - cargo run --manifest-path foundationdb/Cargo.toml --all-features --example hello
 
 after_success:
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]];    \
-      cargo install cargo-kcov                \
-      cargo kcov --all                        \
-      bash <(curl -s https://codecov.io/bash) \
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then  \
+      cargo install cargo-kcov;                  \
+      cargo kcov --all;                          \
+      bash <(curl -s https://codecov.io/bash);   \
     fi
