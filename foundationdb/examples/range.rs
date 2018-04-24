@@ -46,10 +46,10 @@ fn example_get_range() -> Box<Future<Item = (), Error = FdbError>> {
             let end = KeySelector::first_greater_than(key_end.as_bytes());
             let opt = transaction::RangeOptionBuilder::new(begin, end).build();
 
-            let stream = trx.get_range(opt);
-            stream
+            trx.get_ranges(opt)
+                .map_err(|(_opt, e)| e)
                 .fold(0, |count, item| {
-                    let kvs = item.keyvalues()?;
+                    let kvs = item.keyvalues();
                     Ok(count + kvs.as_ref().len())
                 })
                 .map(|count| {

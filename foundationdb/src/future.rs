@@ -204,7 +204,6 @@ impl FdbFutureResult {
         Ok(Some(slice))
     }
 
-    #[allow(unused)]
     pub(crate) fn get_string_array(&self) -> Result<Vec<&[u8]>> {
         use std::os::raw::c_char;
 
@@ -231,7 +230,6 @@ impl FdbFutureResult {
         Ok(v)
     }
 
-    #[allow(unused)]
     pub(crate) fn get_keyvalue_array<'a>(&'a self) -> Result<KeyValues<'a>> {
         let mut out_keyvalues = std::ptr::null();
         let mut out_len = 0;
