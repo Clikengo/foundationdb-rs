@@ -8,6 +8,7 @@ matrix:
     # we want full coverage, include all features...
     - rust: stable
       env: RUST_BACKTRACE=full
+           RUN_KCOV=1
 
     - rust: beta
       env: RUST_BACKTRACE=full
