@@ -6,64 +6,16 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
-///TODO: revise
-//TODO: introduces a Trait to cover both KeySelector/OwnedKeySelector?
 #[derive(Clone, Debug)]
-pub struct KeySelector<'a> {
-    key: &'a [u8],
-    or_equal: bool,
-    offset: usize,
-}
-
-impl<'a> KeySelector<'a> {
-    pub fn new(key: &'a [u8], or_equal: bool, offset: usize) -> Self {
-        Self {
-            key,
-            or_equal,
-            offset,
-        }
-    }
-
-    pub fn key(&self) -> &[u8] {
-        self.key
-    }
-
-    pub fn or_equal(&self) -> bool {
-        self.or_equal
-    }
-
-    pub fn offset(&self) -> usize {
-        self.offset
-    }
-
-    pub fn to_owned(&self) -> OwnedKeySelector {
-        OwnedKeySelector::new(self.key.to_vec(), self.or_equal, self.offset)
-    }
-
-    pub fn last_less_than(key: &'a [u8]) -> Self {
-        Self::new(key, false, 0)
-    }
-    pub fn last_less_or_equal(key: &'a [u8]) -> Self {
-        Self::new(key, true, 0)
-    }
-
-    pub fn first_greater_than(key: &'a [u8]) -> Self {
-        Self::new(key, true, 1)
-    }
-    pub fn first_greater_or_equal(key: &'a [u8]) -> Self {
-        Self::new(key, false, 1)
-    }
-}
-
-///TODO: revise
-pub struct OwnedKeySelector {
+pub struct KeySelector {
     //TODO: Box<[u8]>?
+    //TODO: introduces BorrowedKeySelector?
     key: Vec<u8>,
     or_equal: bool,
     offset: usize,
 }
 
-impl OwnedKeySelector {
+impl KeySelector {
     pub fn new(key: Vec<u8>, or_equal: bool, offset: usize) -> Self {
         Self {
             key,
@@ -84,8 +36,17 @@ impl OwnedKeySelector {
         self.offset
     }
 
-    //TODO: better naming
-    pub(crate) fn as_selector(&self) -> KeySelector {
-        KeySelector::new(self.key.as_slice(), self.or_equal, self.offset)
+    pub fn last_less_than(key: &[u8]) -> Self {
+        Self::new(key.to_vec(), false, 0)
+    }
+    pub fn last_less_or_equal(key: &[u8]) -> Self {
+        Self::new(key.to_vec(), true, 0)
+    }
+
+    pub fn first_greater_than(key: &[u8]) -> Self {
+        Self::new(key.to_vec(), true, 1)
+    }
+    pub fn first_greater_or_equal(key: &[u8]) -> Self {
+        Self::new(key.to_vec(), false, 1)
     }
 }

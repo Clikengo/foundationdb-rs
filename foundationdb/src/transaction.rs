@@ -58,10 +58,11 @@ fn usize_trunc(v: usize) -> std::os::raw::c_int {
     }
 }
 
-/// TBD
-pub struct RangeOption<'a> {
-    begin: KeySelector<'a>,
-    end: KeySelector<'a>,
+/// `RangeOption` represents a query parameters for range scan query.
+#[derive(Clone)]
+pub struct RangeOption {
+    begin: KeySelector,
+    end: KeySelector,
     limit: usize,
     target_bytes: usize,
     mode: options::StreamingMode,
@@ -70,11 +71,11 @@ pub struct RangeOption<'a> {
     reverse: bool,
 }
 
-impl<'a> Default for RangeOption<'a> {
+impl<'a> Default for RangeOption {
     fn default() -> Self {
         Self {
-            begin: KeySelector::first_greater_or_equal(&[0]),
-            end: KeySelector::first_greater_or_equal(&[0]),
+            begin: KeySelector::first_greater_or_equal(&[]).to_owned(),
+            end: KeySelector::first_greater_or_equal(&[]).to_owned(),
             limit: std::usize::MAX,
             target_bytes: 0,
             mode: options::StreamingMode::Iterator,
@@ -84,14 +85,14 @@ impl<'a> Default for RangeOption<'a> {
     }
 }
 
-/// TBD
-pub struct RangeOptionBuilder<'a>(RangeOption<'a>);
-impl<'a> RangeOptionBuilder<'a> {
-    /// TBD
-    pub fn new(begin: KeySelector<'a>, end: KeySelector<'a>) -> Self {
+/// A Builder with which options need to used for a range query.
+pub struct RangeOptionBuilder(RangeOption);
+impl RangeOptionBuilder {
+    /// Creates new builder with given key selectors.
+    pub fn new(begin: KeySelector, end: KeySelector) -> Self {
         let mut opt = RangeOption::default();
-        opt.begin = begin;
-        opt.end = end;
+        opt.begin = begin.to_owned();
+        opt.end = end.to_owned();
         RangeOptionBuilder(opt)
     }
 
@@ -129,7 +130,7 @@ impl<'a> RangeOptionBuilder<'a> {
     }
 
     /// Finalizes the construction of the RangeOption
-    pub fn build(self) -> RangeOption<'a> {
+    pub fn build(self) -> RangeOption {
         self.0
     }
 }
@@ -274,49 +275,32 @@ impl Transaction {
         }
     }
 
-    /// TBD
-    //TODO: proper naming
-    pub fn get_range(&self, opt: RangeOption) -> KeyValuesStream {
-        let iteration = 0;
+    ///
+    pub fn get_ranges(&self, opt: RangeOption) -> RangeStream {
+        let iteration = 1;
+        let inner = self.get_range(opt, iteration);
 
-        let mut stream = KeyValuesStream {
-            begin: opt.begin.to_owned(),
-            end: opt.end.to_owned(),
-            limit: opt.limit,
-            target_bytes: opt.target_bytes,
-            mode: opt.mode,
+        RangeStream {
             iteration,
-            snapshot: opt.snapshot,
-            reverse: opt.reverse,
 
             trx: self.clone(),
-            inner: None,
-            index: 0,
-        };
-        stream.update_inner();
-        stream
+            inner: Some(inner),
+        }
     }
 
-    //TODO: should we expose safe low-level API?
-    //TODO: should we accepts `RangeOption` for the API?
-    #[allow(unused)]
-    fn get_range_inner(
-        &self,
-        begin: KeySelector,
-        end: KeySelector,
-        limit: usize,
-        target_bytes: usize,
-        mode: options::StreamingMode,
-        iteration: usize,
-        snapshot: bool,
-        reverse: bool,
-    ) -> TrxGetRange {
+    /// Reads all key-value pairs in the database snapshot represented by transaction (potentially
+    /// limited by limit, target_bytes, or mode) which have a key lexicographically greater than or
+    /// equal to the key resolved by the begin key selector and lexicographically less than the key
+    /// resolved by the end key selector.
+    pub fn get_range(&self, opt: RangeOption, iteration: usize) -> TrxGetRange {
         let trx = self.inner.inner;
 
-        let key_begin = begin.key();
-        let key_end = end.key();
-
         let f = unsafe {
+            let begin = &opt.begin;
+            let end = &opt.end;
+            let key_begin = begin.key();
+            let key_end = end.key();
+
             fdb::fdb_transaction_get_range(
                 trx,
                 key_begin.as_ptr() as *const _,
@@ -327,12 +311,12 @@ impl Transaction {
                 key_end.len() as i32,
                 fdb_bool(end.or_equal()),
                 end.offset() as i32,
-                usize_trunc(limit),
-                usize_trunc(target_bytes),
-                mode.code(),
+                usize_trunc(opt.limit),
+                usize_trunc(opt.target_bytes),
+                opt.mode.code(),
                 iteration as i32,
-                fdb_bool(snapshot),
-                fdb_bool(reverse),
+                fdb_bool(opt.snapshot),
+                fdb_bool(opt.reverse),
             )
         };
 
@@ -340,6 +324,7 @@ impl Transaction {
         TrxGetRange {
             trx: self.clone(),
             inner: f,
+            opt: Some(opt),
         }
     }
 
@@ -579,11 +564,21 @@ impl Future for TrxGetKey {
     }
 }
 
-/// Represents the data of a `Transaction::get_range`
+/// Represents the data of a `Transaction::get_range`. The result might not contains all results
+/// specified by `Transaction::get_range`. A caller can test if the result is complete by either
+/// checking `GetRangeResult::keyvalues().more()` is `true`, or checking `GetRangeResult::next` is
+/// not `None`.
+/// If a caller wants to fetch all matching results, they should call `Transcation::get_range` with
+/// following `RangeOption` returned by `GetRangeResult::next`. The caller might want to use
+/// `Transaction::get_ranges` which will fetch all results until it finishes.
 pub struct GetRangeResult {
     trx: Transaction,
+    opt: RangeOption,
+
+    // This future should always resolves to keyvalue array.
     inner: FdbFutureResult,
 }
+
 impl GetRangeResult {
     /// Returns a clone of the Transaction this get is a part of
     pub fn transaction(&self) -> Transaction {
@@ -591,96 +586,94 @@ impl GetRangeResult {
     }
 
     /// Returns the values associated with this get
-    pub fn keyvalues(&self) -> Result<KeyValues> {
-        self.inner.get_keyvalue_array()
+    pub fn keyvalues(&self) -> KeyValues {
+        self.inner.get_keyvalue_array().unwrap()
+    }
+
+    /// Returns `None` if all results are returned, and returns `Some(_)` if there are more results
+    /// to fetch. In this case, user can fetch remaining results by calling
+    /// `Transaction::get_range` with returned `RangeOption`.
+    pub fn next(&self) -> Option<RangeOption> {
+        let kva = self.keyvalues();
+        if !kva.more() {
+            return None;
+        }
+
+        let slice = kva.as_ref();
+        if slice.is_empty() {
+            return None;
+        }
+
+        let last = slice.last().unwrap();
+        let last_key = last.key();
+
+        let mut opt = self.opt.clone();
+        opt.limit -= slice.len();
+        if opt.reverse {
+            opt.end = KeySelector::first_greater_or_equal(last_key).to_owned();
+        } else {
+            opt.begin = KeySelector::first_greater_than(last_key).to_owned();
+        }
+        Some(opt)
     }
 }
 
 /// A future results of a `get_range` operation
-struct TrxGetRange {
+pub struct TrxGetRange {
     trx: Transaction,
     inner: FdbFuture,
+    opt: Option<RangeOption>,
 }
+
 impl Future for TrxGetRange {
     type Item = GetRangeResult;
     type Error = FdbError;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         match self.inner.poll() {
-            Ok(Async::Ready(r)) => Ok(Async::Ready(GetRangeResult {
-                trx: self.trx.clone(),
-                inner: r,
-            })),
+            Ok(Async::Ready(r)) => {
+                // tests if the future resolves to keyvalue array.
+                if let Err(e) = r.get_keyvalue_array() {
+                    return Err(e);
+                }
+
+                Ok(Async::Ready(GetRangeResult {
+                    trx: self.trx.clone(),
+                    inner: r,
+                    opt: self.opt.take().expect("should not poll after ready"),
+                }))
+            }
             Ok(Async::NotReady) => Ok(Async::NotReady),
             Err(e) => Err(e),
         }
     }
 }
 
-/// TODO
-pub struct KeyValuesStream {
-    //TODO: use `RangeOption` instead?
-    begin: OwnedKeySelector,
-    end: OwnedKeySelector,
-
-    limit: usize,
-    target_bytes: usize,
-    mode: options::StreamingMode,
+//TODO: proper naming
+/// `RangeStream` represents a stream of `GetRangeResult`
+pub struct RangeStream {
     iteration: usize,
-    snapshot: bool,
-    reverse: bool,
 
     trx: Transaction,
     inner: Option<TrxGetRange>,
-    index: usize,
 }
 
-impl KeyValuesStream {
-    fn update_inner(&mut self) {
+impl RangeStream {
+    fn update_inner(&mut self, opt: RangeOption) {
         self.iteration += 1;
-        self.inner = Some(self.trx.get_range_inner(
-            self.begin.as_selector(),
-            self.end.as_selector(),
-            self.limit - self.index,
-            self.target_bytes,
-            self.mode,
-            self.iteration,
-            self.snapshot,
-            self.reverse,
-        ));
+        self.inner = Some(self.trx.get_range(opt, self.iteration));
     }
 
-    fn advance(&mut self, res: &GetRangeResult) -> Result<()> {
-        let kvs = res.keyvalues()?;
-        let more = kvs.more();
-
-        if !more {
-            return Ok(());
+    fn advance(&mut self, res: &GetRangeResult) {
+        if let Some(opt) = res.next() {
+            self.update_inner(opt)
         }
-
-        let slice = kvs.as_ref();
-        if slice.is_empty() {
-            return Ok(());
-        }
-        self.index += slice.len();
-
-        let last = slice.last().unwrap();
-        let last_key = last.key();
-
-        if self.reverse {
-            self.end = KeySelector::first_greater_or_equal(last_key).to_owned();
-        } else {
-            self.begin = KeySelector::first_greater_than(last_key).to_owned();
-        }
-
-        self.update_inner();
-        Ok(())
     }
 }
 
-impl<'a> Stream for KeyValuesStream {
+impl<'a> Stream for RangeStream {
     type Item = GetRangeResult;
-    type Error = FdbError;
+    type Error = (RangeOption, FdbError);
 
     fn poll(&mut self) -> std::result::Result<Async<Option<Self::Item>>, Self::Error> {
         if self.inner.is_none() {
@@ -694,10 +687,13 @@ impl<'a> Stream for KeyValuesStream {
                 Ok(Async::NotReady)
             }
             Ok(Async::Ready(res)) => {
-                self.advance(&res)?;
+                self.advance(&res);
                 Ok(Async::Ready(Some(res)))
             }
-            Err(e) => Err(e),
+            Err(e) => {
+                // `inner.opt == None` after it resolves, so `inner.opt.unwrap()` should not fail.
+                Err((inner.opt.unwrap(), e))
+            }
         }
     }
 }
