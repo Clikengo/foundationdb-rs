@@ -29,6 +29,12 @@ pub(crate) fn eval(error_code: fdb_sys::fdb_error_t) -> Result<()> {
 pub struct FdbError {
     error_code: i32,
     error_str: &'static str,
+
+    // Not all retryable error should be retried. For example, error_code=1020 transaction conflict
+    // error is always retryable (so `FdbError::is_retryable` always returns `true`), while it
+    // should not be retried if `TransactionOption::RetryLimit` is exceeded. So we should keep
+    // track whether the error should be retried or not.
+    should_retry: bool,
 }
 
 /// An Fdb Result type
@@ -44,6 +50,7 @@ impl FdbError {
             error_str: error_str
                 .to_str()
                 .expect("bad error string from FoundationDB"),
+            should_retry: false,
         }
     }
 
@@ -81,5 +88,18 @@ impl FdbError {
         };
 
         check != 0
+    }
+
+    // `fdb_transaction_on_error` requires error code, so the code should accessible in the crate.
+    pub(crate) fn code(&self) -> i32 {
+        self.error_code
+    }
+
+    pub(crate) fn set_should_retry(&mut self, should_retry: bool) {
+        self.should_retry = should_retry;
+    }
+
+    pub(crate) fn should_retry(&self) -> bool {
+        self.should_retry
     }
 }
