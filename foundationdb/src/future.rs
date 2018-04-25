@@ -23,7 +23,7 @@ use futures::Async;
 use error::{self, FdbError, Result};
 
 /// An opaque type that represents a Future in the FoundationDB C API.
-pub struct FdbFuture {
+pub(crate) struct FdbFuture {
     f: Option<*mut fdb::FDBFuture>,
     task: Option<Box<futures::task::Task>>,
 }
@@ -132,7 +132,7 @@ impl<'a> KeyValue<'a> {
 }
 
 /// The Result of an FdbFuture from which query results can be gottent, etc.
-pub struct FdbFutureResult {
+pub(crate) struct FdbFutureResult {
     f: *mut fdb::FDBFuture,
 }
 

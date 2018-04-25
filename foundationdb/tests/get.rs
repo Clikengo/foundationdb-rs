@@ -144,3 +144,59 @@ fn test_set_conflict_snapshot() {
 
     fut.wait().expect("failed to run")
 }
+
+// Makes the key dirty. It will abort transactions which performs non-snapshot read on the `key`.
+fn make_dirty(db: &Database, key: &[u8]) {
+    let trx = db.create_trx().unwrap();
+    trx.set(key, b"");
+    trx.commit().wait().unwrap();
+}
+
+#[test]
+fn test_transact() {
+    use std::sync::{atomic::*, Arc};
+
+    const KEY: &[u8] = b"test-transact";
+    const RETRY_COUNT: usize = 5;
+    common::setup_static();
+
+    let try_count = Arc::new(AtomicUsize::new(0));
+    let try_count0 = try_count.clone();
+
+    let fut = Cluster::new(foundationdb::default_config_path())
+        .and_then(|cluster| cluster.create_database())
+        .and_then(|db| {
+            // start tranasction with retry
+            db.transact(move |trx| {
+                // increment try counter
+                try_count0.fetch_add(1, Ordering::SeqCst);
+
+                trx.set_option(options::TransactionOption::RetryLimit(RETRY_COUNT as u32))
+                    .expect("failed to set retry limit");
+
+                let db = trx.database();
+
+                // update conflict range
+                trx.get(KEY, false).and_then(move |res| {
+                    // make current transaction invalid by making conflict
+                    make_dirty(&db, KEY);
+
+                    let trx = res.transaction();
+                    trx.set(KEY, common::random_str(10).as_bytes());
+                    // `Database::transact` will handle commit by itself, so returns without commit
+                    Ok(())
+                })
+            }).then(|res| match res {
+                Ok(_) => panic!("should not be able to commit"),
+                Err(e) => {
+                    eprintln!("failed as expected: {:?}", e);
+                    Ok(())
+                }
+            })
+        });
+
+    fut.wait().expect("failed to run");
+    // `TransactionOption::RetryCount` does not count first try, so `try_count` should be equal to
+    // `RETRY_COUNT+1`
+    assert_eq!(try_count.load(Ordering::SeqCst), RETRY_COUNT + 1);
+}

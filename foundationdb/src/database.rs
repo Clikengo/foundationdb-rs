@@ -11,6 +11,8 @@
 //! https://apple.github.io/foundationdb/api-c.html#database
 
 use foundationdb_sys as fdb;
+use futures::future::*;
+use futures::Future;
 use std;
 use std::sync::Arc;
 
@@ -48,6 +50,45 @@ impl Database {
             ))?;
             Ok(Transaction::new(self.clone(), trx))
         }
+    }
+
+    /// `transact` returns a future which retries on error. It tries to resolve a future created by
+    /// caller-provided function `f` inside a retry loop, providing it with a newly created
+    /// transaction. After caller-provided future resolves, the transaction will be committed
+    /// automatically.
+    pub fn transact<F, Fut, Item>(&self, f: F) -> Box<Future<Item = Fut::Item, Error = FdbError>>
+    where
+        F: FnMut(Transaction) -> Fut + 'static,
+        Fut: Future<Item = Item, Error = FdbError> + 'static,
+        Item: 'static,
+    {
+        let db = self.clone();
+
+        let f = result(db.create_trx()).and_then(|trx| {
+            loop_fn((trx, f), |(trx, mut f)| {
+                let trx0 = trx.clone();
+                f(trx.clone())
+                    .and_then(move |res| {
+                        // try to commit the transaction
+                        trx0.commit().map(|_| res)
+                    })
+                    .then(|res| match res {
+                        Ok(v) => {
+                            // committed
+                            Ok(Loop::Break(v))
+                        }
+                        Err(e) => {
+                            if e.should_retry() {
+                                Ok(Loop::Continue((trx, f)))
+                            } else {
+                                Err(e)
+                            }
+                        }
+                    })
+            })
+        });
+
+        Box::new(f)
     }
 }
 
