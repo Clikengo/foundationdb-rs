@@ -72,7 +72,7 @@ fn example_atomic() -> Box<Future<Item = (), Error = FdbError>> {
             // Wait for all atomic operations
             fut_add.join(fut_sub).map(move |_| db)
         })
-        .and_then(|db| result(db.create_trx()).and_then(|trx| trx.get(KEY)))
+        .and_then(|db| result(db.create_trx()).and_then(|trx| trx.get(KEY, false)))
         .and_then(|res| {
             let value = res.value()
                 .expect("failed to get value")
