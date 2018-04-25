@@ -7,18 +7,22 @@
 
 extern crate byteorder;
 extern crate foundationdb;
-extern crate foundationdb_sys;
 extern crate futures;
-
-use foundationdb::*;
+#[macro_use]
+extern crate lazy_static;
 
 use byteorder::ByteOrder;
+use foundationdb::*;
 use futures::future::*;
 
-use error::FdbError;
+mod common;
 
 //TODO: impl Future
-fn atomic_add(db: Database, key: &[u8], value: i64) -> Box<Future<Item = (), Error = FdbError>> {
+fn atomic_add(
+    db: Database,
+    key: &[u8],
+    value: i64,
+) -> Box<Future<Item = (), Error = error::FdbError>> {
     let trx = match db.create_trx() {
         Ok(trx) => trx,
         Err(e) => return Box::new(err(e)),
@@ -35,8 +39,9 @@ fn atomic_add(db: Database, key: &[u8], value: i64) -> Box<Future<Item = (), Err
     Box::new(fut)
 }
 
-//TODO: impl Future
-fn example_atomic() -> Box<Future<Item = (), Error = FdbError>> {
+#[test]
+fn test_atomic() {
+    common::setup_static();
     const KEY: &[u8] = b"test-atomic";
 
     let fut = Cluster::new(foundationdb::default_config_path())
@@ -87,32 +92,5 @@ fn example_atomic() -> Box<Future<Item = (), Error = FdbError>> {
             Ok(())
         });
 
-    Box::new(fut)
-}
-
-#[test]
-fn atomic() {
-    use fdb_api::FdbApiBuilder;
-
-    let network = FdbApiBuilder::default()
-        .build()
-        .expect("failed to init api")
-        .network()
-        .build()
-        .expect("failed to init network");
-
-    let handle = std::thread::spawn(move || {
-        let error = network.run();
-
-        if let Err(error) = error {
-            panic!("fdb_run_network: {}", error);
-        }
-    });
-
-    network.wait();
-
-    example_atomic().wait().expect("failed to run");
-
-    network.stop().expect("failed to stop network");
-    handle.join().expect("failed to join fdb thread");
+    fut.wait().expect("failed to run");
 }

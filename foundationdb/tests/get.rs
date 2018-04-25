@@ -6,17 +6,18 @@
 // copied, modified, or distributed except according to those terms.
 
 extern crate foundationdb;
-extern crate foundationdb_sys;
 extern crate futures;
+#[macro_use]
+extern crate lazy_static;
 
 use foundationdb::*;
-
 use futures::future::*;
 
-use error::FdbError;
+mod common;
 
-//TODO: impl Future
-fn example_set_get() -> Box<Future<Item = (), Error = FdbError>> {
+#[test]
+fn test_set_get() {
+    common::setup_static();
     let fut = Cluster::new(foundationdb::default_config_path())
         .and_then(|cluster| cluster.create_database())
         .and_then(|db| result(db.create_trx()))
@@ -41,10 +42,12 @@ fn example_set_get() -> Box<Future<Item = (), Error = FdbError>> {
             Ok(())
         });
 
-    Box::new(fut)
+    fut.wait().expect("failed to run")
 }
 
-fn example_get_multi() -> Box<Future<Item = (), Error = FdbError>> {
+#[test]
+fn test_get_multi() {
+    common::setup_static();
     let fut = Cluster::new(foundationdb::default_config_path())
         .and_then(|cluster| cluster.create_database())
         .and_then(|db| result(db.create_trx()))
@@ -61,32 +64,5 @@ fn example_get_multi() -> Box<Future<Item = (), Error = FdbError>> {
             Ok(())
         });
 
-    Box::new(fut)
-}
-
-fn main() {
-    use fdb_api::FdbApiBuilder;
-
-    let network = FdbApiBuilder::default()
-        .build()
-        .expect("failed to init api")
-        .network()
-        .build()
-        .expect("failed to init network");
-
-    let handle = std::thread::spawn(move || {
-        let error = network.run();
-
-        if let Err(error) = error {
-            panic!("fdb_run_network: {}", error);
-        }
-    });
-
-    network.wait();
-
-    example_set_get().wait().expect("failed to run");
-    example_get_multi().wait().expect("failed to run");
-
-    network.stop().expect("failed to stop network");
-    handle.join().expect("failed to join fdb thread");
+    fut.wait().expect("failed to run")
 }
