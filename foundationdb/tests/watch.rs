@@ -6,26 +6,18 @@
 // copied, modified, or distributed except according to those terms.
 
 extern crate foundationdb;
-extern crate foundationdb_sys;
 extern crate futures;
-extern crate rand;
+#[macro_use]
+extern crate lazy_static;
 
 use foundationdb::*;
-
 use futures::future::*;
 
-use error::FdbError;
+mod common;
 
-/// generate random string. Foundationdb watch only fires when value changed, so updating with same
-/// value twice will not fire watches. To make examples work over multiple run, we use random
-/// string as a value.
-fn random_str(len: usize) -> String {
-    use rand::Rng;
-    let mut rng = rand::thread_rng();
-    rng.gen_ascii_chars().take(len).collect::<String>()
-}
-
-fn example_watch() -> Box<Future<Item = (), Error = FdbError>> {
+#[test]
+fn test_watch() {
+    common::setup_static();
     const KEY: &'static [u8] = b"test-watch";
 
     let fut = Cluster::new(foundationdb::default_config_path())
@@ -43,7 +35,7 @@ fn example_watch() -> Box<Future<Item = (), Error = FdbError>> {
             let write = result(db.create_trx()).and_then(|trx| {
                 eprintln!("writing value");
 
-                let value = random_str(10);
+                let value = common::random_str(10);
                 trx.set(KEY, value.as_bytes());
                 trx.commit().map(|_| {
                     eprintln!("write committed");
@@ -65,10 +57,12 @@ fn example_watch() -> Box<Future<Item = (), Error = FdbError>> {
             })
         });
 
-    Box::new(fut)
+    fut.wait().expect("failed to run")
 }
 
-fn example_watch_without_commit() -> Box<Future<Item = (), Error = FdbError>> {
+#[test]
+fn test_watch_without_commit() {
+    common::setup_static();
     const KEY: &'static [u8] = b"test-watch-2";
 
     let fut = Cluster::new(foundationdb::default_config_path())
@@ -84,38 +78,8 @@ fn example_watch_without_commit() -> Box<Future<Item = (), Error = FdbError>> {
             // should return error_code=1025, `Operation aborted because the transaction was
             // canceled`
             eprintln!("error as expected: {:?}", e);
-            Ok(())
+            Ok::<(), error::FdbError>(())
         });
 
-    Box::new(fut)
-}
-
-#[test]
-fn watch() {
-    use fdb_api::FdbApiBuilder;
-
-    let network = FdbApiBuilder::default()
-        .build()
-        .expect("failed to init api")
-        .network()
-        .build()
-        .expect("failed to init network");
-
-    let handle = std::thread::spawn(move || {
-        let error = network.run();
-
-        if let Err(error) = error {
-            panic!("fdb_run_network: {}", error);
-        }
-    });
-
-    network.wait();
-
-    example_watch().wait().expect("failed to run");
-    example_watch_without_commit()
-        .wait()
-        .expect("failed to run");
-
-    network.stop().expect("failed to stop network");
-    handle.join().expect("failed to join fdb thread");
+    fut.wait().expect("failed to run")
 }
