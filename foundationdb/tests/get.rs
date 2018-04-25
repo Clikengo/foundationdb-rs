@@ -66,3 +66,81 @@ fn test_get_multi() {
 
     fut.wait().expect("failed to run")
 }
+
+#[test]
+fn test_set_conflict() {
+    common::setup_static();
+
+    let key = b"test-conflict";
+    let fut = Cluster::new(foundationdb::default_config_path())
+        .and_then(|cluster| cluster.create_database())
+        .and_then(|db| {
+            // First transaction. It will be committed before second one.
+            let fut_set1 = result(db.create_trx()).and_then(|trx1| {
+                trx1.set(key, common::random_str(10).as_bytes());
+                trx1.commit()
+            });
+
+            // Second transaction. There will be conflicted by first transaction before commit.
+            result(db.create_trx())
+                .and_then(|trx2| {
+                    // try to read value to set conflict range
+                    trx2.get(key, false)
+                })
+                .and_then(move |val| {
+                    // commit first transaction to create conflict
+                    fut_set1.map(move |_trx1| val.transaction())
+                })
+                .and_then(|trx2| {
+                    // commit seconds transaction, which will cause conflict
+                    trx2.set(key, common::random_str(10).as_bytes());
+                    trx2.commit()
+                })
+                .map(|_v| {
+                    panic!("should not be committed without conflict");
+                })
+                .or_else(|e| {
+                    eprintln!("error as expected: {:?}", e);
+                    Ok(())
+                })
+        });
+
+    fut.wait().expect("failed to run")
+}
+
+#[test]
+fn test_set_conflict_snapshot() {
+    common::setup_static();
+
+    let key = b"test-conflict-snapshot";
+    let fut = Cluster::new(foundationdb::default_config_path())
+        .and_then(|cluster| cluster.create_database())
+        .and_then(|db| {
+            // First transaction. It will be committed before second one.
+            let fut_set1 = result(db.create_trx()).and_then(|trx1| {
+                trx1.set(key, common::random_str(10).as_bytes());
+                trx1.commit()
+            });
+
+            // Second transaction.
+            result(db.create_trx())
+                .and_then(|trx2| {
+                    // snapshot read does not set conflict range, so both transaction will be
+                    // committed.
+                    trx2.get(key, true)
+                })
+                .and_then(move |val| {
+                    // commit first transaction
+                    fut_set1.map(move |_trx1| val.transaction())
+                })
+                .and_then(|trx2| {
+                    // commit seconds transaction, which will *not* cause conflict because of
+                    // snapshot read
+                    trx2.set(key, common::random_str(10).as_bytes());
+                    trx2.commit()
+                })
+                .map(|_v| ())
+        });
+
+    fut.wait().expect("failed to run")
+}
