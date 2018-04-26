@@ -71,10 +71,8 @@ fn test_watch_without_commit() {
         .and_then(|trx| {
             eprintln!("setting watch");
 
-            let f = trx.watch(KEY);
-            // `trx` is canceled, so a watch will be canceled
-            trx.cancel();
-            f
+            // trx will be dropped without `commit`, so a watch will be canceled
+            trx.watch(KEY)
         })
         .or_else(|e| {
             // should return error_code=1025, `Operation aborted because the transaction was

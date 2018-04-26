@@ -56,6 +56,12 @@ impl Database {
     /// caller-provided function `f` inside a retry loop, providing it with a newly created
     /// transaction. After caller-provided future resolves, the transaction will be committed
     /// automatically.
+    ///
+    /// # Warning
+    ///
+    /// It might retry indefinitely if the transaction is highly contentious. It is recommended to
+    /// set `TransactionOption::RetryLimit` or `TransactionOption::SetTimeout` on the transaction
+    /// if the task need to be guaranteed to finish.
     pub fn transact<F, Fut, Item>(&self, f: F) -> Box<Future<Item = Fut::Item, Error = FdbError>>
     where
         F: FnMut(Transaction) -> Fut + 'static,

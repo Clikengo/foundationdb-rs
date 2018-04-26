@@ -457,7 +457,7 @@ impl Transaction {
         let f =
             unsafe { fdb::fdb_transaction_watch(trx, key.as_ptr() as *const _, key.len() as i32) };
         TrxWatch {
-            inner: self.new_future(f),
+            inner: FdbFuture::new(f),
         }
     }
 
@@ -737,7 +737,9 @@ impl Future for TrxGetAddressesForKey {
 
 /// A future result of a `Transaction::watch`
 pub struct TrxWatch {
-    inner: TrxFuture,
+    // `TrxWatch` can live longer then a parent transaction that registhers the watch, so it should
+    // not maintain a reference to the transaction, which will prevent the transcation to be freed.
+    inner: FdbFuture,
 }
 impl Future for TrxWatch {
     type Item = ();
