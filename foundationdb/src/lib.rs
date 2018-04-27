@@ -114,6 +114,7 @@
 extern crate failure;
 #[macro_use]
 extern crate failure_derive;
+extern crate byteorder;
 extern crate foundationdb_sys;
 extern crate futures;
 
@@ -129,6 +130,8 @@ pub mod network;
 #[allow(missing_docs)]
 pub mod options;
 pub mod transaction;
+#[allow(missing_docs)]
+pub mod tuple;
 
 //move to prelude?
 pub use cluster::Cluster;
