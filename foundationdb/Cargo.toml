@@ -19,12 +19,13 @@ travis-ci = { repository = "bluejekyll/foundationdb-rs" }
 # codecov = { repository = "bluejekyll/foundationdb-rs", branch = "master", service = "github" }
 
 [dependencies]
+byteorder = "1.2"
 failure = "0.1"
 failure_derive = "0.1"
 foundationdb-sys = { version = "0.1.0", path = "../foundationdb-sys" }
 futures = "0.1"
 lazy_static = "1.0"
+uuid = "0.6"
 
 [dev-dependencies]
 rand = "0.4"
-byteorder = "1.2"
