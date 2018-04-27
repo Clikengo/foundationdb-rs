@@ -464,6 +464,51 @@ impl Transaction {
     fn new_future(&self, f: *mut fdb::FDBFuture) -> TrxFuture {
         TrxFuture::new(self.clone(), f)
     }
+
+    /// Returns an FDBFuture which will be set to the versionstamp which was used by any
+    /// versionstamp operations in this transaction. You must first wait for the FDBFuture to be
+    /// ready, check for errors, call fdb_future_get_key() to extract the key, and then destroy the
+    /// FDBFuture with fdb_future_destroy().
+    ///
+    /// The future will be ready only after the successful completion of a call to
+    /// fdb_transaction_commit() on this Transaction. Read-only transactions do not modify the
+    /// database when committed and will result in the future completing with an error.  Keep in
+    /// mind that a transaction which reads keys and then sets them to their current values may be
+    /// optimized to a read-only transaction.
+    ///
+    /// Most applications will not call this function.
+    pub fn get_versionstamp(&self) -> TrxVersionstamp {
+        let trx = self.inner.inner;
+
+        let f = unsafe { fdb::fdb_transaction_get_versionstamp(trx) };
+        TrxVersionstamp {
+            inner: FdbFuture::new(f),
+        }
+    }
+
+    /// The transaction obtains a snapshot read version automatically at the time of the first call
+    /// to fdb_transaction_get_*() (including this one) and (unless causal consistency has been
+    /// deliberately compromised by transaction options) is guaranteed to represent all
+    /// transactions which were reported committed before that call.
+    pub fn get_read_version(&self) -> TrxReadVersion {
+        let trx = self.inner.inner;
+
+        let f = unsafe { fdb::fdb_transaction_get_read_version(trx) };
+        TrxReadVersion {
+            inner: self.new_future(f),
+        }
+    }
+
+    /// Sets the snapshot read version used by a transaction. This is not needed in simple cases.
+    /// If the given version is too old, subsequent reads will fail with error_code_past_version;
+    /// if it is too new, subsequent reads may be delayed indefinitely and/or fail with
+    /// error_code_future_version. If any of fdb_transaction_get_*() have been called on this
+    /// transaction already, the result is undefined.
+    pub fn set_read_version(&self, version: i64) {
+        let trx = self.inner.inner;
+
+        unsafe { fdb::fdb_transaction_set_read_version(trx, version) }
+    }
 }
 
 struct TransactionInner {
@@ -748,6 +793,68 @@ impl Future for TrxWatch {
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         match self.inner.poll() {
             Ok(Async::Ready(_r)) => Ok(Async::Ready(())),
+            Ok(Async::NotReady) => Ok(Async::NotReady),
+            Err(e) => Err(e),
+        }
+    }
+}
+
+/// A versionstamp is a 10 byte, unique, monotonically (but not sequentially) increasing value for
+/// each committed transaction. The first 8 bytes are the committed version of the database. The
+/// last 2 bytes are monotonic in the serialization order for transactions.
+#[derive(Clone, Copy)]
+pub struct Versionstamp([u8; 10]);
+impl Versionstamp {
+    /// get versionstamp
+    pub fn versionstamp(self) -> [u8; 10] {
+        self.0
+    }
+}
+
+/// A future result of a `Transaction::watch`
+pub struct TrxVersionstamp {
+    // `TrxVersionstamp` resolves after `Transaction::commit`, so like `TrxWatch` it does not
+    // not maintain a reference to the transaction.
+    inner: FdbFuture,
+}
+impl Future for TrxVersionstamp {
+    type Item = Versionstamp;
+    type Error = FdbError;
+
+    fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
+        match self.inner.poll() {
+            Ok(Async::Ready(r)) => {
+                // returning future should resolve to key
+                match r.get_key() {
+                    Err(e) => Err(e),
+                    Ok(key) => {
+                        let mut buf: [u8; 10] = Default::default();
+                        buf.copy_from_slice(key);
+                        Ok(Async::Ready(Versionstamp(buf)))
+                    }
+                }
+            }
+            Ok(Async::NotReady) => Ok(Async::NotReady),
+            Err(e) => Err(e),
+        }
+    }
+}
+
+/// A future result of a `Transaction::watch`
+pub struct TrxReadVersion {
+    inner: TrxFuture,
+}
+
+impl Future for TrxReadVersion {
+    type Item = i64;
+    type Error = FdbError;
+
+    fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
+        match self.inner.poll() {
+            Ok(Async::Ready((_trx, r))) => match r.get_version() {
+                Err(e) => Err(e),
+                Ok(version) => Ok(Async::Ready(version)),
+            },
             Ok(Async::NotReady) => Ok(Async::NotReady),
             Err(e) => Err(e),
         }

@@ -253,6 +253,14 @@ impl FdbFutureResult {
             more: (more != 0),
         })
     }
+
+    pub(crate) fn get_version(&self) -> Result<i64> {
+        let mut version: i64 = 0;
+        unsafe {
+            error::eval(fdb::fdb_future_get_version(self.f, &mut version as *mut _))?;
+        }
+        Ok(version)
+    }
 }
 
 #[allow(unused)]

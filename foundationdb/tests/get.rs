@@ -200,3 +200,61 @@ fn test_transact() {
     // `RETRY_COUNT+1`
     assert_eq!(try_count.load(Ordering::SeqCst), RETRY_COUNT + 1);
 }
+
+#[test]
+fn test_versionstamp() {
+    const KEY: &[u8] = b"test-versionstamp";
+    common::setup_static();
+
+    let fut = Cluster::new(foundationdb::default_config_path())
+        .and_then(|cluster| cluster.create_database())
+        .and_then(|db| result(db.create_trx()))
+        .and_then(|trx| {
+            trx.set(KEY, common::random_str(10).as_bytes());
+            let f_version = trx.get_versionstamp();
+            trx.commit().and_then(move |_trx| f_version)
+        })
+        .map(|r| {
+            eprintln!("versionstamp: {:?}", r.versionstamp());
+        });
+
+    fut.wait().expect("failed to run");
+}
+
+#[test]
+fn test_read_version() {
+    common::setup_static();
+
+    let fut = Cluster::new(foundationdb::default_config_path())
+        .and_then(|cluster| cluster.create_database())
+        .and_then(|db| result(db.create_trx()))
+        .and_then(|trx| trx.get_read_version())
+        .map(|v| {
+            eprintln!("read version: {:?}", v);
+        });
+
+    fut.wait().expect("failed to run");
+}
+
+#[test]
+fn test_set_read_version() {
+    const KEY: &[u8] = b"test-versionstamp";
+    common::setup_static();
+
+    let fut = Cluster::new(foundationdb::default_config_path())
+        .and_then(|cluster| cluster.create_database())
+        .and_then(|db| result(db.create_trx()))
+        .and_then(|trx| {
+            trx.set_read_version(0);
+            trx.get(KEY, false)
+        })
+        .map(|_v| {
+            panic!("should fail with past_version");
+        })
+        .or_else(|e| {
+            eprintln!("failed as expeced: {:?}", e);
+            Ok::<(), ()>(())
+        });
+
+    fut.wait().expect("failed to run");
+}
