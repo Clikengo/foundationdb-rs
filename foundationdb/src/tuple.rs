@@ -317,12 +317,12 @@ macro_rules! tuple_impls {
         $(
             impl<$($name),+> Tuple for ($($name,)+)
             where
-                $($name: Single,)+
+                $($name: Single + Default,)+
             {
 				#[allow(non_snake_case, unused_assignments, deprecated)]
 				fn decode(buf: &[u8]) -> Result<Self> {
 					let mut buf = buf;
-					let mut out: Self = unsafe { std::mem::uninitialized() };
+					let mut out: Self = Default::default();
 					$(
 						// builder.field(&$name);
 						let (v0, offset0) = $name::decode(buf)?;
@@ -354,10 +354,6 @@ tuple_impls! {
     10 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9)
     11 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10)
     12 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11)
-    13 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11 12 T12)
-    14 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11 12 T12 13 T13)
-    15 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11 12 T12 13 T13 14 T14)
-    16 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11 12 T12 13 T13 14 T14 15 T15)
 }
 
 #[cfg(test)]
