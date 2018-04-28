@@ -306,9 +306,13 @@ impl Single for i64 {
 }
 
 trait Tuple: Sized {
-    fn encode<W: Write>(&self, _w: W) -> std::io::Result<()> {
-        unimplemented!();
+    fn encode<W: Write>(&self, _w: W) -> std::io::Result<()>;
+    fn encode_to_vec(&self) -> std::io::Result<Vec<u8>> {
+        let mut v = Vec::new();
+        self.encode(&mut v)?;
+        Ok(v)
     }
+
     fn decode(buf: &[u8]) -> Result<Self>;
 }
 
@@ -319,23 +323,30 @@ macro_rules! tuple_impls {
             where
                 $($name: Single + Default,)+
             {
-				#[allow(non_snake_case, unused_assignments, deprecated)]
-				fn decode(buf: &[u8]) -> Result<Self> {
-					let mut buf = buf;
-					let mut out: Self = Default::default();
-					$(
-						// builder.field(&$name);
-						let (v0, offset0) = $name::decode(buf)?;
-						out.$n = v0;
-						buf = &buf[offset0..];
-					)*
+                #[allow(non_snake_case, unused_assignments, deprecated)]
+                fn encode<W: Write>(&self, mut w: W) -> std::io::Result<()> {
+                    $(
+                        self.$n.encode(&mut w)?;
+                    )*
+                    Ok(())
+                }
+
+                #[allow(non_snake_case, unused_assignments, deprecated)]
+                fn decode(buf: &[u8]) -> Result<Self> {
+                    let mut buf = buf;
+                    let mut out: Self = Default::default();
+                    $(
+                        let (v0, offset0) = $name::decode(buf)?;
+                        out.$n = v0;
+                        buf = &buf[offset0..];
+                    )*
 
                     if !buf.is_empty() {
                         return Err(TupleError::InvalidData);
                     }
 
-					Ok(out)
-				}
+                    Ok(out)
+                }
             }
         )+
     }
@@ -417,5 +428,15 @@ mod tests {
         let (v1, v2): (String, Vec<u8>) = Tuple::decode(data).unwrap();
         assert_eq!(v1, "hello");
         assert_eq!(v2, b"world");
+    }
+
+    #[test]
+    fn test_encode_tuple_ty() {
+        let tup = (String::from("hello"), b"world".to_vec());
+
+        assert_eq!(
+            &[2, 104, 101, 108, 108, 111, 0, 1, 119, 111, 114, 108, 100, 0],
+            Tuple::encode_to_vec(&tup).unwrap().as_slice()
+        );
     }
 }
