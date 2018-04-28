@@ -124,6 +124,8 @@ fn decode_bytes(buf: &[u8]) -> Result<(Vec<u8>, usize)> {
         if buf[offset] == 0x00 {
             if offset + 1 < buf.len() && buf[offset + 1] == 0xff {
                 out.push(0x00);
+                offset += 2;
+                continue;
             } else {
                 break;
             }
@@ -414,6 +416,7 @@ mod tests {
 
         // binary
         test_round_trip(b"hello".to_vec(), &[1, 104, 101, 108, 108, 111, 0]);
+        test_round_trip(vec![0], &[1, 0, 0xff, 0]);
     }
 
     #[test]
