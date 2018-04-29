@@ -22,10 +22,12 @@ esac
 
 ## build the python bindings
 (
-  cd /tmp
+  fdb_builddir=${fdb_rs_dir:?}/target/foundationdb_build
+  mkdir -p ${fdb_builddir:?}
+  cd ${fdb_builddir:?}
 
   ## Get foundationdb source
-  git clone git@github.com:apple/foundationdb.git
+  git clone https://github.com/apple/foundationdb.git
   cd foundationdb
 
   ## currently we only support 5.1
