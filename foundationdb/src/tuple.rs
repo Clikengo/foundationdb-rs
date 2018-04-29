@@ -247,7 +247,7 @@ impl Single for f64 {
 }
 
 const SIZE_LIMITS: &[i64] = &[
-    1,
+    0,
     (1 << (1 * 8)) - 1,
     (1 << (2 * 8)) - 1,
     (1 << (3 * 8)) - 1,
@@ -395,6 +395,8 @@ mod tests {
 
         // int
         test_round_trip(0i64, &[0x14]);
+        test_round_trip(1i64, &[0x15, 1]);
+        test_round_trip(-1i64, &[0x13, 254]);
         test_round_trip(100i64, &[21, 100]);
 
         test_round_trip(10000i64, &[22, 39, 16]);
