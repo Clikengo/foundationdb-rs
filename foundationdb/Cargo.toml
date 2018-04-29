@@ -25,6 +25,7 @@ foundationdb-sys = { version = "0.1.0", path = "../foundationdb-sys" }
 futures = "0.1"
 lazy_static = "1.0"
 byteorder = "1.2"
+log = "0.4"
 
 [dev-dependencies]
 rand = "0.4"

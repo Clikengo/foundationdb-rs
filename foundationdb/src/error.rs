@@ -90,8 +90,8 @@ impl FdbError {
         check != 0
     }
 
-    // `fdb_transaction_on_error` requires error code, so the code should accessible in the crate.
-    pub(crate) fn code(&self) -> i32 {
+    /// Error code
+    pub fn code(&self) -> i32 {
         self.error_code
     }
 

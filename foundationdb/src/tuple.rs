@@ -22,7 +22,7 @@ pub enum TupleError {
 
 type Result<T> = std::result::Result<T, TupleError>;
 
-trait Single: Sized {
+pub trait Single: Sized {
     fn encode<W: Write>(&self, _w: W) -> std::io::Result<()>;
     fn encode_to_vec(&self) -> std::io::Result<Vec<u8>> {
         let mut v = Vec::new();
@@ -79,7 +79,8 @@ impl Single for () {
     }
 }
 
-struct UUID([u8; 16]);
+#[derive(Debug, Clone)]
+pub struct UUID([u8; 16]);
 
 impl Single for UUID {
     fn encode<W: Write>(&self, mut w: W) -> std::io::Result<()> {
@@ -307,7 +308,7 @@ impl Single for i64 {
     }
 }
 
-trait Tuple: Sized {
+pub trait Tuple: Sized {
     fn encode<W: Write>(&self, _w: W) -> std::io::Result<()>;
     fn encode_to_vec(&self) -> std::io::Result<Vec<u8>> {
         let mut v = Vec::new();
@@ -367,6 +368,100 @@ tuple_impls! {
     10 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9)
     11 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10)
     12 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11)
+}
+
+#[derive(Debug, Clone)]
+pub enum SingleValue {
+    Empty,
+    Bytes(Vec<u8>),
+    Str(String),
+    // Nested(Vec<TupleValue>),
+    Int(i64),
+    Float(f32),
+    Double(f64),
+    Boolean(bool),
+    Uuid(UUID),
+}
+
+impl Single for SingleValue {
+    fn encode<W: Write>(&self, w: W) -> std::io::Result<()> {
+        use self::SingleValue::*;
+
+        match *self {
+            Empty => Single::encode(&(), w),
+            Bytes(ref v) => Single::encode(v, w),
+            Str(ref v) => Single::encode(v, w),
+            Int(ref v) => Single::encode(v, w),
+            Float(ref v) => Single::encode(v, w),
+            Double(ref v) => Single::encode(v, w),
+            Boolean(ref v) => Single::encode(v, w),
+            Uuid(ref v) => Single::encode(v, w),
+        }
+    }
+
+    fn decode(buf: &[u8]) -> Result<(Self, usize)> {
+        if buf.is_empty() {
+            return Err(TupleError::EOF);
+        }
+
+        let code = buf[0];
+        match code {
+            0x00 => Ok((SingleValue::Empty, 1)),
+            0x01 => {
+                let (v, offset) = Single::decode(buf)?;
+                Ok((SingleValue::Bytes(v), offset))
+            }
+            0x02 => {
+                let (v, offset) = Single::decode(buf)?;
+                Ok((SingleValue::Str(v), offset))
+            }
+            0x20 => {
+                let (v, offset) = Single::decode(buf)?;
+                Ok((SingleValue::Float(v), offset))
+            }
+            0x21 => {
+                let (v, offset) = Single::decode(buf)?;
+                Ok((SingleValue::Double(v), offset))
+            }
+            0x26 => Ok((SingleValue::Boolean(false), 1)),
+            0x27 => Ok((SingleValue::Boolean(false), 1)),
+            0x30 => {
+                let (v, offset) = Single::decode(buf)?;
+                Ok((SingleValue::Uuid(v), offset))
+            }
+            val => {
+                if val >= 0x0b && val <= 0x1d {
+                    let (v, offset) = Single::decode(buf)?;
+                    Ok((SingleValue::Int(v), offset))
+                } else {
+                    unimplemented!("unknown code: 0x{:02x}", val);
+                }
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TupleValue(pub Vec<SingleValue>);
+
+impl Tuple for TupleValue {
+    fn encode<W: Write>(&self, mut w: W) -> std::io::Result<()> {
+        for item in self.0.iter() {
+            item.encode(&mut w)?;
+        }
+        Ok(())
+    }
+
+    fn decode(buf: &[u8]) -> Result<Self> {
+        let mut data = buf;
+        let mut v = Vec::new();
+        while !data.is_empty() {
+            let (s, offset): (SingleValue, _) = Single::decode(data)?;
+            v.push(s);
+            data = &data[offset..];
+        }
+        Ok(TupleValue(v))
+    }
 }
 
 #[cfg(test)]
