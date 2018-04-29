@@ -30,6 +30,12 @@ matrix:
       script:
         - cargo fmt --all -- --write-mode=diff
 
+    ## bindingtester
+    - rust: stable
+      env: RUST_BACKTRACE=full
+      script:
+        - scripts/run_bindingtester.sh
+
   allow_failures:
     - rust: nightly
 
