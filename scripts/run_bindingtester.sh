@@ -2,7 +2,7 @@
 
 set -x
 
-fdb_rs_dir=$(dirname $0)/..
+fdb_rs_dir=$(pwd)
 
 case $(uname) in
   Darwin) 
