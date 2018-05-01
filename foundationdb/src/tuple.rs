@@ -14,7 +14,7 @@ use std::io::Write;
 use byteorder::{self, ByteOrder};
 
 /// Various tuple types
-const EMPTY: u8 = 0x00;
+const NIL: u8 = 0x00;
 const BYTES: u8 = 0x01;
 const STRING: u8 = 0x02;
 const NESTED: u8 = 0x05;
@@ -64,7 +64,7 @@ impl SingleType for u8 {
     /// Validates this is a known type
     fn is_valid(self) -> Result<()> {
         match self {
-            EMPTY => Ok(()),
+            NIL => Ok(()),
             BYTES => Ok(()),
             STRING => Ok(()),
             NESTED => Ok(()),
@@ -128,7 +128,7 @@ impl Single for bool {
 
 impl Single for () {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
-        EMPTY.write(w)
+        NIL.write(w)
     }
 
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
@@ -136,7 +136,7 @@ impl Single for () {
             return Err(TupleError::EOF);
         }
 
-        EMPTY.expect(buf[0])?;
+        NIL.expect(buf[0])?;
         Ok(((), 1))
     }
 }
@@ -171,7 +171,7 @@ fn encode_bytes<W: Write>(w: &mut W, buf: &[u8]) -> std::io::Result<()> {
             w.write_all(&[0xff])?;
         }
     }
-    EMPTY.write(w)
+    NIL.write(w)
 }
 
 fn decode_bytes(buf: &[u8]) -> Result<(Vec<u8>, usize)> {
@@ -183,9 +183,9 @@ fn decode_bytes(buf: &[u8]) -> Result<(Vec<u8>, usize)> {
         }
 
         // is the null marker at the offset
-        if EMPTY.expect(buf[offset]).is_ok() {
+        if NIL.expect(buf[offset]).is_ok() {
             if offset + 1 < buf.len() && buf[offset + 1] == 0xff {
-                out.push(EMPTY);
+                out.push(NIL);
                 offset += 2;
                 continue;
             } else {
@@ -222,7 +222,7 @@ impl Single for Vec<SingleValue> {
         for v in self {
             v.encode(w)?;
         }
-        EMPTY.write(w)
+        NIL.write(w)
     }
 
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
@@ -234,13 +234,17 @@ impl Single for Vec<SingleValue> {
 
         let mut tuples = Vec::new();
         let mut idx = 1;
-        while buf[idx] != EMPTY {
+        while idx < buf.len() && buf[idx] != NIL {
             let (tuple, offset) = SingleValue::decode(&buf[idx..])?;
             tuples.push(tuple);
             idx += offset;
         }
 
-        EMPTY.expect(buf[idx])?;
+        if idx >= buf.len() {
+            return Err(TupleError::InvalidData);
+        }
+
+        NIL.expect(buf[idx])?;
 
         // skip the final null
         Ok((tuples, idx + 1))
@@ -492,7 +496,7 @@ impl Single for SingleValue {
 
         let code = buf[0];
         match code {
-            EMPTY => Ok((SingleValue::Empty, 1)),
+            NIL => Ok((SingleValue::Empty, 1)),
             BYTES => {
                 let (v, offset) = Single::decode(buf)?;
                 Ok((SingleValue::Bytes(v), offset))
@@ -576,7 +580,7 @@ mod tests {
         test_round_trip(true, &[TRUE]);
 
         // empty
-        test_round_trip((), &[EMPTY]);
+        test_round_trip((), &[NIL]);
 
         // int
         test_round_trip(0i64, &[INTZERO]);
@@ -629,7 +633,7 @@ mod tests {
                 /*42*/ 21,
                 42,
                 /*end nested*/
-                EMPTY,
+                NIL,
             ],
         );
     }
@@ -656,5 +660,14 @@ mod tests {
             &[2, 104, 101, 108, 108, 111, 0, 1, 119, 111, 114, 108, 100, 0],
             Tuple::encode_to_vec(&tup).unwrap().as_slice()
         );
+    }
+
+    #[test]
+    fn test_decode_nested() {
+        assert!(TupleValue::decode(&[NESTED]).is_err());
+        assert!(TupleValue::decode(&[NESTED, NIL]).is_ok());
+        assert!(TupleValue::decode(&[NESTED, INTZERO]).is_err());
+        assert!(TupleValue::decode(&[NESTED, NIL, NESTED, NIL]).is_ok());
+        assert!(TupleValue::decode(&[NESTED, NESTED, NESTED, NIL, NIL, NIL]).is_ok());
     }
 }
