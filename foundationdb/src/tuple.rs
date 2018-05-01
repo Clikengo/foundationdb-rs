@@ -141,7 +141,7 @@ impl Single for () {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Uuid([u8; 16]);
 
 impl Single for Uuid {
@@ -213,6 +213,39 @@ impl Single for String {
 
         let (bytes, offset) = decode_bytes(&buf[1..])?;
         Ok((String::from_utf8(bytes).unwrap(), offset + 1))
+    }
+}
+
+impl Single for Vec<SingleValue> {
+    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+        NESTED.write(w)?;
+        for v in self {
+            println!("encoding: {:?}", v);
+            v.encode(w)?;
+        }
+        EMPTY.write(w)
+    }
+
+    fn decode(buf: &[u8]) -> Result<(Self, usize)> {
+        if buf.len() < 2 {
+            return Err(TupleError::EOF);
+        }
+
+        NESTED.expect(buf[0])?;
+
+        let mut tuples = Vec::new();
+        let mut idx = 1;
+        while buf[idx] != EMPTY {
+            let (tuple, offset) = SingleValue::decode(&buf[idx..])?;
+            println!("decoded: {:?}", tuple);
+            tuples.push(tuple);
+            idx += offset;
+        }
+
+        EMPTY.expect(buf[idx])?;
+
+        // skip the final null
+        Ok((tuples, idx + 1))
     }
 }
 
@@ -424,12 +457,12 @@ tuple_impls! {
     12 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SingleValue {
     Empty,
     Bytes(Vec<u8>),
     Str(String),
-    // Nested(Vec<TupleValue>),
+    Nested(Vec<SingleValue>),
     Int(i64),
     Float(f32),
     Double(f64),
@@ -445,6 +478,7 @@ impl Single for SingleValue {
             Empty => Single::encode(&(), w),
             Bytes(ref v) => Single::encode(v, w),
             Str(ref v) => Single::encode(v, w),
+            Nested(ref v) => Single::encode(v, w),
             Int(ref v) => Single::encode(v, w),
             Float(ref v) => Single::encode(v, w),
             Double(ref v) => Single::encode(v, w),
@@ -482,6 +516,10 @@ impl Single for SingleValue {
             UUID => {
                 let (v, offset) = Single::decode(buf)?;
                 Ok((SingleValue::Uuid(v), offset))
+            }
+            NESTED => {
+                let (v, offset) = Single::decode(buf)?;
+                Ok((SingleValue::Nested(v), offset))
             }
             val => {
                 if val >= NEGINTSTART && val <= POSINTEND {
@@ -568,6 +606,34 @@ mod tests {
         // binary
         test_round_trip(b"hello".to_vec(), &[1, 104, 101, 108, 108, 111, 0]);
         test_round_trip(vec![0], &[1, 0, 0xff, 0]);
+        test_round_trip(
+            SingleValue::Nested(vec![
+                SingleValue::Str("hello".to_string()),
+                SingleValue::Str("world".to_string()),
+                SingleValue::Int(42),
+            ]),
+            &[
+                NESTED,
+                /*hello*/ 2,
+                104,
+                101,
+                108,
+                108,
+                111,
+                0,
+                /*world*/ 2,
+                119,
+                111,
+                114,
+                108,
+                100,
+                0,
+                /*42*/ 21,
+                42,
+                /*end nested*/
+                EMPTY,
+            ],
+        );
     }
 
     #[test]
