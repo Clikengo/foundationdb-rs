@@ -13,78 +13,81 @@ use std::io::Write;
 
 use byteorder::{self, ByteOrder};
 
+/// Various tuple types
+const EMPTY: u8 = 0x00;
+const BYTES: u8 = 0x01;
+const STRING: u8 = 0x02;
+const NESTED: u8 = 0x05;
+const INTZERO: u8 = 0x14;
+const POSINTEND: u8 = 0x1d;
+const NEGINTSTART: u8 = 0x0b;
+const FLOAT: u8 = 0x20;
+const DOUBLE: u8 = 0x21;
+const FALSE: u8 = 0x26;
+const TRUE: u8 = 0x27;
+const UUID: u8 = 0x30;
+const VERSIONSTAMP: u8 = 0x33;
+
 #[derive(Debug, Fail)]
 pub enum TupleError {
     #[fail(display = "Unexpected end of file")]
     EOF,
-    #[fail(display = "Invalid type")]
-    InvalidType(u8),
+    #[fail(display = "Invalid type: {}", value)]
+    InvalidType { value: u8 },
     #[fail(display = "Invalid data")]
     InvalidData,
 }
 
 type Result<T> = std::result::Result<T, TupleError>;
 
-/// Various tuple types
-#[derive(Clone, Copy, Eq, PartialEq)]
-enum SingleType {
-    Empty = 0x00,
-    Bytes = 0x01,
-    String = 0x02,
-    Nested = 0x05,
-    IntZero = 0x14,
-    PosIntEnd = 0x1d,
-    NegIntStart = 0x0b,
-    Float = 0x20,
-    Double = 0x21,
-    False = 0x26,
-    True = 0x27,
-    Uuid = 0x30,
-    VersionStamp = 0x33,
+trait SingleType: Copy {
+    /// verifies the value matches this type
+    fn expect(self, value: u8) -> Result<()>;
+
+    /// Validates this is a known type
+    fn is_valid(self) -> Result<()>;
+
+    /// writes this to w
+    fn write<W: Write>(self, w: &mut W) -> std::io::Result<()>;
 }
 
-impl SingleType {
-    /// Tries to convert a u8 into a SingleType
-    fn try_from(value: u8) -> Result<Self> {
-        use self::SingleType::*;
-        match value as i32 {
-            v if Empty as i32 == v => Ok(Empty),
-            v if Bytes as i32 == v => Ok(Bytes),
-            v if String as i32 == v => Ok(String),
-            v if Nested as i32 == v => Ok(Nested),
-            v if IntZero as i32 == v => Ok(IntZero),
-            v if PosIntEnd as i32 == v => Ok(PosIntEnd),
-            v if NegIntStart as i32 == v => Ok(NegIntStart),
-            v if Float as i32 == v => Ok(Float),
-            v if Double as i32 == v => Ok(Double),
-            v if False as i32 == v => Ok(False),
-            v if True as i32 == v => Ok(True),
-            v if Uuid as i32 == v => Ok(Uuid),
-            v if VersionStamp as i32 == v => Ok(VersionStamp),
-            _ => Err(TupleError::InvalidType(value)),
-        }
-    }
-
+impl SingleType for u8 {
     /// verifies the value matches this type
     fn expect(self, value: u8) -> Result<()> {
-        if self.to_u8() == value {
+        if self == value {
             Ok(())
         } else {
-            Err(TupleError::InvalidType(value))
+            Err(TupleError::InvalidType { value })
         }
     }
 
-    #[inline(always)]
-    fn to_u8(self) -> u8 {
-        let result = self as i32;
-        debug_assert!(result >= u8::min_value() as i32);
-        debug_assert!(result <= u8::max_value() as i32);
-        result as u8
+    /// Validates this is a known type
+    fn is_valid(self) -> Result<()> {
+        match self {
+            EMPTY => Ok(()),
+            BYTES => Ok(()),
+            STRING => Ok(()),
+            NESTED => Ok(()),
+            INTZERO => Ok(()),
+            POSINTEND => Ok(()),
+            NEGINTSTART => Ok(()),
+            FLOAT => Ok(()),
+            DOUBLE => Ok(()),
+            FALSE => Ok(()),
+            TRUE => Ok(()),
+            UUID => Ok(()),
+            VERSIONSTAMP => Ok(()),
+            _ => Err(TupleError::InvalidType { value: self }),
+        }
+    }
+
+    fn write<W: Write>(self, w: &mut W) -> std::io::Result<()> {
+        w.write_all(&[self])
     }
 }
 
 pub trait Single: Sized {
-    fn encode<W: Write>(&self, _w: W) -> std::io::Result<()>;
+    fn encode<W: Write>(&self, _w: &mut W) -> std::io::Result<()>;
     fn encode_to_vec(&self) -> std::io::Result<Vec<u8>> {
         let mut v = Vec::new();
         self.encode(&mut v)?;
@@ -102,11 +105,11 @@ pub trait Single: Sized {
 }
 
 impl Single for bool {
-    fn encode<W: Write>(&self, mut w: W) -> std::io::Result<()> {
+    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         if *self {
-            w.write_all(&[SingleType::True.to_u8()])
+            TRUE.write(w)
         } else {
-            w.write_all(&[SingleType::False.to_u8()])
+            FALSE.write(w)
         }
     }
 
@@ -116,16 +119,16 @@ impl Single for bool {
         }
 
         match buf[0] {
-            v if SingleType::False.expect(v).is_ok() => Ok((false, 1)),
-            v if SingleType::True.expect(v).is_ok() => Ok((true, 1)),
-            v => Err(TupleError::InvalidType(v)),
+            FALSE => Ok((false, 1)),
+            TRUE => Ok((true, 1)),
+            v => Err(TupleError::InvalidType { value: v }),
         }
     }
 }
 
 impl Single for () {
-    fn encode<W: Write>(&self, mut w: W) -> std::io::Result<()> {
-        w.write_all(&[SingleType::Empty.to_u8()])
+    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+        EMPTY.write(w)
     }
 
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
@@ -133,17 +136,17 @@ impl Single for () {
             return Err(TupleError::EOF);
         }
 
-        SingleType::Empty.expect(buf[0])?;
+        EMPTY.expect(buf[0])?;
         Ok(((), 1))
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct UUID([u8; 16]);
+pub struct Uuid([u8; 16]);
 
-impl Single for UUID {
-    fn encode<W: Write>(&self, mut w: W) -> std::io::Result<()> {
-        w.write_all(&[SingleType::Uuid.to_u8()])?;
+impl Single for Uuid {
+    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+        UUID.write(w)?;
         w.write_all(&self.0)
     }
 
@@ -152,23 +155,23 @@ impl Single for UUID {
             return Err(TupleError::EOF);
         }
 
-        SingleType::Uuid.expect(buf[0])?;
+        UUID.expect(buf[0])?;
 
         let mut uuid = [0u8; 16];
         uuid.copy_from_slice(&buf[1..17]);
 
-        Ok((UUID(uuid), 17))
+        Ok((Uuid(uuid), 17))
     }
 }
 
-fn encode_bytes<W: Write>(mut w: W, buf: &[u8]) -> std::io::Result<()> {
+fn encode_bytes<W: Write>(w: &mut W, buf: &[u8]) -> std::io::Result<()> {
     for b in buf {
         w.write_all(&[*b])?;
         if *b == 0 {
             w.write_all(&[0xff])?;
         }
     }
-    w.write_all(&[SingleType::Empty.to_u8()])
+    EMPTY.write(w)
 }
 
 fn decode_bytes(buf: &[u8]) -> Result<(Vec<u8>, usize)> {
@@ -180,9 +183,9 @@ fn decode_bytes(buf: &[u8]) -> Result<(Vec<u8>, usize)> {
         }
 
         // is the null marker at the offset
-        if SingleType::Empty.expect(buf[offset]).is_ok() {
+        if EMPTY.expect(buf[offset]).is_ok() {
             if offset + 1 < buf.len() && buf[offset + 1] == 0xff {
-                out.push(SingleType::Empty.to_u8());
+                out.push(EMPTY);
                 offset += 2;
                 continue;
             } else {
@@ -196,8 +199,8 @@ fn decode_bytes(buf: &[u8]) -> Result<(Vec<u8>, usize)> {
 }
 
 impl Single for String {
-    fn encode<W: Write>(&self, mut w: W) -> std::io::Result<()> {
-        w.write_all(&[SingleType::String.to_u8()])?;
+    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+        STRING.write(w)?;
         encode_bytes(w, self.as_bytes())
     }
 
@@ -206,7 +209,7 @@ impl Single for String {
             return Err(TupleError::EOF);
         }
 
-        SingleType::String.expect(buf[0])?;
+        STRING.expect(buf[0])?;
 
         let (bytes, offset) = decode_bytes(&buf[1..])?;
         Ok((String::from_utf8(bytes).unwrap(), offset + 1))
@@ -214,8 +217,8 @@ impl Single for String {
 }
 
 impl Single for Vec<u8> {
-    fn encode<W: Write>(&self, mut w: W) -> std::io::Result<()> {
-        w.write_all(&[SingleType::Bytes.to_u8()])?;
+    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+        BYTES.write(w)?;
         encode_bytes(w, self.as_slice())
     }
 
@@ -224,7 +227,7 @@ impl Single for Vec<u8> {
             return Err(TupleError::EOF);
         }
 
-        SingleType::Bytes.expect(buf[0])?;
+        BYTES.expect(buf[0])?;
 
         let (bytes, offset) = decode_bytes(&buf[1..])?;
         Ok((bytes, offset + 1))
@@ -244,8 +247,8 @@ fn adjust_float_bytes(b: &mut [u8], encode: bool) {
 }
 
 impl Single for f32 {
-    fn encode<W: Write>(&self, mut w: W) -> std::io::Result<()> {
-        w.write_all(&[SingleType::Float.to_u8()])?;
+    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+        FLOAT.write(w)?;
 
         let mut buf: [u8; 4] = Default::default();
         byteorder::BE::write_f32(&mut buf, *self);
@@ -259,7 +262,7 @@ impl Single for f32 {
             return Err(TupleError::EOF);
         }
 
-        SingleType::Float.expect(buf[0])?;
+        FLOAT.expect(buf[0])?;
 
         let mut data: [u8; 4] = Default::default();
         data.copy_from_slice(&buf[1..5]);
@@ -271,8 +274,8 @@ impl Single for f32 {
 }
 
 impl Single for f64 {
-    fn encode<W: Write>(&self, mut w: W) -> std::io::Result<()> {
-        w.write_all(&[SingleType::Double.to_u8()])?;
+    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+        DOUBLE.write(w)?;
 
         let mut buf: [u8; 8] = Default::default();
         byteorder::BE::write_f64(&mut buf, *self);
@@ -286,7 +289,7 @@ impl Single for f64 {
             return Err(TupleError::EOF);
         }
 
-        SingleType::Double.expect(buf[0])?;
+        DOUBLE.expect(buf[0])?;
 
         let mut data: [u8; 8] = Default::default();
         data.copy_from_slice(&buf[1..9]);
@@ -313,8 +316,8 @@ fn bisect_left(val: i64) -> usize {
 }
 
 impl Single for i64 {
-    fn encode<W: Write>(&self, mut w: W) -> std::io::Result<()> {
-        let mut code = SingleType::IntZero.to_u8();
+    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+        let mut code = INTZERO;
         let n;
         let mut buf: [u8; 8] = Default::default();
 
@@ -335,22 +338,22 @@ impl Single for i64 {
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         let header = buf[0];
         if header < 0x0c || header > 0x1c {
-            return Err(TupleError::InvalidType(header));
+            return Err(TupleError::InvalidType { value: header });
         }
 
         // if it's 0
-        if SingleType::IntZero.expect(header).is_ok() {
+        if INTZERO.expect(header).is_ok() {
             return Ok((0, 1));
         }
 
         let mut data: [u8; 8] = Default::default();
-        if header > SingleType::IntZero.to_u8() {
-            let n = usize::from(header - SingleType::IntZero.to_u8());
+        if header > INTZERO {
+            let n = usize::from(header - INTZERO);
             (&mut data[(8 - n)..8]).copy_from_slice(&buf[1..(n + 1)]);
             let val = byteorder::BE::read_i64(&data);
             Ok((val, n + 1))
         } else {
-            let n = usize::from(SingleType::IntZero.to_u8() - header);
+            let n = usize::from(INTZERO - header);
             (&mut data[(8 - n)..8]).copy_from_slice(&buf[1..(n + 1)]);
             let shift = (1 << (n * 8)) - 1;
             let val = byteorder::BE::read_i64(&data);
@@ -360,7 +363,7 @@ impl Single for i64 {
 }
 
 pub trait Tuple: Sized {
-    fn encode<W: Write>(&self, _w: W) -> std::io::Result<()>;
+    fn encode<W: Write>(&self, _w: &mut W) -> std::io::Result<()>;
     fn encode_to_vec(&self) -> std::io::Result<Vec<u8>> {
         let mut v = Vec::new();
         self.encode(&mut v)?;
@@ -378,9 +381,9 @@ macro_rules! tuple_impls {
                 $($name: Single + Default,)+
             {
                 #[allow(non_snake_case, unused_assignments, deprecated)]
-                fn encode<W: Write>(&self, mut w: W) -> std::io::Result<()> {
+                fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
                     $(
-                        self.$n.encode(&mut w)?;
+                        self.$n.encode(w)?;
                     )*
                     Ok(())
                 }
@@ -431,11 +434,11 @@ pub enum SingleValue {
     Float(f32),
     Double(f64),
     Boolean(bool),
-    Uuid(UUID),
+    Uuid(Uuid),
 }
 
 impl Single for SingleValue {
-    fn encode<W: Write>(&self, w: W) -> std::io::Result<()> {
+    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         use self::SingleValue::*;
 
         match *self {
@@ -455,32 +458,39 @@ impl Single for SingleValue {
             return Err(TupleError::EOF);
         }
 
-        let code = SingleType::try_from(buf[0])?;
+        let code = buf[0];
         match code {
-            SingleType::Empty => Ok((SingleValue::Empty, 1)),
-            SingleType::Bytes => {
+            EMPTY => Ok((SingleValue::Empty, 1)),
+            BYTES => {
                 let (v, offset) = Single::decode(buf)?;
                 Ok((SingleValue::Bytes(v), offset))
             }
-            SingleType::String => {
+            STRING => {
                 let (v, offset) = Single::decode(buf)?;
                 Ok((SingleValue::Str(v), offset))
             }
-            SingleType::Float => {
+            FLOAT => {
                 let (v, offset) = Single::decode(buf)?;
                 Ok((SingleValue::Float(v), offset))
             }
-            SingleType::Double => {
+            DOUBLE => {
                 let (v, offset) = Single::decode(buf)?;
                 Ok((SingleValue::Double(v), offset))
             }
-            SingleType::False => Ok((SingleValue::Boolean(false), 1)),
-            SingleType::True => Ok((SingleValue::Boolean(false), 1)),
-            SingleType::Uuid => {
+            FALSE => Ok((SingleValue::Boolean(false), 1)),
+            TRUE => Ok((SingleValue::Boolean(false), 1)),
+            UUID => {
                 let (v, offset) = Single::decode(buf)?;
                 Ok((SingleValue::Uuid(v), offset))
             }
-            _ => unimplemented!(),
+            val => {
+                if val >= NEGINTSTART && val <= POSINTEND {
+                    let (v, offset) = Single::decode(buf)?;
+                    Ok((SingleValue::Int(v), offset))
+                } else {
+                    unimplemented!("unknown code: 0x{:02x}", val);
+                }
+            }
         }
     }
 }
@@ -489,9 +499,9 @@ impl Single for SingleValue {
 pub struct TupleValue(pub Vec<SingleValue>);
 
 impl Tuple for TupleValue {
-    fn encode<W: Write>(&self, mut w: W) -> std::io::Result<()> {
+    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         for item in self.0.iter() {
-            item.encode(&mut w)?;
+            item.encode(w)?;
         }
         Ok(())
     }
@@ -526,14 +536,14 @@ mod tests {
         // [ord(v) for v in fdb.tuple.pack(tup)]
 
         // bool
-        test_round_trip(false, &[SingleType::False.to_u8()]);
-        test_round_trip(true, &[SingleType::True.to_u8()]);
+        test_round_trip(false, &[FALSE]);
+        test_round_trip(true, &[TRUE]);
 
         // empty
-        test_round_trip((), &[SingleType::Empty.to_u8()]);
+        test_round_trip((), &[EMPTY]);
 
         // int
-        test_round_trip(0i64, &[SingleType::IntZero.to_u8()]);
+        test_round_trip(0i64, &[INTZERO]);
         test_round_trip(1i64, &[0x15, 1]);
         test_round_trip(-1i64, &[0x13, 254]);
         test_round_trip(100i64, &[21, 100]);
