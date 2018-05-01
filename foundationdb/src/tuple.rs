@@ -220,7 +220,6 @@ impl Single for Vec<SingleValue> {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         NESTED.write(w)?;
         for v in self {
-            println!("encoding: {:?}", v);
             v.encode(w)?;
         }
         EMPTY.write(w)
@@ -237,7 +236,6 @@ impl Single for Vec<SingleValue> {
         let mut idx = 1;
         while buf[idx] != EMPTY {
             let (tuple, offset) = SingleValue::decode(&buf[idx..])?;
-            println!("decoded: {:?}", tuple);
             tuples.push(tuple);
             idx += offset;
         }
