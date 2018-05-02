@@ -28,6 +28,8 @@ const TRUE: u8 = 0x27;
 const UUID: u8 = 0x30;
 const VERSIONSTAMP: u8 = 0x33;
 
+const ESCAPE: u8 = 0xff;
+
 #[derive(Debug, Fail)]
 pub enum TupleError {
     #[fail(display = "Unexpected end of file")]
@@ -167,9 +169,9 @@ impl Single for Uuid {
 
 fn encode_bytes<W: Write>(w: &mut W, buf: &[u8]) -> std::io::Result<()> {
     for b in buf {
-        w.write_all(&[*b])?;
+        b.write(w)?;
         if *b == 0 {
-            w.write_all(&[0xff])?;
+            ESCAPE.write(w)?;
         }
     }
     NIL.write(w)
@@ -185,7 +187,7 @@ fn decode_bytes(buf: &[u8]) -> Result<(Vec<u8>, usize)> {
 
         // is the null marker at the offset
         if NIL.expect(buf[offset]).is_ok() {
-            if offset + 1 < buf.len() && buf[offset + 1] == 0xff {
+            if offset + 1 < buf.len() && buf[offset + 1] == ESCAPE {
                 out.push(NIL);
                 offset += 2;
                 continue;
@@ -221,34 +223,56 @@ impl Single for Vec<SingleValue> {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         NESTED.write(w)?;
         for v in self {
-            v.encode(w)?;
+            match v {
+                &SingleValue::Empty => {
+                    // Empty value in nested tuple is encoded with [NIL, ESCAPE] to disambiguate
+                    // itself with end-of-tuple marker.
+                    NIL.write(w)?;
+                    ESCAPE.write(w)?;
+                }
+                v => {
+                    v.encode(w)?;
+                }
+            }
         }
         NIL.write(w)
     }
 
-    fn decode(buf: &[u8]) -> Result<(Self, usize)> {
+    fn decode(mut buf: &[u8]) -> Result<(Self, usize)> {
         if buf.len() < 2 {
             return Err(TupleError::EOF);
         }
 
         NESTED.expect(buf[0])?;
+        let len = buf.len();
+        buf = &buf[1..];
 
         let mut tuples = Vec::new();
-        let mut idx = 1;
-        while idx < buf.len() && buf[idx] != NIL {
-            let (tuple, offset) = SingleValue::decode(&buf[idx..])?;
+        loop {
+            if buf.is_empty() {
+                // tuple must end with NIL byte
+                return Err(TupleError::EOF);
+            }
+
+            if buf[0] == NIL {
+                if buf.len() > 1 && buf[1] == ESCAPE {
+                    // nested Empty value, which is encoded to [NIL, ESCAPE]
+                    tuples.push(SingleValue::Empty);
+                    buf = &buf[2..];
+                    continue;
+                }
+
+                buf = &buf[1..];
+                break;
+            }
+
+            let (tuple, offset) = SingleValue::decode(buf)?;
             tuples.push(tuple);
-            idx += offset;
+            buf = &buf[offset..];
         }
-
-        if idx >= buf.len() {
-            return Err(TupleError::InvalidData);
-        }
-
-        NIL.expect(buf[idx])?;
 
         // skip the final null
-        Ok((tuples, idx + 1))
+        Ok((tuples, len - buf.len()))
     }
 }
 
@@ -388,11 +412,19 @@ impl Single for i64 {
         let mut data: [u8; 8] = Default::default();
         if header > INTZERO {
             let n = usize::from(header - INTZERO);
+            if n + 1 > buf.len() {
+                return Err(TupleError::InvalidData);
+            }
+
             (&mut data[(8 - n)..8]).copy_from_slice(&buf[1..(n + 1)]);
             let val = byteorder::BE::read_i64(&data);
             Ok((val, n + 1))
         } else {
             let n = usize::from(INTZERO - header);
+            if n + 1 > buf.len() {
+                return Err(TupleError::InvalidData);
+            }
+
             (&mut data[(8 - n)..8]).copy_from_slice(&buf[1..(n + 1)]);
             let shift = (1 << (n * 8)) - 1;
             let val = byteorder::BE::read_i64(&data);
@@ -641,6 +673,29 @@ mod tests {
                 NIL,
             ],
         );
+
+        test_round_trip(
+            SingleValue::Nested(TupleValue(vec![
+                SingleValue::Bytes(vec![0]),
+                SingleValue::Empty,
+                SingleValue::Nested(TupleValue(vec![
+                    SingleValue::Bytes(vec![0]),
+                    SingleValue::Empty,
+                ])),
+            ])),
+            &[5, 1, 0, 255, 0, 0, 255, 5, 1, 0, 255, 0, 0, 255, 0, 0],
+        );
+    }
+
+    #[test]
+    fn test_malformed_int() {
+        assert!(TupleValue::decode(&[21, 0]).is_ok());
+        assert!(TupleValue::decode(&[22, 0]).is_err());
+        assert!(TupleValue::decode(&[22, 0, 0]).is_ok());
+
+        assert!(TupleValue::decode(&[19, 0]).is_ok());
+        assert!(TupleValue::decode(&[18, 0]).is_err());
+        assert!(TupleValue::decode(&[18, 0, 0]).is_ok());
     }
 
     #[test]
