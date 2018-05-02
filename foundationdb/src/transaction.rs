@@ -561,6 +561,31 @@ impl Transaction {
     pub fn on_error(&self, error: FdbError) -> TrxErrFuture {
         TrxErrFuture::new(self.clone(), error)
     }
+
+    /// Adds a conflict range to a transaction without performing the associated read or write.
+    ///
+    /// # Note
+    ///
+    /// Most applications will use the serializable isolation that transactions provide by default
+    /// and will not need to manipulate conflict ranges.
+    pub fn add_conflict_range(
+        &self,
+        begin: &[u8],
+        end: &[u8],
+        ty: options::ConflictRangeType,
+    ) -> Result<()> {
+        let trx = self.inner.inner;
+        unsafe {
+            eval(fdb::fdb_transaction_add_conflict_range(
+                trx,
+                begin.as_ptr() as *const _,
+                begin.len() as i32,
+                end.as_ptr() as *const _,
+                end.len() as i32,
+                ty.code(),
+            ))
+        }
+    }
 }
 
 struct TransactionInner {
