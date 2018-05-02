@@ -464,7 +464,7 @@ pub enum SingleValue {
     Empty,
     Bytes(Vec<u8>),
     Str(String),
-    Nested(Vec<SingleValue>),
+    Nested(TupleValue),
     Int(i64),
     Float(f32),
     Double(f64),
@@ -480,7 +480,7 @@ impl Single for SingleValue {
             Empty => Single::encode(&(), w),
             Bytes(ref v) => Single::encode(v, w),
             Str(ref v) => Single::encode(v, w),
-            Nested(ref v) => Single::encode(v, w),
+            Nested(ref v) => Single::encode(&v.0, w),
             Int(ref v) => Single::encode(v, w),
             Float(ref v) => Single::encode(v, w),
             Double(ref v) => Single::encode(v, w),
@@ -521,7 +521,7 @@ impl Single for SingleValue {
             }
             NESTED => {
                 let (v, offset) = Single::decode(buf)?;
-                Ok((SingleValue::Nested(v), offset))
+                Ok((SingleValue::Nested(TupleValue(v)), offset))
             }
             val => {
                 if val >= NEGINTSTART && val <= POSINTEND {
@@ -535,7 +535,7 @@ impl Single for SingleValue {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TupleValue(pub Vec<SingleValue>);
 
 impl Tuple for TupleValue {
@@ -609,11 +609,11 @@ mod tests {
         test_round_trip(b"hello".to_vec(), &[1, 104, 101, 108, 108, 111, 0]);
         test_round_trip(vec![0], &[1, 0, 0xff, 0]);
         test_round_trip(
-            SingleValue::Nested(vec![
+            SingleValue::Nested(TupleValue(vec![
                 SingleValue::Str("hello".to_string()),
                 SingleValue::Str("world".to_string()),
                 SingleValue::Int(42),
-            ]),
+            ])),
             &[
                 NESTED,
                 /*hello*/ 2,
