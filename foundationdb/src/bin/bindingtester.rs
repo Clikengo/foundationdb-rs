@@ -191,7 +191,7 @@ impl Instr {
 
         let code = match cmd {
             "PUSH" => {
-                let data = Single::encode_to_vec(&tup.0[1]).unwrap();
+                let data = Single::encode_to_vec(&tup.0[1]);
                 Push(data)
             }
             "DUP" => Dup,
@@ -280,13 +280,13 @@ impl StackItem {
 
         //TODO: wait
         match self.fut.unwrap().wait() {
-            Ok((_trx, data)) => Single::encode_to_vec(&data).unwrap(),
+            Ok((_trx, data)) => Single::encode_to_vec(&data),
             Err(e) => {
                 let code = format!("{}", e.code());
                 let tup = (b"ERROR".to_vec(), code.into_bytes());
                 debug!("ERROR: {:?}", e);
-                let bytes = Tuple::encode_to_vec(&tup).expect("failed to encode");
-                Single::encode_to_vec(&bytes).unwrap()
+                let bytes = Tuple::encode_to_vec(&tup);
+                Single::encode_to_vec(&bytes)
             }
         }
     }
@@ -406,7 +406,7 @@ impl StackMachine {
     where
         S: Single,
     {
-        let data = Single::encode_to_vec(s).expect("failed to encode");
+        let data = Single::encode_to_vec(s);
         self.push(number, data);
     }
 
@@ -723,7 +723,7 @@ impl StackMachine {
 
                 while !data.is_empty() {
                     let (val, offset): (SingleValue, _) = Single::decode(data).unwrap();
-                    let bytes = Single::encode_to_vec(&val).unwrap();
+                    let bytes = Single::encode_to_vec(&val);
                     self.push_single(number, &bytes);
                     data = &data[offset..];
                 }

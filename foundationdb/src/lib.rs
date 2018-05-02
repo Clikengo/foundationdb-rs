@@ -129,6 +129,7 @@ pub mod network;
 /// Generated configuration types for use with the various `set_option` functions
 #[allow(missing_docs)]
 pub mod options;
+pub mod subspace;
 pub mod transaction;
 #[allow(missing_docs)]
 pub mod tuple;
