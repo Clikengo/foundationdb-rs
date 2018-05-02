@@ -90,10 +90,11 @@ impl SingleType for u8 {
 
 pub trait Single: Sized {
     fn encode<W: Write>(&self, _w: &mut W) -> std::io::Result<()>;
-    fn encode_to_vec(&self) -> std::io::Result<Vec<u8>> {
+    fn encode_to_vec(&self) -> Vec<u8> {
         let mut v = Vec::new();
-        self.encode(&mut v)?;
-        Ok(v)
+        // `self.encode` should not fail because undering `Write` does not return error.
+        self.encode(&mut v).unwrap();
+        v
     }
 
     fn decode(buf: &[u8]) -> Result<(Self, usize)>;
@@ -395,6 +396,9 @@ impl Single for i64 {
     }
 
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
+        if buf.is_empty() {
+            return Err(TupleError::EOF);
+        }
         let header = buf[0];
         if header < 0x0c || header > 0x1c {
             return Err(TupleError::InvalidType { value: header });
@@ -431,10 +435,10 @@ impl Single for i64 {
 
 pub trait Tuple: Sized {
     fn encode<W: Write>(&self, _w: &mut W) -> std::io::Result<()>;
-    fn encode_to_vec(&self) -> std::io::Result<Vec<u8>> {
+    fn encode_to_vec(&self) -> Vec<u8> {
         let mut v = Vec::new();
-        self.encode(&mut v)?;
-        Ok(v)
+        self.encode(&mut v).unwrap();
+        v
     }
 
     fn decode(buf: &[u8]) -> Result<Self>;
@@ -560,7 +564,8 @@ impl Single for SingleValue {
                     let (v, offset) = Single::decode(buf)?;
                     Ok((SingleValue::Int(v), offset))
                 } else {
-                    unimplemented!("unknown code: 0x{:02x}", val);
+                    //TODO: Versionstamp, ...
+                    Err(TupleError::InvalidData)
                 }
             }
         }
@@ -599,7 +604,7 @@ mod tests {
         S: Single + std::fmt::Debug + PartialEq,
     {
         assert_eq!(val, Single::decode_full(buf).unwrap());
-        assert_eq!(buf, Single::encode_to_vec(&val).unwrap().as_slice());
+        assert_eq!(buf, Single::encode_to_vec(&val).as_slice());
     }
 
     #[test]
@@ -713,7 +718,7 @@ mod tests {
 
         assert_eq!(
             &[2, 104, 101, 108, 108, 111, 0, 1, 119, 111, 114, 108, 100, 0],
-            Tuple::encode_to_vec(&tup).unwrap().as_slice()
+            Tuple::encode_to_vec(&tup).as_slice()
         );
     }
 

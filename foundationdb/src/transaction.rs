@@ -102,7 +102,7 @@ impl RangeOptionBuilder {
     where
         T: tuple::Tuple,
     {
-        let bytes = tuple::Tuple::encode_to_vec(tup).expect("failed to encode tuple");
+        let bytes = tuple::Tuple::encode_to_vec(tup);
         let mut begin = bytes.clone();
         begin.push(0x00);
 
