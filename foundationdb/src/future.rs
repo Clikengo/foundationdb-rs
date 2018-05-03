@@ -29,7 +29,8 @@ pub(crate) struct FdbFuture {
 }
 
 impl FdbFuture {
-    pub(crate) fn new(f: *mut fdb::FDBFuture) -> Self {
+    // `new` is marked as unsafe because it's lifetime is not well-defined.
+    pub(crate) unsafe fn new(f: *mut fdb::FDBFuture) -> Self {
         Self {
             f: Some(f),
             task: None,
