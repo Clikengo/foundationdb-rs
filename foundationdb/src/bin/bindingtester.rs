@@ -177,7 +177,7 @@ impl Instr {
     fn from(data: &[u8]) -> Self {
         use InstrCode::*;
 
-        let tup: TupleValue = Tuple::decode(data).unwrap();
+        let tup: tuple::Value = Tuple::decode(data).unwrap();
         let cmd = match tup.0[0] {
             SingleValue::Str(ref s) => s.clone(),
             _ => panic!("unexpected instr"),

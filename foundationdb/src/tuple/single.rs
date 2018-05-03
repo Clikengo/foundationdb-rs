@@ -1,6 +1,6 @@
 use std::{self, io::Write};
 
-use super::{Error, TupleValue, Result};
+use tuple::{self, Error, Result};
 use byteorder::{self, ByteOrder};
 
 /// Various tuple types
@@ -39,7 +39,7 @@ pub enum SingleValue {
     Empty,
     Bytes(Vec<u8>),
     Str(String),
-    Nested(TupleValue),
+    Nested(tuple::Value),
     Int(i64),
     Float(f32),
     Double(f64),
@@ -474,7 +474,7 @@ impl Single for SingleValue {
             }
             NESTED => {
                 let (v, offset) = Single::decode(buf)?;
-                Ok((SingleValue::Nested(TupleValue(v)), offset))
+                Ok((SingleValue::Nested(tuple::Value(v)), offset))
             }
             val => {
                 if val >= NEGINTSTART && val <= POSINTEND {
@@ -492,7 +492,7 @@ impl Single for SingleValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tuple::Tuple;
+    use tuple::{Tuple, Value as TupleValue};
 
     fn test_round_trip<S>(val: S, buf: &[u8])
     where
