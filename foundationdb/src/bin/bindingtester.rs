@@ -178,7 +178,7 @@ impl Instr {
 
         let tup: tuple::Value = tuple::Decode::decode(data).unwrap();
         let cmd = match tup.0[0] {
-            single::Value::Str(ref s) => s.clone(),
+            item::Value::Str(ref s) => s.clone(),
             _ => panic!("unexpected instr"),
         };
 
@@ -191,7 +191,7 @@ impl Instr {
 
         let code = match cmd {
             "PUSH" => {
-                let data = single::Encode::encode_to_vec(&tup.0[1]);
+                let data = item::Encode::encode_to_vec(&tup.0[1]);
                 Push(data)
             }
             "DUP" => Dup,
@@ -280,13 +280,13 @@ impl StackItem {
 
         //TODO: wait
         match self.fut.unwrap().wait() {
-            Ok((_trx, data)) => single::Encode::encode_to_vec(&data),
+            Ok((_trx, data)) => item::Encode::encode_to_vec(&data),
             Err(e) => {
                 let code = format!("{}", e.code());
                 let tup = (b"ERROR".to_vec(), code.into_bytes());
                 debug!("ERROR: {:?}", e);
                 let bytes = tuple::Encode::encode_to_vec(&tup);
-                single::Encode::encode_to_vec(&bytes)
+                item::Encode::encode_to_vec(&bytes)
             }
         }
     }
@@ -377,15 +377,15 @@ impl StackMachine {
         self.stack.pop().expect("stack empty")
     }
 
-    fn pop_single<S>(&mut self) -> S
+    fn pop_item<S>(&mut self) -> S
     where
-        S: single::Decode,
+        S: item::Decode,
     {
         let data = self.pop().data();
-        match single::Decode::decode_full(&data) {
+        match item::Decode::decode_full(&data) {
             Ok(v) => v,
             Err(e) => {
-                panic!("failed to decode single {:?}: {:?}", data, e);
+                panic!("failed to decode item {:?}: {:?}", data, e);
             }
         }
     }
@@ -395,18 +395,18 @@ impl StackMachine {
     }
 
     fn pop_selector(&mut self) -> KeySelector {
-        let key: Vec<u8> = self.pop_single();
-        let or_equal: i64 = self.pop_single();
-        let offset: i64 = self.pop_single();
+        let key: Vec<u8> = self.pop_item();
+        let or_equal: i64 = self.pop_item();
+        let offset: i64 = self.pop_item();
 
         KeySelector::new(key, or_equal != 0, offset as usize)
     }
 
-    fn push_single<S>(&mut self, number: usize, s: &S)
+    fn push_item<S>(&mut self, number: usize, s: &S)
     where
-        S: single::Encode,
+        S: item::Encode,
     {
-        let data = single::Encode::encode_to_vec(s);
+        let data = item::Encode::encode_to_vec(s);
         self.push(number, data);
     }
 
@@ -453,7 +453,7 @@ impl StackMachine {
             }
             EmptyStack => self.stack.clear(),
             Swap => {
-                let idx: i64 = self.pop_single();
+                let idx: i64 = self.pop_item();
                 {
                     let len = self.stack.len();
                     let idx1 = len - 1;
@@ -469,16 +469,16 @@ impl StackMachine {
                 self.pop();
             }
             Sub => {
-                let a: i64 = self.pop_single();
-                let b: i64 = self.pop_single();
+                let a: i64 = self.pop_item();
+                let b: i64 = self.pop_item();
 
-                self.push_single(number, &(a - b));
+                self.push_item(number, &(a - b));
             }
             Concat => {
-                let mut a: Vec<u8> = self.pop_single();
-                let mut b: Vec<u8> = self.pop_single();
+                let mut a: Vec<u8> = self.pop_item();
+                let mut b: Vec<u8> = self.pop_item();
                 a.append(&mut b);
-                self.push_single(number, &a);
+                self.push_item(number, &a);
             }
             // LogStack,
             NewTransaction => {
@@ -488,18 +488,18 @@ impl StackMachine {
                 self.transactions.insert(name, trx);
             }
             UseTransacton => {
-                let name: Vec<u8> = self.pop_single();
+                let name: Vec<u8> = self.pop_item();
                 self.cur_transaction = name;
             }
             OnError => {
-                let code: i64 = self.pop_single();
+                let code: i64 = self.pop_item();
                 let trx0 = trx.clone();
                 let f = trx.on_error(FdbError::from(code as i32))
                     .map(move |_| (trx0, b"RESULT_NOT_PRESENT".to_vec()));
                 self.push_fut(number, f);
             }
             Get => {
-                let key: Vec<u8> = self.pop_single();
+                let key: Vec<u8> = self.pop_item();
                 let trx0 = trx.clone();
                 let f = trx.get(&key, instr.pop_snapshot()).map(move |res| {
                     let val = res.value().expect("failed to get value");
@@ -517,7 +517,7 @@ impl StackMachine {
 
             GetKey => {
                 let selector = self.pop_selector();
-                let mut prefix: Vec<u8> = self.pop_single();
+                let mut prefix: Vec<u8> = self.pop_item();
 
                 //TODO: wait
                 let key = trx.get_key(selector, instr.pop_snapshot())
@@ -526,12 +526,12 @@ impl StackMachine {
                     .unwrap();
 
                 if key.starts_with(&prefix) {
-                    self.push_single(number, &key);
+                    self.push_item(number, &key);
                 } else if key < prefix {
-                    self.push_single(number, &prefix);
+                    self.push_item(number, &prefix);
                 } else {
                     strinc(&mut prefix);
-                    self.push_single(number, &prefix);
+                    self.push_item(number, &prefix);
                 }
             }
 
@@ -539,7 +539,7 @@ impl StackMachine {
                 let selector = instr.pop_selector();
 
                 let (begin, end) = if instr.pop_starts_with() {
-                    let begin: Vec<u8> = self.pop_single();
+                    let begin: Vec<u8> = self.pop_item();
                     let mut end = begin.clone();
                     strinc(&mut end);
                     (
@@ -551,17 +551,17 @@ impl StackMachine {
                     let end = self.pop_selector();
                     (begin, end)
                 } else {
-                    let begin: Vec<u8> = self.pop_single();
-                    let end: Vec<u8> = self.pop_single();
+                    let begin: Vec<u8> = self.pop_item();
+                    let end: Vec<u8> = self.pop_item();
                     (
                         KeySelector::first_greater_or_equal(&begin),
                         KeySelector::first_greater_or_equal(&end),
                     )
                 };
 
-                let limit: i64 = self.pop_single();
-                let reverse: i64 = self.pop_single();
-                let streaming_mode: i64 = self.pop_single();
+                let limit: i64 = self.pop_item();
+                let reverse: i64 = self.pop_item();
+                let streaming_mode: i64 = self.pop_item();
                 let mode = streaming_from_value(streaming_mode as i32);
 
                 debug!(
@@ -570,7 +570,7 @@ impl StackMachine {
                 );
 
                 let prefix: Option<Vec<u8>> = if selector {
-                    Some(self.pop_single())
+                    Some(self.pop_item())
                 } else {
                     None
                 };
@@ -600,8 +600,8 @@ impl StackMachine {
                                     continue;
                                 }
                             }
-                            single::Encode::encode(&key.to_vec(), &mut out).expect("failed to encode");
-                            single::Encode::encode(&value.to_vec(), &mut out).expect("failed to encode");
+                            item::Encode::encode(&key.to_vec(), &mut out).expect("failed to encode");
+                            item::Encode::encode(&value.to_vec(), &mut out).expect("failed to encode");
                         }
                         Ok(out)
                     })
@@ -625,7 +625,7 @@ impl StackMachine {
                 instr.pop_snapshot();
 
                 self.last_version = version;
-                self.push_single(number, &b"GOT_READ_VERSION".to_vec());
+                self.push_item(number, &b"GOT_READ_VERSION".to_vec());
             }
 
             GetVersionstamp => {
@@ -637,8 +637,8 @@ impl StackMachine {
             }
 
             Set => {
-                let key: Vec<u8> = self.pop_single();
-                let value: Vec<u8> = self.pop_single();
+                let key: Vec<u8> = self.pop_item();
+                let value: Vec<u8> = self.pop_item();
 
                 debug!("set  : key={:?}, value={:?}", key, value);
                 trx.set(&key, &value);
@@ -650,7 +650,7 @@ impl StackMachine {
             }
 
             Clear => {
-                let key: Vec<u8> = self.pop_single();
+                let key: Vec<u8> = self.pop_item();
                 trx.clear(&key);
 
                 debug!("clear: key={:?}", key);
@@ -658,13 +658,13 @@ impl StackMachine {
             }
 
             ClearRange => {
-                let begin: Vec<u8> = self.pop_single();
+                let begin: Vec<u8> = self.pop_item();
                 let end = if instr.pop_starts_with() {
                     let mut end = begin.clone();
                     strinc(&mut end);
                     end
                 } else {
-                    let end: Vec<u8> = self.pop_single();
+                    let end: Vec<u8> = self.pop_item();
                     end
                 };
                 trx.clear_range(&begin, &end);
@@ -672,9 +672,9 @@ impl StackMachine {
             }
 
             AtomicOp => {
-                let optype: String = self.pop_single();
-                let key: Vec<u8> = self.pop_single();
-                let value: Vec<u8> = self.pop_single();
+                let optype: String = self.pop_item();
+                let key: Vec<u8> = self.pop_item();
+                let value: Vec<u8> = self.pop_item();
 
                 let op = mutation_from_str(&optype);
                 trx.atomic_op(&key, &value, op);
@@ -696,7 +696,7 @@ impl StackMachine {
                 let last_version = trx.committed_version()
                     .expect("failed to get committed version");
                 self.last_version = last_version;
-                self.push_single(number, &b"GOT_COMMITTED_VERSION".to_vec());
+                self.push_item(number, &b"GOT_COMMITTED_VERSION".to_vec());
             }
 
             WaitFuture => {
@@ -707,30 +707,30 @@ impl StackMachine {
             }
 
             TuplePack => {
-                let n: i64 = self.pop_single();
+                let n: i64 = self.pop_item();
 
                 let mut buf = Vec::new();
                 for _ in 0..n {
                     let mut data = self.pop_data();
                     buf.append(&mut data);
                 }
-                self.push_single(number, &buf);
+                self.push_item(number, &buf);
             }
 
             TupleUnpack => {
-                let data: Vec<u8> = self.pop_single();
+                let data: Vec<u8> = self.pop_item();
                 let mut data = data.as_slice();
 
                 while !data.is_empty() {
-                    let (val, offset): (single::Value, _) = single::Decode::decode(data).unwrap();
-                    let bytes = single::Encode::encode_to_vec(&val);
-                    self.push_single(number, &bytes);
+                    let (val, offset): (item::Value, _) = item::Decode::decode(data).unwrap();
+                    let bytes = item::Encode::encode_to_vec(&val);
+                    self.push_item(number, &bytes);
                     data = &data[offset..];
                 }
             }
 
             TupleRange => {
-                let n: i64 = self.pop_single();
+                let n: i64 = self.pop_item();
 
                 let mut tup = Vec::new();
                 for _ in 0..n {
@@ -742,12 +742,12 @@ impl StackMachine {
                 {
                     let mut data = tup.clone();
                     data.push(0x00);
-                    self.push_single(number, &data);
+                    self.push_item(number, &data);
                 }
                 {
                     let mut data = tup.clone();
                     data.push(0xff);
-                    self.push_single(number, &data);
+                    self.push_item(number, &data);
                 }
             }
 
@@ -763,7 +763,7 @@ impl StackMachine {
         if is_db && mutation {
             //TODO
             trx.commit().wait().expect("failed to commit");
-            self.push_single(number, &b"RESULT_NOT_PRESENT".to_vec());
+            self.push_item(number, &b"RESULT_NOT_PRESENT".to_vec());
         }
 
         if instr.has_flags() {

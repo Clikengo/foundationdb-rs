@@ -8,7 +8,7 @@
 
 //! Tuple Key type like that of other FoundationDB libraries
 
-pub mod single;
+pub mod item;
 
 use std::{self, io::Write, string::FromUtf8Error};
 
@@ -51,7 +51,7 @@ macro_rules! tuple_impls {
         $(
             impl<$($name),+> Encode for ($($name,)+)
             where
-                $($name: single::Encode + Default,)+
+                $($name: item::Encode + Default,)+
             {
                 #[allow(non_snake_case, unused_assignments, deprecated)]
                 fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
@@ -64,7 +64,7 @@ macro_rules! tuple_impls {
 
             impl<$($name),+> Decode for ($($name,)+)
             where
-                $($name: single::Decode + Default,)+
+                $($name: item::Decode + Default,)+
             {
                 #[allow(non_snake_case, unused_assignments, deprecated)]
                 fn decode(buf: &[u8]) -> Result<Self> {
@@ -103,11 +103,11 @@ tuple_impls! {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Value(pub Vec<single::Value>);
+pub struct Value(pub Vec<item::Value>);
 
 impl Encode for Value {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
-        use self::single::Encode;
+        use self::item::Encode;
         for item in self.0.iter() {
             item.encode(w)?;
         }
@@ -120,7 +120,7 @@ impl Decode for Value {
         let mut data = buf;
         let mut v = Vec::new();
         while !data.is_empty() {
-            let (s, offset): (single::Value, _) = single::Decode::decode(data)?;
+            let (s, offset): (item::Value, _) = item::Decode::decode(data)?;
             v.push(s);
             data = &data[offset..];
         }
