@@ -102,9 +102,9 @@ impl RangeOptionBuilder {
     /// Create new builder with a tuple as a prefix
     pub fn from_tuple<T>(tup: &T) -> Self
     where
-        T: tuple::Tuple,
+        T: tuple::Encode,
     {
-        let bytes = tuple::Tuple::encode_to_vec(tup);
+        let bytes = tuple::Encode::encode_to_vec(tup);
         let mut begin = bytes.clone();
         begin.push(0x00);
 

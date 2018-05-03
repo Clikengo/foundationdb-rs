@@ -1,17 +1,6 @@
-// Copyright 2018 foundationdb-rs developers, https://github.com/bluejekyll/foundationdb-rs/graphs/contributors
-// Copyright 2013-2018 Apple, Inc and the FoundationDB project authors.
-//
-// Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
-// http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
-// http://opensource.org/licenses/MIT>, at your option. This file may not be
-// copied, modified, or distributed except according to those terms.
+use std::{self, io::Write};
 
-//! Tuple Key type like that of other FoundationDB libraries
-
-use std;
-use std::io::Write;
-use std::string::FromUtf8Error;
-
+use tuple::{self, Error, Result};
 use byteorder::{self, ByteOrder};
 
 /// Various tuple types
@@ -31,27 +20,34 @@ const VERSIONSTAMP: u8 = 0x33;
 
 const ESCAPE: u8 = 0xff;
 
-#[derive(Debug, Fail)]
-pub enum TupleError {
-    #[fail(display = "Unexpected end of file")]
-    EOF,
-    #[fail(display = "Invalid type: {}", value)]
-    InvalidType { value: u8 },
-    #[fail(display = "Invalid data")]
-    InvalidData,
-    #[fail(display = "UTF8 conversion error")]
-    FromUtf8Error(FromUtf8Error),
+const SIZE_LIMITS: &[i64] = &[
+    0,
+    (1 << (1 * 8)) - 1,
+    (1 << (2 * 8)) - 1,
+    (1 << (3 * 8)) - 1,
+    (1 << (4 * 8)) - 1,
+    (1 << (5 * 8)) - 1,
+    (1 << (6 * 8)) - 1,
+    (1 << (7 * 8)) - 1,
+];
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Uuid([u8; 16]);
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Value {
+    Empty,
+    Bytes(Vec<u8>),
+    Str(String),
+    Nested(tuple::Value),
+    Int(i64),
+    Float(f32),
+    Double(f64),
+    Boolean(bool),
+    Uuid(Uuid),
 }
 
-type Result<T> = std::result::Result<T, TupleError>;
-
-impl From<FromUtf8Error> for TupleError {
-    fn from(error: FromUtf8Error) -> Self {
-        TupleError::FromUtf8Error(error)
-    }
-}
-
-trait SingleType: Copy {
+trait Type: Copy {
     /// verifies the value matches this type
     fn expect(self, value: u8) -> Result<()>;
 
@@ -62,13 +58,63 @@ trait SingleType: Copy {
     fn write<W: Write>(self, w: &mut W) -> std::io::Result<()>;
 }
 
-impl SingleType for u8 {
+fn encode_bytes<W: Write>(w: &mut W, buf: &[u8]) -> std::io::Result<()> {
+    for b in buf {
+        b.write(w)?;
+        if *b == 0 {
+            ESCAPE.write(w)?;
+        }
+    }
+    NIL.write(w)
+}
+
+fn decode_bytes(buf: &[u8]) -> Result<(Vec<u8>, usize)> {
+    let mut out = Vec::<u8>::new();
+    let mut offset = 0;
+    loop {
+        if offset >= buf.len() {
+            return Err(Error::EOF);
+        }
+
+        // is the null marker at the offset
+        if NIL.expect(buf[offset]).is_ok() {
+            if offset + 1 < buf.len() && buf[offset + 1] == ESCAPE {
+                out.push(NIL);
+                offset += 2;
+                continue;
+            } else {
+                break;
+            }
+        }
+        out.push(buf[offset]);
+        offset += 1;
+    }
+    Ok((out, offset + 1))
+}
+
+fn adjust_float_bytes(b: &mut [u8], encode: bool) {
+    if (encode && b[0] & 0x80 != 0x00) || (!encode && b[0] & 0x80 == 0x00) {
+        // Negative numbers: flip all of the bytes.
+        for byte in b.iter_mut() {
+            *byte = *byte ^ 0xff
+        }
+    } else {
+        // Positive number: flip just the sign bit.
+        b[0] = b[0] ^ 0x80
+    }
+}
+
+fn bisect_left(val: i64) -> usize {
+    SIZE_LIMITS.iter().position(|v| val <= *v).unwrap_or(8)
+}
+
+impl Type for u8 {
     /// verifies the value matches this type
     fn expect(self, value: u8) -> Result<()> {
         if self == value {
             Ok(())
         } else {
-            Err(TupleError::InvalidType { value })
+            Err(Error::InvalidType { value })
         }
     }
 
@@ -88,7 +134,7 @@ impl SingleType for u8 {
             TRUE => Ok(()),
             UUID => Ok(()),
             VERSIONSTAMP => Ok(()),
-            _ => Err(TupleError::InvalidType { value: self }),
+            _ => Err(Error::InvalidType { value: self }),
         }
     }
 
@@ -97,27 +143,29 @@ impl SingleType for u8 {
     }
 }
 
-pub trait Single: Sized {
+pub trait Encode {
     fn encode<W: Write>(&self, _w: &mut W) -> std::io::Result<()>;
     fn encode_to_vec(&self) -> Vec<u8> {
         let mut v = Vec::new();
-        // `self.encode` should not fail because undering `Write` does not return error.
+        // `self.encode` should not fail because underlying `Write` does not return error.
         self.encode(&mut v)
             .expect("single encoding should never fail");
         v
     }
+}
 
+pub trait Decode: Sized {
     fn decode(buf: &[u8]) -> Result<(Self, usize)>;
     fn decode_full(buf: &[u8]) -> Result<Self> {
         let (val, offset) = Self::decode(buf)?;
         if offset != buf.len() {
-            return Err(TupleError::InvalidData);
+            return Err(Error::InvalidData);
         }
         Ok(val)
     }
 }
 
-impl Single for bool {
+impl Encode for bool {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         if *self {
             TRUE.write(w)
@@ -125,28 +173,32 @@ impl Single for bool {
             FALSE.write(w)
         }
     }
+}
 
+impl Decode for bool {
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.is_empty() {
-            return Err(TupleError::EOF);
+            return Err(Error::EOF);
         }
 
         match buf[0] {
             FALSE => Ok((false, 1)),
             TRUE => Ok((true, 1)),
-            v => Err(TupleError::InvalidType { value: v }),
+            v => Err(Error::InvalidType { value: v }),
         }
     }
 }
 
-impl Single for () {
+impl Encode for () {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         NIL.write(w)
     }
+}
 
+impl Decode for () {
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.is_empty() {
-            return Err(TupleError::EOF);
+            return Err(Error::EOF);
         }
 
         NIL.expect(buf[0])?;
@@ -154,18 +206,17 @@ impl Single for () {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct Uuid([u8; 16]);
-
-impl Single for Uuid {
+impl Encode for Uuid {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         UUID.write(w)?;
         w.write_all(&self.0)
     }
+}
 
+impl Decode for Uuid {
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.len() < 17 {
-            return Err(TupleError::EOF);
+            return Err(Error::EOF);
         }
 
         UUID.expect(buf[0])?;
@@ -177,49 +228,17 @@ impl Single for Uuid {
     }
 }
 
-fn encode_bytes<W: Write>(w: &mut W, buf: &[u8]) -> std::io::Result<()> {
-    for b in buf {
-        b.write(w)?;
-        if *b == 0 {
-            ESCAPE.write(w)?;
-        }
-    }
-    NIL.write(w)
-}
-
-fn decode_bytes(buf: &[u8]) -> Result<(Vec<u8>, usize)> {
-    let mut out = Vec::<u8>::new();
-    let mut offset = 0;
-    loop {
-        if offset >= buf.len() {
-            return Err(TupleError::EOF);
-        }
-
-        // is the null marker at the offset
-        if NIL.expect(buf[offset]).is_ok() {
-            if offset + 1 < buf.len() && buf[offset + 1] == ESCAPE {
-                out.push(NIL);
-                offset += 2;
-                continue;
-            } else {
-                break;
-            }
-        }
-        out.push(buf[offset]);
-        offset += 1;
-    }
-    Ok((out, offset + 1))
-}
-
-impl Single for String {
+impl Encode for String {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         STRING.write(w)?;
         encode_bytes(w, self.as_bytes())
     }
+}
 
+impl Decode for String {
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.len() < 2 {
-            return Err(TupleError::EOF);
+            return Err(Error::EOF);
         }
 
         STRING.expect(buf[0])?;
@@ -229,12 +248,12 @@ impl Single for String {
     }
 }
 
-impl Single for Vec<SingleValue> {
+impl Encode for Vec<Value> {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         NESTED.write(w)?;
         for v in self {
             match v {
-                &SingleValue::Empty => {
+                &Value::Empty => {
                     // Empty value in nested tuple is encoded with [NIL, ESCAPE] to disambiguate
                     // itself with end-of-tuple marker.
                     NIL.write(w)?;
@@ -247,10 +266,12 @@ impl Single for Vec<SingleValue> {
         }
         NIL.write(w)
     }
+}
 
+impl Decode for Vec<Value> {
     fn decode(mut buf: &[u8]) -> Result<(Self, usize)> {
         if buf.len() < 2 {
-            return Err(TupleError::EOF);
+            return Err(Error::EOF);
         }
 
         NESTED.expect(buf[0])?;
@@ -261,13 +282,13 @@ impl Single for Vec<SingleValue> {
         loop {
             if buf.is_empty() {
                 // tuple must end with NIL byte
-                return Err(TupleError::EOF);
+                return Err(Error::EOF);
             }
 
             if buf[0] == NIL {
                 if buf.len() > 1 && buf[1] == ESCAPE {
                     // nested Empty value, which is encoded to [NIL, ESCAPE]
-                    tuples.push(SingleValue::Empty);
+                    tuples.push(Value::Empty);
                     buf = &buf[2..];
                     continue;
                 }
@@ -276,7 +297,7 @@ impl Single for Vec<SingleValue> {
                 break;
             }
 
-            let (tuple, offset) = SingleValue::decode(buf)?;
+            let (tuple, offset) = Value::decode(buf)?;
             tuples.push(tuple);
             buf = &buf[offset..];
         }
@@ -286,15 +307,17 @@ impl Single for Vec<SingleValue> {
     }
 }
 
-impl Single for Vec<u8> {
+impl Encode for Vec<u8> {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         BYTES.write(w)?;
         encode_bytes(w, self.as_slice())
     }
+}
 
+impl Decode for Vec<u8> {
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.len() < 2 {
-            return Err(TupleError::EOF);
+            return Err(Error::EOF);
         }
 
         BYTES.expect(buf[0])?;
@@ -304,19 +327,7 @@ impl Single for Vec<u8> {
     }
 }
 
-fn adjust_float_bytes(b: &mut [u8], encode: bool) {
-    if (encode && b[0] & 0x80 != 0x00) || (!encode && b[0] & 0x80 == 0x00) {
-        // Negative numbers: flip all of the bytes.
-        for byte in b.iter_mut() {
-            *byte = *byte ^ 0xff
-        }
-    } else {
-        // Positive number: flip just the sign bit.
-        b[0] = b[0] ^ 0x80
-    }
-}
-
-impl Single for f32 {
+impl Encode for f32 {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         FLOAT.write(w)?;
 
@@ -326,10 +337,12 @@ impl Single for f32 {
 
         w.write_all(&buf)
     }
+}
 
+impl Decode for f32 {
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.len() < 5 {
-            return Err(TupleError::EOF);
+            return Err(Error::EOF);
         }
 
         FLOAT.expect(buf[0])?;
@@ -343,7 +356,7 @@ impl Single for f32 {
     }
 }
 
-impl Single for f64 {
+impl Encode for f64 {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         DOUBLE.write(w)?;
 
@@ -353,10 +366,12 @@ impl Single for f64 {
 
         w.write_all(&buf)
     }
+}
 
+impl Decode for f64 {
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.len() < 9 {
-            return Err(TupleError::EOF);
+            return Err(Error::EOF);
         }
 
         DOUBLE.expect(buf[0])?;
@@ -370,22 +385,7 @@ impl Single for f64 {
     }
 }
 
-const SIZE_LIMITS: &[i64] = &[
-    0,
-    (1 << (1 * 8)) - 1,
-    (1 << (2 * 8)) - 1,
-    (1 << (3 * 8)) - 1,
-    (1 << (4 * 8)) - 1,
-    (1 << (5 * 8)) - 1,
-    (1 << (6 * 8)) - 1,
-    (1 << (7 * 8)) - 1,
-];
-
-fn bisect_left(val: i64) -> usize {
-    SIZE_LIMITS.iter().position(|v| val <= *v).unwrap_or(8)
-}
-
-impl Single for i64 {
+impl Encode for i64 {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         let mut code = INTZERO;
         let n;
@@ -404,14 +404,16 @@ impl Single for i64 {
         w.write_all(&[code])?;
         w.write_all(&buf[(8 - n)..8])
     }
+}
 
+impl Decode for i64 {
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.is_empty() {
-            return Err(TupleError::EOF);
+            return Err(Error::EOF);
         }
         let header = buf[0];
         if header < 0x0c || header > 0x1c {
-            return Err(TupleError::InvalidType { value: header });
+            return Err(Error::InvalidType { value: header });
         }
 
         // if it's 0
@@ -423,7 +425,7 @@ impl Single for i64 {
         if header > INTZERO {
             let n = usize::from(header - INTZERO);
             if n + 1 > buf.len() {
-                return Err(TupleError::InvalidData);
+                return Err(Error::InvalidData);
             }
 
             (&mut data[(8 - n)..8]).copy_from_slice(&buf[1..(n + 1)]);
@@ -432,7 +434,7 @@ impl Single for i64 {
         } else {
             let n = usize::from(INTZERO - header);
             if n + 1 > buf.len() {
-                return Err(TupleError::InvalidData);
+                return Err(Error::InvalidData);
             }
 
             (&mut data[(8 - n)..8]).copy_from_slice(&buf[1..(n + 1)]);
@@ -443,179 +445,83 @@ impl Single for i64 {
     }
 }
 
-pub trait Tuple: Sized {
-    fn encode<W: Write>(&self, _w: &mut W) -> std::io::Result<()>;
-    fn encode_to_vec(&self) -> Vec<u8> {
-        let mut v = Vec::new();
-        self.encode(&mut v)
-            .expect("tuple encoding should never fail");
-        v
-    }
-
-    fn decode(buf: &[u8]) -> Result<Self>;
-}
-
-macro_rules! tuple_impls {
-    ($($len:expr => ($($n:tt $name:ident)+))+) => {
-        $(
-            impl<$($name),+> Tuple for ($($name,)+)
-            where
-                $($name: Single + Default,)+
-            {
-                #[allow(non_snake_case, unused_assignments, deprecated)]
-                fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
-                    $(
-                        self.$n.encode(w)?;
-                    )*
-                    Ok(())
-                }
-
-                #[allow(non_snake_case, unused_assignments, deprecated)]
-                fn decode(buf: &[u8]) -> Result<Self> {
-                    let mut buf = buf;
-                    let mut out: Self = Default::default();
-                    $(
-                        let (v0, offset0) = $name::decode(buf)?;
-                        out.$n = v0;
-                        buf = &buf[offset0..];
-                    )*
-
-                    if !buf.is_empty() {
-                        return Err(TupleError::InvalidData);
-                    }
-
-                    Ok(out)
-                }
-            }
-        )+
-    }
-}
-
-tuple_impls! {
-    1 => (0 T0)
-    2 => (0 T0 1 T1)
-    3 => (0 T0 1 T1 2 T2)
-    4 => (0 T0 1 T1 2 T2 3 T3)
-    5 => (0 T0 1 T1 2 T2 3 T3 4 T4)
-    6 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5)
-    7 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6)
-    8 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7)
-    9 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8)
-    10 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9)
-    11 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10)
-    12 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11)
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum SingleValue {
-    Empty,
-    Bytes(Vec<u8>),
-    Str(String),
-    Nested(TupleValue),
-    Int(i64),
-    Float(f32),
-    Double(f64),
-    Boolean(bool),
-    Uuid(Uuid),
-}
-
-impl Single for SingleValue {
+impl Encode for Value {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
-        use self::SingleValue::*;
+        use self::Value::*;
 
         match *self {
-            Empty => Single::encode(&(), w),
-            Bytes(ref v) => Single::encode(v, w),
-            Str(ref v) => Single::encode(v, w),
-            Nested(ref v) => Single::encode(&v.0, w),
-            Int(ref v) => Single::encode(v, w),
-            Float(ref v) => Single::encode(v, w),
-            Double(ref v) => Single::encode(v, w),
-            Boolean(ref v) => Single::encode(v, w),
-            Uuid(ref v) => Single::encode(v, w),
+            Empty => Encode::encode(&(), w),
+            Bytes(ref v) => Encode::encode(v, w),
+            Str(ref v) => Encode::encode(v, w),
+            Nested(ref v) => Encode::encode(&v.0, w),
+            Int(ref v) => Encode::encode(v, w),
+            Float(ref v) => Encode::encode(v, w),
+            Double(ref v) => Encode::encode(v, w),
+            Boolean(ref v) => Encode::encode(v, w),
+            Uuid(ref v) => Encode::encode(v, w),
         }
     }
+}
 
+impl Decode for Value {
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.is_empty() {
-            return Err(TupleError::EOF);
+            return Err(Error::EOF);
         }
 
         let code = buf[0];
         match code {
-            NIL => Ok((SingleValue::Empty, 1)),
+            NIL => Ok((Value::Empty, 1)),
             BYTES => {
-                let (v, offset) = Single::decode(buf)?;
-                Ok((SingleValue::Bytes(v), offset))
+                let (v, offset) = Decode::decode(buf)?;
+                Ok((Value::Bytes(v), offset))
             }
             STRING => {
-                let (v, offset) = Single::decode(buf)?;
-                Ok((SingleValue::Str(v), offset))
+                let (v, offset) = Decode::decode(buf)?;
+                Ok((Value::Str(v), offset))
             }
             FLOAT => {
-                let (v, offset) = Single::decode(buf)?;
-                Ok((SingleValue::Float(v), offset))
+                let (v, offset) = Decode::decode(buf)?;
+                Ok((Value::Float(v), offset))
             }
             DOUBLE => {
-                let (v, offset) = Single::decode(buf)?;
-                Ok((SingleValue::Double(v), offset))
+                let (v, offset) = Decode::decode(buf)?;
+                Ok((Value::Double(v), offset))
             }
-            FALSE => Ok((SingleValue::Boolean(false), 1)),
-            TRUE => Ok((SingleValue::Boolean(false), 1)),
+            FALSE => Ok((Value::Boolean(false), 1)),
+            TRUE => Ok((Value::Boolean(false), 1)),
             UUID => {
-                let (v, offset) = Single::decode(buf)?;
-                Ok((SingleValue::Uuid(v), offset))
+                let (v, offset) = Decode::decode(buf)?;
+                Ok((Value::Uuid(v), offset))
             }
             NESTED => {
-                let (v, offset) = Single::decode(buf)?;
-                Ok((SingleValue::Nested(TupleValue(v)), offset))
+                let (v, offset) = Decode::decode(buf)?;
+                Ok((Value::Nested(tuple::Value(v)), offset))
             }
             val => {
                 if val >= NEGINTSTART && val <= POSINTEND {
-                    let (v, offset) = Single::decode(buf)?;
-                    Ok((SingleValue::Int(v), offset))
+                    let (v, offset) = Decode::decode(buf)?;
+                    Ok((Value::Int(v), offset))
                 } else {
                     //TODO: Versionstamp, ...
-                    Err(TupleError::InvalidData)
+                    Err(Error::InvalidData)
                 }
             }
         }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct TupleValue(pub Vec<SingleValue>);
-
-impl Tuple for TupleValue {
-    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
-        for item in self.0.iter() {
-            item.encode(w)?;
-        }
-        Ok(())
-    }
-
-    fn decode(buf: &[u8]) -> Result<Self> {
-        let mut data = buf;
-        let mut v = Vec::new();
-        while !data.is_empty() {
-            let (s, offset): (SingleValue, _) = Single::decode(data)?;
-            v.push(s);
-            data = &data[offset..];
-        }
-        Ok(TupleValue(v))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tuple::Value as TupleValue;
 
     fn test_round_trip<S>(val: S, buf: &[u8])
     where
-        S: Single + std::fmt::Debug + PartialEq,
+        S: Encode + Decode + std::fmt::Debug + PartialEq,
     {
-        assert_eq!(val, Single::decode_full(buf).unwrap());
-        assert_eq!(buf, Single::encode_to_vec(&val).as_slice());
+        assert_eq!(val, Decode::decode_full(buf).unwrap());
+        assert_eq!(buf, Encode::encode_to_vec(&val).as_slice());
     }
 
     #[test]
@@ -657,10 +563,10 @@ mod tests {
         test_round_trip(b"hello".to_vec(), &[1, 104, 101, 108, 108, 111, 0]);
         test_round_trip(vec![0], &[1, 0, 0xff, 0]);
         test_round_trip(
-            SingleValue::Nested(TupleValue(vec![
-                SingleValue::Str("hello".to_string()),
-                SingleValue::Str("world".to_string()),
-                SingleValue::Int(42),
+            Value::Nested(TupleValue(vec![
+                Value::Str("hello".to_string()),
+                Value::Str("world".to_string()),
+                Value::Int(42),
             ])),
             &[
                 NESTED,
@@ -686,12 +592,12 @@ mod tests {
         );
 
         test_round_trip(
-            SingleValue::Nested(TupleValue(vec![
-                SingleValue::Bytes(vec![0]),
-                SingleValue::Empty,
-                SingleValue::Nested(TupleValue(vec![
-                    SingleValue::Bytes(vec![0]),
-                    SingleValue::Empty,
+            Value::Nested(TupleValue(vec![
+                Value::Bytes(vec![0]),
+                Value::Empty,
+                Value::Nested(TupleValue(vec![
+                    Value::Bytes(vec![0]),
+                    Value::Empty,
                 ])),
             ])),
             &[5, 1, 0, 255, 0, 0, 255, 5, 1, 0, 255, 0, 0, 255, 0, 0],
@@ -699,42 +605,9 @@ mod tests {
     }
 
     #[test]
-    fn test_malformed_int() {
-        assert!(TupleValue::decode(&[21, 0]).is_ok());
-        assert!(TupleValue::decode(&[22, 0]).is_err());
-        assert!(TupleValue::decode(&[22, 0, 0]).is_ok());
-
-        assert!(TupleValue::decode(&[19, 0]).is_ok());
-        assert!(TupleValue::decode(&[18, 0]).is_err());
-        assert!(TupleValue::decode(&[18, 0, 0]).is_ok());
-    }
-
-    #[test]
-    fn test_decode_tuple() {
-        assert_eq!((0, ()), Tuple::decode(&[20, 0]).unwrap());
-    }
-
-    #[test]
-    fn test_decode_tuple_ty() {
-        let data: &[u8] = &[2, 104, 101, 108, 108, 111, 0, 1, 119, 111, 114, 108, 100, 0];
-
-        let (v1, v2): (String, Vec<u8>) = Tuple::decode(data).unwrap();
-        assert_eq!(v1, "hello");
-        assert_eq!(v2, b"world");
-    }
-
-    #[test]
-    fn test_encode_tuple_ty() {
-        let tup = (String::from("hello"), b"world".to_vec());
-
-        assert_eq!(
-            &[2, 104, 101, 108, 108, 111, 0, 1, 119, 111, 114, 108, 100, 0],
-            Tuple::encode_to_vec(&tup).as_slice()
-        );
-    }
-
-    #[test]
     fn test_decode_nested() {
+        use tuple::Decode;
+
         assert!(TupleValue::decode(&[NESTED]).is_err());
         assert!(TupleValue::decode(&[NESTED, NIL]).is_ok());
         assert!(TupleValue::decode(&[NESTED, INTZERO]).is_err());
