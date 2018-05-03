@@ -68,16 +68,16 @@ impl Subspace {
     /// removed.  `unpack` will return an error if the key is not in this Subspace or does not
     /// encode a well-formed Tuple.
     pub fn unpack<T: Tuple>(&self, key: &[u8]) -> Result<T, TupleError> {
-        if !self.covers(key) {
+        if !self.is_start_of(key) {
             return Err(TupleError::InvalidData);
         }
         let key = &key[self.prefix.len()..];
         Tuple::decode(&key)
     }
 
-    /// `covers` returns true if the provided key starts with the prefix of this Subspace,
+    /// `is_start_of` returns true if the provided key starts with the prefix of this Subspace,
     /// indicating that the Subspace logically contains the key.
-    pub fn covers(&self, key: &[u8]) -> bool {
+    pub fn is_start_of(&self, key: &[u8]) -> bool {
         key.starts_with(&self.prefix)
     }
 
@@ -124,13 +124,13 @@ mod tests {
     }
 
     #[test]
-    fn covers() {
+    fn is_start_of() {
         let ss0 = Subspace::new(&(1,));
         let ss1 = Subspace::new(&(2,));
         let tup = (2, 3);
 
-        assert!(ss0.covers(&ss0.pack(&tup)));
-        assert!(!ss1.covers(&ss0.pack(&tup)));
+        assert!(ss0.is_start_of(&ss0.pack(&tup)));
+        assert!(!ss1.is_start_of(&ss0.pack(&tup)));
     }
 
     #[test]
