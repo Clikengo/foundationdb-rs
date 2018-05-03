@@ -11,7 +11,7 @@
 pub mod single;
 
 use std::{self, io::Write, string::FromUtf8Error};
-use self::single::{Single, SingleValue};
+use self::single::Single;
 
 #[derive(Debug, Fail)]
 pub enum Error {
@@ -97,7 +97,7 @@ tuple_impls! {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Value(pub Vec<SingleValue>);
+pub struct Value(pub Vec<single::Value>);
 
 impl Tuple for Value {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
@@ -111,7 +111,7 @@ impl Tuple for Value {
         let mut data = buf;
         let mut v = Vec::new();
         while !data.is_empty() {
-            let (s, offset): (SingleValue, _) = Single::decode(data)?;
+            let (s, offset): (single::Value, _) = Single::decode(data)?;
             v.push(s);
             data = &data[offset..];
         }
