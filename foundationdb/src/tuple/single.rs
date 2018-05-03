@@ -1,17 +1,6 @@
-// Copyright 2018 foundationdb-rs developers, https://github.com/bluejekyll/foundationdb-rs/graphs/contributors
-// Copyright 2013-2018 Apple, Inc and the FoundationDB project authors.
-//
-// Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
-// http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
-// http://opensource.org/licenses/MIT>, at your option. This file may not be
-// copied, modified, or distributed except according to those terms.
+use std::{self, io::Write};
 
-//! Tuple Key type like that of other FoundationDB libraries
-
-use std;
-use std::io::Write;
-use std::string::FromUtf8Error;
-
+use super::{TupleError, TupleValue, Result};
 use byteorder::{self, ByteOrder};
 
 /// Various tuple types
@@ -31,24 +20,31 @@ const VERSIONSTAMP: u8 = 0x33;
 
 const ESCAPE: u8 = 0xff;
 
-#[derive(Debug, Fail)]
-pub enum TupleError {
-    #[fail(display = "Unexpected end of file")]
-    EOF,
-    #[fail(display = "Invalid type: {}", value)]
-    InvalidType { value: u8 },
-    #[fail(display = "Invalid data")]
-    InvalidData,
-    #[fail(display = "UTF8 conversion error")]
-    FromUtf8Error(FromUtf8Error),
-}
+const SIZE_LIMITS: &[i64] = &[
+    0,
+    (1 << (1 * 8)) - 1,
+    (1 << (2 * 8)) - 1,
+    (1 << (3 * 8)) - 1,
+    (1 << (4 * 8)) - 1,
+    (1 << (5 * 8)) - 1,
+    (1 << (6 * 8)) - 1,
+    (1 << (7 * 8)) - 1,
+];
 
-type Result<T> = std::result::Result<T, TupleError>;
+#[derive(Clone, Debug, PartialEq)]
+pub struct Uuid([u8; 16]);
 
-impl From<FromUtf8Error> for TupleError {
-    fn from(error: FromUtf8Error) -> Self {
-        TupleError::FromUtf8Error(error)
-    }
+#[derive(Clone, Debug, PartialEq)]
+pub enum SingleValue {
+    Empty,
+    Bytes(Vec<u8>),
+    Str(String),
+    Nested(TupleValue),
+    Int(i64),
+    Float(f32),
+    Double(f64),
+    Boolean(bool),
+    Uuid(Uuid),
 }
 
 trait SingleType: Copy {
@@ -60,6 +56,56 @@ trait SingleType: Copy {
 
     /// writes this to w
     fn write<W: Write>(self, w: &mut W) -> std::io::Result<()>;
+}
+
+fn encode_bytes<W: Write>(w: &mut W, buf: &[u8]) -> std::io::Result<()> {
+    for b in buf {
+        b.write(w)?;
+        if *b == 0 {
+            ESCAPE.write(w)?;
+        }
+    }
+    NIL.write(w)
+}
+
+fn decode_bytes(buf: &[u8]) -> Result<(Vec<u8>, usize)> {
+    let mut out = Vec::<u8>::new();
+    let mut offset = 0;
+    loop {
+        if offset >= buf.len() {
+            return Err(TupleError::EOF);
+        }
+
+        // is the null marker at the offset
+        if NIL.expect(buf[offset]).is_ok() {
+            if offset + 1 < buf.len() && buf[offset + 1] == ESCAPE {
+                out.push(NIL);
+                offset += 2;
+                continue;
+            } else {
+                break;
+            }
+        }
+        out.push(buf[offset]);
+        offset += 1;
+    }
+    Ok((out, offset + 1))
+}
+
+fn adjust_float_bytes(b: &mut [u8], encode: bool) {
+    if (encode && b[0] & 0x80 != 0x00) || (!encode && b[0] & 0x80 == 0x00) {
+        // Negative numbers: flip all of the bytes.
+        for byte in b.iter_mut() {
+            *byte = *byte ^ 0xff
+        }
+    } else {
+        // Positive number: flip just the sign bit.
+        b[0] = b[0] ^ 0x80
+    }
+}
+
+fn bisect_left(val: i64) -> usize {
+    SIZE_LIMITS.iter().position(|v| val <= *v).unwrap_or(8)
 }
 
 impl SingleType for u8 {
@@ -154,9 +200,6 @@ impl Single for () {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct Uuid([u8; 16]);
-
 impl Single for Uuid {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         UUID.write(w)?;
@@ -175,40 +218,6 @@ impl Single for Uuid {
 
         Ok((Uuid(uuid), 17))
     }
-}
-
-fn encode_bytes<W: Write>(w: &mut W, buf: &[u8]) -> std::io::Result<()> {
-    for b in buf {
-        b.write(w)?;
-        if *b == 0 {
-            ESCAPE.write(w)?;
-        }
-    }
-    NIL.write(w)
-}
-
-fn decode_bytes(buf: &[u8]) -> Result<(Vec<u8>, usize)> {
-    let mut out = Vec::<u8>::new();
-    let mut offset = 0;
-    loop {
-        if offset >= buf.len() {
-            return Err(TupleError::EOF);
-        }
-
-        // is the null marker at the offset
-        if NIL.expect(buf[offset]).is_ok() {
-            if offset + 1 < buf.len() && buf[offset + 1] == ESCAPE {
-                out.push(NIL);
-                offset += 2;
-                continue;
-            } else {
-                break;
-            }
-        }
-        out.push(buf[offset]);
-        offset += 1;
-    }
-    Ok((out, offset + 1))
 }
 
 impl Single for String {
@@ -304,18 +313,6 @@ impl Single for Vec<u8> {
     }
 }
 
-fn adjust_float_bytes(b: &mut [u8], encode: bool) {
-    if (encode && b[0] & 0x80 != 0x00) || (!encode && b[0] & 0x80 == 0x00) {
-        // Negative numbers: flip all of the bytes.
-        for byte in b.iter_mut() {
-            *byte = *byte ^ 0xff
-        }
-    } else {
-        // Positive number: flip just the sign bit.
-        b[0] = b[0] ^ 0x80
-    }
-}
-
 impl Single for f32 {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         FLOAT.write(w)?;
@@ -368,21 +365,6 @@ impl Single for f64 {
         let val = byteorder::BE::read_f64(&data);
         Ok((val, 9))
     }
-}
-
-const SIZE_LIMITS: &[i64] = &[
-    0,
-    (1 << (1 * 8)) - 1,
-    (1 << (2 * 8)) - 1,
-    (1 << (3 * 8)) - 1,
-    (1 << (4 * 8)) - 1,
-    (1 << (5 * 8)) - 1,
-    (1 << (6 * 8)) - 1,
-    (1 << (7 * 8)) - 1,
-];
-
-fn bisect_left(val: i64) -> usize {
-    SIZE_LIMITS.iter().position(|v| val <= *v).unwrap_or(8)
 }
 
 impl Single for i64 {
@@ -441,82 +423,6 @@ impl Single for i64 {
             Ok((val - shift, n + 1))
         }
     }
-}
-
-pub trait Tuple: Sized {
-    fn encode<W: Write>(&self, _w: &mut W) -> std::io::Result<()>;
-    fn encode_to_vec(&self) -> Vec<u8> {
-        let mut v = Vec::new();
-        self.encode(&mut v)
-            .expect("tuple encoding should never fail");
-        v
-    }
-
-    fn decode(buf: &[u8]) -> Result<Self>;
-}
-
-macro_rules! tuple_impls {
-    ($($len:expr => ($($n:tt $name:ident)+))+) => {
-        $(
-            impl<$($name),+> Tuple for ($($name,)+)
-            where
-                $($name: Single + Default,)+
-            {
-                #[allow(non_snake_case, unused_assignments, deprecated)]
-                fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
-                    $(
-                        self.$n.encode(w)?;
-                    )*
-                    Ok(())
-                }
-
-                #[allow(non_snake_case, unused_assignments, deprecated)]
-                fn decode(buf: &[u8]) -> Result<Self> {
-                    let mut buf = buf;
-                    let mut out: Self = Default::default();
-                    $(
-                        let (v0, offset0) = $name::decode(buf)?;
-                        out.$n = v0;
-                        buf = &buf[offset0..];
-                    )*
-
-                    if !buf.is_empty() {
-                        return Err(TupleError::InvalidData);
-                    }
-
-                    Ok(out)
-                }
-            }
-        )+
-    }
-}
-
-tuple_impls! {
-    1 => (0 T0)
-    2 => (0 T0 1 T1)
-    3 => (0 T0 1 T1 2 T2)
-    4 => (0 T0 1 T1 2 T2 3 T3)
-    5 => (0 T0 1 T1 2 T2 3 T3 4 T4)
-    6 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5)
-    7 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6)
-    8 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7)
-    9 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8)
-    10 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9)
-    11 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10)
-    12 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11)
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum SingleValue {
-    Empty,
-    Bytes(Vec<u8>),
-    Str(String),
-    Nested(TupleValue),
-    Int(i64),
-    Float(f32),
-    Double(f64),
-    Boolean(bool),
-    Uuid(Uuid),
 }
 
 impl Single for SingleValue {
@@ -583,32 +489,10 @@ impl Single for SingleValue {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct TupleValue(pub Vec<SingleValue>);
-
-impl Tuple for TupleValue {
-    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
-        for item in self.0.iter() {
-            item.encode(w)?;
-        }
-        Ok(())
-    }
-
-    fn decode(buf: &[u8]) -> Result<Self> {
-        let mut data = buf;
-        let mut v = Vec::new();
-        while !data.is_empty() {
-            let (s, offset): (SingleValue, _) = Single::decode(data)?;
-            v.push(s);
-            data = &data[offset..];
-        }
-        Ok(TupleValue(v))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tuple::Tuple;
 
     fn test_round_trip<S>(val: S, buf: &[u8])
     where
