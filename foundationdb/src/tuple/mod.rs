@@ -14,7 +14,7 @@ use std::{self, io::Write, string::FromUtf8Error};
 use self::single::{Single, SingleValue};
 
 #[derive(Debug, Fail)]
-pub enum TupleError {
+pub enum Error {
     #[fail(display = "Unexpected end of file")]
     EOF,
     #[fail(display = "Invalid type: {}", value)]
@@ -25,11 +25,11 @@ pub enum TupleError {
     FromUtf8Error(FromUtf8Error),
 }
 
-type Result<T> = std::result::Result<T, TupleError>;
+type Result<T> = std::result::Result<T, Error>;
 
-impl From<FromUtf8Error> for TupleError {
+impl From<FromUtf8Error> for Error {
     fn from(error: FromUtf8Error) -> Self {
-        TupleError::FromUtf8Error(error)
+        Error::FromUtf8Error(error)
     }
 }
 
@@ -71,7 +71,7 @@ macro_rules! tuple_impls {
                     )*
 
                     if !buf.is_empty() {
-                        return Err(TupleError::InvalidData);
+                        return Err(Error::InvalidData);
                     }
 
                     Ok(out)
