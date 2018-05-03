@@ -143,16 +143,18 @@ impl Type for u8 {
     }
 }
 
-pub trait Single: Sized {
+pub trait Encode {
     fn encode<W: Write>(&self, _w: &mut W) -> std::io::Result<()>;
     fn encode_to_vec(&self) -> Vec<u8> {
         let mut v = Vec::new();
-        // `self.encode` should not fail because undering `Write` does not return error.
+        // `self.encode` should not fail because underlying `Write` does not return error.
         self.encode(&mut v)
             .expect("single encoding should never fail");
         v
     }
+}
 
+pub trait Decode: Sized {
     fn decode(buf: &[u8]) -> Result<(Self, usize)>;
     fn decode_full(buf: &[u8]) -> Result<Self> {
         let (val, offset) = Self::decode(buf)?;
@@ -163,7 +165,7 @@ pub trait Single: Sized {
     }
 }
 
-impl Single for bool {
+impl Encode for bool {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         if *self {
             TRUE.write(w)
@@ -171,7 +173,9 @@ impl Single for bool {
             FALSE.write(w)
         }
     }
+}
 
+impl Decode for bool {
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.is_empty() {
             return Err(Error::EOF);
@@ -185,11 +189,13 @@ impl Single for bool {
     }
 }
 
-impl Single for () {
+impl Encode for () {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         NIL.write(w)
     }
+}
 
+impl Decode for () {
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.is_empty() {
             return Err(Error::EOF);
@@ -200,12 +206,14 @@ impl Single for () {
     }
 }
 
-impl Single for Uuid {
+impl Encode for Uuid {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         UUID.write(w)?;
         w.write_all(&self.0)
     }
+}
 
+impl Decode for Uuid {
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.len() < 17 {
             return Err(Error::EOF);
@@ -220,12 +228,14 @@ impl Single for Uuid {
     }
 }
 
-impl Single for String {
+impl Encode for String {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         STRING.write(w)?;
         encode_bytes(w, self.as_bytes())
     }
+}
 
+impl Decode for String {
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.len() < 2 {
             return Err(Error::EOF);
@@ -238,7 +248,7 @@ impl Single for String {
     }
 }
 
-impl Single for Vec<Value> {
+impl Encode for Vec<Value> {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         NESTED.write(w)?;
         for v in self {
@@ -256,7 +266,9 @@ impl Single for Vec<Value> {
         }
         NIL.write(w)
     }
+}
 
+impl Decode for Vec<Value> {
     fn decode(mut buf: &[u8]) -> Result<(Self, usize)> {
         if buf.len() < 2 {
             return Err(Error::EOF);
@@ -295,12 +307,14 @@ impl Single for Vec<Value> {
     }
 }
 
-impl Single for Vec<u8> {
+impl Encode for Vec<u8> {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         BYTES.write(w)?;
         encode_bytes(w, self.as_slice())
     }
+}
 
+impl Decode for Vec<u8> {
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.len() < 2 {
             return Err(Error::EOF);
@@ -313,7 +327,7 @@ impl Single for Vec<u8> {
     }
 }
 
-impl Single for f32 {
+impl Encode for f32 {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         FLOAT.write(w)?;
 
@@ -323,7 +337,9 @@ impl Single for f32 {
 
         w.write_all(&buf)
     }
+}
 
+impl Decode for f32 {
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.len() < 5 {
             return Err(Error::EOF);
@@ -340,7 +356,7 @@ impl Single for f32 {
     }
 }
 
-impl Single for f64 {
+impl Encode for f64 {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         DOUBLE.write(w)?;
 
@@ -350,7 +366,9 @@ impl Single for f64 {
 
         w.write_all(&buf)
     }
+}
 
+impl Decode for f64 {
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.len() < 9 {
             return Err(Error::EOF);
@@ -367,7 +385,7 @@ impl Single for f64 {
     }
 }
 
-impl Single for i64 {
+impl Encode for i64 {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         let mut code = INTZERO;
         let n;
@@ -386,7 +404,9 @@ impl Single for i64 {
         w.write_all(&[code])?;
         w.write_all(&buf[(8 - n)..8])
     }
+}
 
+impl Decode for i64 {
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.is_empty() {
             return Err(Error::EOF);
@@ -425,23 +445,25 @@ impl Single for i64 {
     }
 }
 
-impl Single for Value {
+impl Encode for Value {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         use self::Value::*;
 
         match *self {
-            Empty => Single::encode(&(), w),
-            Bytes(ref v) => Single::encode(v, w),
-            Str(ref v) => Single::encode(v, w),
-            Nested(ref v) => Single::encode(&v.0, w),
-            Int(ref v) => Single::encode(v, w),
-            Float(ref v) => Single::encode(v, w),
-            Double(ref v) => Single::encode(v, w),
-            Boolean(ref v) => Single::encode(v, w),
-            Uuid(ref v) => Single::encode(v, w),
+            Empty => Encode::encode(&(), w),
+            Bytes(ref v) => Encode::encode(v, w),
+            Str(ref v) => Encode::encode(v, w),
+            Nested(ref v) => Encode::encode(&v.0, w),
+            Int(ref v) => Encode::encode(v, w),
+            Float(ref v) => Encode::encode(v, w),
+            Double(ref v) => Encode::encode(v, w),
+            Boolean(ref v) => Encode::encode(v, w),
+            Uuid(ref v) => Encode::encode(v, w),
         }
     }
+}
 
+impl Decode for Value {
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.is_empty() {
             return Err(Error::EOF);
@@ -451,34 +473,34 @@ impl Single for Value {
         match code {
             NIL => Ok((Value::Empty, 1)),
             BYTES => {
-                let (v, offset) = Single::decode(buf)?;
+                let (v, offset) = Decode::decode(buf)?;
                 Ok((Value::Bytes(v), offset))
             }
             STRING => {
-                let (v, offset) = Single::decode(buf)?;
+                let (v, offset) = Decode::decode(buf)?;
                 Ok((Value::Str(v), offset))
             }
             FLOAT => {
-                let (v, offset) = Single::decode(buf)?;
+                let (v, offset) = Decode::decode(buf)?;
                 Ok((Value::Float(v), offset))
             }
             DOUBLE => {
-                let (v, offset) = Single::decode(buf)?;
+                let (v, offset) = Decode::decode(buf)?;
                 Ok((Value::Double(v), offset))
             }
             FALSE => Ok((Value::Boolean(false), 1)),
             TRUE => Ok((Value::Boolean(false), 1)),
             UUID => {
-                let (v, offset) = Single::decode(buf)?;
+                let (v, offset) = Decode::decode(buf)?;
                 Ok((Value::Uuid(v), offset))
             }
             NESTED => {
-                let (v, offset) = Single::decode(buf)?;
+                let (v, offset) = Decode::decode(buf)?;
                 Ok((Value::Nested(tuple::Value(v)), offset))
             }
             val => {
                 if val >= NEGINTSTART && val <= POSINTEND {
-                    let (v, offset) = Single::decode(buf)?;
+                    let (v, offset) = Decode::decode(buf)?;
                     Ok((Value::Int(v), offset))
                 } else {
                     //TODO: Versionstamp, ...
@@ -491,15 +513,15 @@ impl Single for Value {
 
 #[cfg(test)]
 mod tests {
-    use super::{*, Value as SingleValue};
-    use tuple::{Tuple, Value as TupleValue};
+    use super::*;
+    use tuple::Value as TupleValue;
 
     fn test_round_trip<S>(val: S, buf: &[u8])
     where
-        S: Single + std::fmt::Debug + PartialEq,
+        S: Encode + Decode + std::fmt::Debug + PartialEq,
     {
-        assert_eq!(val, Single::decode_full(buf).unwrap());
-        assert_eq!(buf, Single::encode_to_vec(&val).as_slice());
+        assert_eq!(val, Decode::decode_full(buf).unwrap());
+        assert_eq!(buf, Encode::encode_to_vec(&val).as_slice());
     }
 
     #[test]
@@ -541,10 +563,10 @@ mod tests {
         test_round_trip(b"hello".to_vec(), &[1, 104, 101, 108, 108, 111, 0]);
         test_round_trip(vec![0], &[1, 0, 0xff, 0]);
         test_round_trip(
-            SingleValue::Nested(TupleValue(vec![
-                SingleValue::Str("hello".to_string()),
-                SingleValue::Str("world".to_string()),
-                SingleValue::Int(42),
+            Value::Nested(TupleValue(vec![
+                Value::Str("hello".to_string()),
+                Value::Str("world".to_string()),
+                Value::Int(42),
             ])),
             &[
                 NESTED,
@@ -570,12 +592,12 @@ mod tests {
         );
 
         test_round_trip(
-            SingleValue::Nested(TupleValue(vec![
-                SingleValue::Bytes(vec![0]),
-                SingleValue::Empty,
-                SingleValue::Nested(TupleValue(vec![
-                    SingleValue::Bytes(vec![0]),
-                    SingleValue::Empty,
+            Value::Nested(TupleValue(vec![
+                Value::Bytes(vec![0]),
+                Value::Empty,
+                Value::Nested(TupleValue(vec![
+                    Value::Bytes(vec![0]),
+                    Value::Empty,
                 ])),
             ])),
             &[5, 1, 0, 255, 0, 0, 255, 5, 1, 0, 255, 0, 0, 255, 0, 0],
@@ -583,42 +605,9 @@ mod tests {
     }
 
     #[test]
-    fn test_malformed_int() {
-        assert!(TupleValue::decode(&[21, 0]).is_ok());
-        assert!(TupleValue::decode(&[22, 0]).is_err());
-        assert!(TupleValue::decode(&[22, 0, 0]).is_ok());
-
-        assert!(TupleValue::decode(&[19, 0]).is_ok());
-        assert!(TupleValue::decode(&[18, 0]).is_err());
-        assert!(TupleValue::decode(&[18, 0, 0]).is_ok());
-    }
-
-    #[test]
-    fn test_decode_tuple() {
-        assert_eq!((0, ()), Tuple::decode(&[20, 0]).unwrap());
-    }
-
-    #[test]
-    fn test_decode_tuple_ty() {
-        let data: &[u8] = &[2, 104, 101, 108, 108, 111, 0, 1, 119, 111, 114, 108, 100, 0];
-
-        let (v1, v2): (String, Vec<u8>) = Tuple::decode(data).unwrap();
-        assert_eq!(v1, "hello");
-        assert_eq!(v2, b"world");
-    }
-
-    #[test]
-    fn test_encode_tuple_ty() {
-        let tup = (String::from("hello"), b"world".to_vec());
-
-        assert_eq!(
-            &[2, 104, 101, 108, 108, 111, 0, 1, 119, 111, 114, 108, 100, 0],
-            Tuple::encode_to_vec(&tup).as_slice()
-        );
-    }
-
-    #[test]
     fn test_decode_nested() {
+        use tuple::Decode;
+
         assert!(TupleValue::decode(&[NESTED]).is_err());
         assert!(TupleValue::decode(&[NESTED, NIL]).is_ok());
         assert!(TupleValue::decode(&[NESTED, INTZERO]).is_err());

@@ -11,7 +11,6 @@
 pub mod single;
 
 use std::{self, io::Write, string::FromUtf8Error};
-use self::single::Single;
 
 #[derive(Debug, Fail)]
 pub enum Error {
@@ -33,7 +32,7 @@ impl From<FromUtf8Error> for Error {
     }
 }
 
-pub trait Tuple: Sized {
+pub trait Encode {
     fn encode<W: Write>(&self, _w: &mut W) -> std::io::Result<()>;
     fn encode_to_vec(&self) -> Vec<u8> {
         let mut v = Vec::new();
@@ -41,16 +40,18 @@ pub trait Tuple: Sized {
             .expect("tuple encoding should never fail");
         v
     }
+}
 
+pub trait Decode: Sized {
     fn decode(buf: &[u8]) -> Result<Self>;
 }
 
 macro_rules! tuple_impls {
     ($($len:expr => ($($n:tt $name:ident)+))+) => {
         $(
-            impl<$($name),+> Tuple for ($($name,)+)
+            impl<$($name),+> Encode for ($($name,)+)
             where
-                $($name: Single + Default,)+
+                $($name: single::Encode + Default,)+
             {
                 #[allow(non_snake_case, unused_assignments, deprecated)]
                 fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
@@ -59,7 +60,12 @@ macro_rules! tuple_impls {
                     )*
                     Ok(())
                 }
+            }
 
+            impl<$($name),+> Decode for ($($name,)+)
+            where
+                $($name: single::Decode + Default,)+
+            {
                 #[allow(non_snake_case, unused_assignments, deprecated)]
                 fn decode(buf: &[u8]) -> Result<Self> {
                     let mut buf = buf;
@@ -99,22 +105,65 @@ tuple_impls! {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Value(pub Vec<single::Value>);
 
-impl Tuple for Value {
+impl Encode for Value {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+        use self::single::Encode;
         for item in self.0.iter() {
             item.encode(w)?;
         }
         Ok(())
     }
+}
 
+impl Decode for Value {
     fn decode(buf: &[u8]) -> Result<Self> {
         let mut data = buf;
         let mut v = Vec::new();
         while !data.is_empty() {
-            let (s, offset): (single::Value, _) = Single::decode(data)?;
+            let (s, offset): (single::Value, _) = single::Decode::decode(data)?;
             v.push(s);
             data = &data[offset..];
         }
         Ok(Value(v))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_malformed_int() {
+        assert!(Value::decode(&[21, 0]).is_ok());
+        assert!(Value::decode(&[22, 0]).is_err());
+        assert!(Value::decode(&[22, 0, 0]).is_ok());
+
+        assert!(Value::decode(&[19, 0]).is_ok());
+        assert!(Value::decode(&[18, 0]).is_err());
+        assert!(Value::decode(&[18, 0, 0]).is_ok());
+    }
+
+    #[test]
+    fn test_decode_tuple() {
+        assert_eq!((0, ()), Decode::decode(&[20, 0]).unwrap());
+    }
+
+    #[test]
+    fn test_decode_tuple_ty() {
+        let data: &[u8] = &[2, 104, 101, 108, 108, 111, 0, 1, 119, 111, 114, 108, 100, 0];
+
+        let (v1, v2): (String, Vec<u8>) = Decode::decode(data).unwrap();
+        assert_eq!(v1, "hello");
+        assert_eq!(v2, b"world");
+    }
+
+    #[test]
+    fn test_encode_tuple_ty() {
+        let tup = (String::from("hello"), b"world".to_vec());
+
+        assert_eq!(
+            &[2, 104, 101, 108, 108, 111, 0, 1, 119, 111, 114, 108, 100, 0],
+            Encode::encode_to_vec(&tup).as_slice()
+        );
     }
 }
