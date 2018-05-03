@@ -10,6 +10,7 @@
 
 use std;
 use std::io::Write;
+use std::string::FromUtf8Error;
 
 use byteorder::{self, ByteOrder};
 
@@ -38,9 +39,17 @@ pub enum TupleError {
     InvalidType { value: u8 },
     #[fail(display = "Invalid data")]
     InvalidData,
+    #[fail(display = "UTF8 conversion error")]
+    FromUtf8Error(FromUtf8Error),
 }
 
 type Result<T> = std::result::Result<T, TupleError>;
+
+impl From<FromUtf8Error> for TupleError {
+    fn from(error: FromUtf8Error) -> Self {
+        TupleError::FromUtf8Error(error)
+    }
+}
 
 trait SingleType: Copy {
     /// verifies the value matches this type
@@ -93,7 +102,8 @@ pub trait Single: Sized {
     fn encode_to_vec(&self) -> Vec<u8> {
         let mut v = Vec::new();
         // `self.encode` should not fail because undering `Write` does not return error.
-        self.encode(&mut v).unwrap();
+        self.encode(&mut v)
+            .expect("single encoding should never fail");
         v
     }
 
@@ -215,7 +225,7 @@ impl Single for String {
         STRING.expect(buf[0])?;
 
         let (bytes, offset) = decode_bytes(&buf[1..])?;
-        Ok((String::from_utf8(bytes).unwrap(), offset + 1))
+        Ok((String::from_utf8(bytes)?, offset + 1))
     }
 }
 
@@ -437,7 +447,8 @@ pub trait Tuple: Sized {
     fn encode<W: Write>(&self, _w: &mut W) -> std::io::Result<()>;
     fn encode_to_vec(&self) -> Vec<u8> {
         let mut v = Vec::new();
-        self.encode(&mut v).unwrap();
+        self.encode(&mut v)
+            .expect("tuple encoding should never fail");
         v
     }
 
