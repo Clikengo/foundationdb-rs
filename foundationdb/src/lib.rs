@@ -117,6 +117,8 @@ extern crate failure_derive;
 extern crate byteorder;
 extern crate foundationdb_sys;
 extern crate futures;
+#[cfg(feature = "uuid")]
+extern crate uuid;
 
 pub mod cluster;
 pub mod database;

@@ -18,6 +18,9 @@ categories = ["database"]
 travis-ci = { repository = "bluejekyll/foundationdb-rs" }
 # codecov = { repository = "bluejekyll/foundationdb-rs", branch = "master", service = "github" }
 
+[features]
+default = ["uuid"]
+
 [dependencies]
 failure = "0.1"
 failure_derive = "0.1"
@@ -26,6 +29,8 @@ futures = "0.1"
 lazy_static = "1.0"
 byteorder = "1.2"
 log = "0.4"
+
+uuid = { version = "0.6", optional = true }
 
 [dev-dependencies]
 rand = "0.4"
