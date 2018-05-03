@@ -47,7 +47,7 @@ pub enum Value {
     Uuid(Uuid),
 }
 
-trait SingleType: Copy {
+trait Type: Copy {
     /// verifies the value matches this type
     fn expect(self, value: u8) -> Result<()>;
 
@@ -108,7 +108,7 @@ fn bisect_left(val: i64) -> usize {
     SIZE_LIMITS.iter().position(|v| val <= *v).unwrap_or(8)
 }
 
-impl SingleType for u8 {
+impl Type for u8 {
     /// verifies the value matches this type
     fn expect(self, value: u8) -> Result<()> {
         if self == value {
