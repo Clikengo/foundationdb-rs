@@ -143,7 +143,7 @@ mod tests {
             v
         };
 
-        assert!(ss0.unpack::<tuple::TupleValue>(&malformed).is_err());
+        assert!(ss0.unpack::<tuple::Value>(&malformed).is_err());
     }
 
     #[test]

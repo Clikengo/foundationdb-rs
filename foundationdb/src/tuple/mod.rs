@@ -97,9 +97,9 @@ tuple_impls! {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct TupleValue(pub Vec<SingleValue>);
+pub struct Value(pub Vec<SingleValue>);
 
-impl Tuple for TupleValue {
+impl Tuple for Value {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         for item in self.0.iter() {
             item.encode(w)?;
@@ -115,6 +115,6 @@ impl Tuple for TupleValue {
             v.push(s);
             data = &data[offset..];
         }
-        Ok(TupleValue(v))
+        Ok(Value(v))
     }
 }
