@@ -15,7 +15,7 @@
 //! general guidance on subspace usage, see the Subspaces section of the Developer Guide
 //! (https://apple.github.io/foundationdb/developer-guide.html#subspaces).
 
-use tuple::{Tuple, TupleError};
+use tuple::{self, Tuple};
 
 /// Subspace represents a well-defined region of keyspace in a FoundationDB database.
 #[derive(Debug, Clone)]

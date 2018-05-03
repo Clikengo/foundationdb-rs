@@ -1,6 +1,6 @@
 use std::{self, io::Write};
 
-use super::{TupleError, TupleValue, Result};
+use super::{Error, TupleValue, Result};
 use byteorder::{self, ByteOrder};
 
 /// Various tuple types
@@ -73,7 +73,7 @@ fn decode_bytes(buf: &[u8]) -> Result<(Vec<u8>, usize)> {
     let mut offset = 0;
     loop {
         if offset >= buf.len() {
-            return Err(TupleError::EOF);
+            return Err(Error::EOF);
         }
 
         // is the null marker at the offset
@@ -114,7 +114,7 @@ impl SingleType for u8 {
         if self == value {
             Ok(())
         } else {
-            Err(TupleError::InvalidType { value })
+            Err(Error::InvalidType { value })
         }
     }
 
@@ -134,7 +134,7 @@ impl SingleType for u8 {
             TRUE => Ok(()),
             UUID => Ok(()),
             VERSIONSTAMP => Ok(()),
-            _ => Err(TupleError::InvalidType { value: self }),
+            _ => Err(Error::InvalidType { value: self }),
         }
     }
 
@@ -157,7 +157,7 @@ pub trait Single: Sized {
     fn decode_full(buf: &[u8]) -> Result<Self> {
         let (val, offset) = Self::decode(buf)?;
         if offset != buf.len() {
-            return Err(TupleError::InvalidData);
+            return Err(Error::InvalidData);
         }
         Ok(val)
     }
@@ -174,13 +174,13 @@ impl Single for bool {
 
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.is_empty() {
-            return Err(TupleError::EOF);
+            return Err(Error::EOF);
         }
 
         match buf[0] {
             FALSE => Ok((false, 1)),
             TRUE => Ok((true, 1)),
-            v => Err(TupleError::InvalidType { value: v }),
+            v => Err(Error::InvalidType { value: v }),
         }
     }
 }
@@ -192,7 +192,7 @@ impl Single for () {
 
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.is_empty() {
-            return Err(TupleError::EOF);
+            return Err(Error::EOF);
         }
 
         NIL.expect(buf[0])?;
@@ -208,7 +208,7 @@ impl Single for Uuid {
 
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.len() < 17 {
-            return Err(TupleError::EOF);
+            return Err(Error::EOF);
         }
 
         UUID.expect(buf[0])?;
@@ -228,7 +228,7 @@ impl Single for String {
 
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.len() < 2 {
-            return Err(TupleError::EOF);
+            return Err(Error::EOF);
         }
 
         STRING.expect(buf[0])?;
@@ -259,7 +259,7 @@ impl Single for Vec<SingleValue> {
 
     fn decode(mut buf: &[u8]) -> Result<(Self, usize)> {
         if buf.len() < 2 {
-            return Err(TupleError::EOF);
+            return Err(Error::EOF);
         }
 
         NESTED.expect(buf[0])?;
@@ -270,7 +270,7 @@ impl Single for Vec<SingleValue> {
         loop {
             if buf.is_empty() {
                 // tuple must end with NIL byte
-                return Err(TupleError::EOF);
+                return Err(Error::EOF);
             }
 
             if buf[0] == NIL {
@@ -303,7 +303,7 @@ impl Single for Vec<u8> {
 
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.len() < 2 {
-            return Err(TupleError::EOF);
+            return Err(Error::EOF);
         }
 
         BYTES.expect(buf[0])?;
@@ -326,7 +326,7 @@ impl Single for f32 {
 
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.len() < 5 {
-            return Err(TupleError::EOF);
+            return Err(Error::EOF);
         }
 
         FLOAT.expect(buf[0])?;
@@ -353,7 +353,7 @@ impl Single for f64 {
 
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.len() < 9 {
-            return Err(TupleError::EOF);
+            return Err(Error::EOF);
         }
 
         DOUBLE.expect(buf[0])?;
@@ -389,11 +389,11 @@ impl Single for i64 {
 
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.is_empty() {
-            return Err(TupleError::EOF);
+            return Err(Error::EOF);
         }
         let header = buf[0];
         if header < 0x0c || header > 0x1c {
-            return Err(TupleError::InvalidType { value: header });
+            return Err(Error::InvalidType { value: header });
         }
 
         // if it's 0
@@ -405,7 +405,7 @@ impl Single for i64 {
         if header > INTZERO {
             let n = usize::from(header - INTZERO);
             if n + 1 > buf.len() {
-                return Err(TupleError::InvalidData);
+                return Err(Error::InvalidData);
             }
 
             (&mut data[(8 - n)..8]).copy_from_slice(&buf[1..(n + 1)]);
@@ -414,7 +414,7 @@ impl Single for i64 {
         } else {
             let n = usize::from(INTZERO - header);
             if n + 1 > buf.len() {
-                return Err(TupleError::InvalidData);
+                return Err(Error::InvalidData);
             }
 
             (&mut data[(8 - n)..8]).copy_from_slice(&buf[1..(n + 1)]);
@@ -444,7 +444,7 @@ impl Single for SingleValue {
 
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.is_empty() {
-            return Err(TupleError::EOF);
+            return Err(Error::EOF);
         }
 
         let code = buf[0];
@@ -482,7 +482,7 @@ impl Single for SingleValue {
                     Ok((SingleValue::Int(v), offset))
                 } else {
                     //TODO: Versionstamp, ...
-                    Err(TupleError::InvalidData)
+                    Err(Error::InvalidData)
                 }
             }
         }
