@@ -33,8 +33,10 @@ use tuple;
 /// Transactions are also causally consistent: once a transaction has been successfully committed, all subsequently created transactions will see the modifications made by it.
 #[derive(Clone)]
 pub struct Transaction {
-    database: Database,
+    // Order of fields should not be changed, because Rust drops field top-to-bottom, and
+    // transaction should be dropped before cluster.
     inner: Arc<TransactionInner>,
+    database: Database,
 }
 
 /// Converts Rust `bool` into `fdb::fdb_bool_t`
@@ -173,6 +175,10 @@ impl Transaction {
         self.database.clone()
     }
 
+    fn into_database(self) -> Database {
+        self.database
+    }
+
     /// Modify the database snapshot represented by transaction to change the given key to have the given value.
     ///
     /// If the given key was not previously present in the database it is inserted. The modification affects the actual database only if transaction is later committed with `Transaction::commit`.
@@ -229,7 +235,7 @@ impl Transaction {
             )
         };
         TrxGet {
-            inner: self.new_future(f),
+            inner: self.new_fut_trx(f),
         }
     }
 
@@ -288,7 +294,7 @@ impl Transaction {
             )
         };
         TrxGetKey {
-            inner: self.new_future(f),
+            inner: self.new_fut_trx(f),
         }
     }
 
@@ -338,7 +344,7 @@ impl Transaction {
         };
 
         TrxGetRange {
-            inner: self.new_future(f),
+            inner: self.new_fut_trx(f),
             opt: Some(opt),
         }
     }
@@ -379,7 +385,7 @@ impl Transaction {
         let trx = self.inner.inner;
 
         let f = unsafe { fdb::fdb_transaction_commit(trx) };
-        let f = self.new_future(f);
+        let f = self.new_fut_trx(f);
         TrxCommit { inner: f }
     }
 
@@ -442,7 +448,7 @@ impl Transaction {
             )
         };
         TrxGetAddressesForKey {
-            inner: self.new_future(f),
+            inner: self.new_fut_trx(f),
         }
     }
 
@@ -478,12 +484,8 @@ impl Transaction {
         let f =
             unsafe { fdb::fdb_transaction_watch(trx, key.as_ptr() as *const _, key.len() as i32) };
         TrxWatch {
-            inner: FdbFuture::new(f),
+            inner: self.new_fut_non_trx(f),
         }
-    }
-
-    fn new_future(&self, f: *mut fdb::FDBFuture) -> TrxFuture {
-        TrxFuture::new(self.clone(), f)
     }
 
     /// Returns an FDBFuture which will be set to the versionstamp which was used by any
@@ -503,7 +505,7 @@ impl Transaction {
 
         let f = unsafe { fdb::fdb_transaction_get_versionstamp(trx) };
         TrxVersionstamp {
-            inner: FdbFuture::new(f),
+            inner: self.new_fut_non_trx(f),
         }
     }
 
@@ -516,7 +518,7 @@ impl Transaction {
 
         let f = unsafe { fdb::fdb_transaction_get_read_version(trx) };
         TrxReadVersion {
-            inner: self.new_future(f),
+            inner: self.new_fut_trx(f),
         }
     }
 
@@ -585,6 +587,14 @@ impl Transaction {
                 ty.code(),
             ))
         }
+    }
+
+    fn new_fut_trx(&self, f: *mut fdb::FDBFuture) -> TrxFuture {
+        TrxFuture::new(self.clone(), f)
+    }
+
+    fn new_fut_non_trx(&self, f: *mut fdb::FDBFuture) -> NonTrxFuture {
+        NonTrxFuture::new(self.database(), f)
     }
 }
 
@@ -863,7 +873,7 @@ impl Future for TrxGetAddressesForKey {
 pub struct TrxWatch {
     // `TrxWatch` can live longer then a parent transaction that registhers the watch, so it should
     // not maintain a reference to the transaction, which will prevent the transcation to be freed.
-    inner: FdbFuture,
+    inner: NonTrxFuture,
 }
 impl Future for TrxWatch {
     type Item = ();
@@ -894,7 +904,7 @@ impl Versionstamp {
 pub struct TrxVersionstamp {
     // `TrxVersionstamp` resolves after `Transaction::commit`, so like `TrxWatch` it does not
     // not maintain a reference to the transaction.
-    inner: FdbFuture,
+    inner: NonTrxFuture,
 }
 impl Future for TrxVersionstamp {
     type Item = Versionstamp;
@@ -940,26 +950,51 @@ impl Future for TrxReadVersion {
     }
 }
 
+/// Futures that could be outlive transaction.
+struct NonTrxFuture {
+    // Order of fields should not be changed, because Rust drops field top-to-bottom, and future
+    // should be dropped before database.
+    inner: FdbFuture,
+    // We should maintain refcount for database, to make FdbFuture not outlive database.
+    #[allow(unused)]
+    db: Database,
+}
+
+impl NonTrxFuture {
+    fn new(db: Database, f: *mut fdb::FDBFuture) -> Self {
+        let inner = unsafe { FdbFuture::new(f) };
+        Self { inner, db }
+    }
+}
+
+impl Future for NonTrxFuture {
+    type Item = FdbFutureResult;
+    type Error = FdbError;
+
+    fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
+        self.inner.poll()
+    }
+}
+
 /// Abstraction over `fdb_transaction_on_err`.
 pub struct TrxErrFuture {
-    err: Option<FdbError>,
     // A future from `fdb_transaction_on_err`. It resolves to `Ok(_)` after backoff interval if
     // undering transaction should be retried, and resolved to `Err(e)` if the error should be
     // reported to the user without retry.
-    inner: FdbFuture,
+    inner: NonTrxFuture,
+    err: Option<FdbError>,
 }
 impl TrxErrFuture {
     fn new(trx: Transaction, err: FdbError) -> Self {
-        let trx = trx.inner.inner;
-        let inner = unsafe { fdb::fdb_transaction_on_error(trx, err.code()) };
-        let inner = FdbFuture::new(inner);
+        let inner = unsafe { fdb::fdb_transaction_on_error(trx.inner.inner, err.code()) };
 
         Self {
+            inner: NonTrxFuture::new(trx.into_database(), inner),
             err: Some(err),
-            inner,
         }
     }
 }
+
 impl Future for TrxErrFuture {
     type Item = FdbError;
     type Error = FdbError;
@@ -979,16 +1014,19 @@ impl Future for TrxErrFuture {
 
 /// Futures for transaction, which supports retry/backoff with `Database::transact`.
 struct TrxFuture {
-    trx: Option<Transaction>,
+    // Order of fields should not be changed, because Rust drops field top-to-bottom, and future
+    // should be dropped before transaction.
     inner: FdbFuture,
+    trx: Option<Transaction>,
     f_err: Option<TrxErrFuture>,
 }
 
 impl TrxFuture {
     fn new(trx: Transaction, f: *mut fdb::FDBFuture) -> Self {
+        let inner = unsafe { FdbFuture::new(f) };
         Self {
+            inner,
             trx: Some(trx),
-            inner: FdbFuture::new(f),
             f_err: None,
         }
     }
