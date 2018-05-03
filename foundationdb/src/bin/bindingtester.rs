@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use fdb::error::FdbError;
 use fdb::keyselector::KeySelector;
 use fdb::tuple::*;
+use fdb::tuple::single::*;
 use fdb::*;
 use futures::future::*;
 use futures::prelude::*;
