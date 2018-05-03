@@ -35,7 +35,7 @@ const SIZE_LIMITS: &[i64] = &[
 pub struct Uuid([u8; 16]);
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum SingleValue {
+pub enum Value {
     Empty,
     Bytes(Vec<u8>),
     Str(String),
@@ -238,12 +238,12 @@ impl Single for String {
     }
 }
 
-impl Single for Vec<SingleValue> {
+impl Single for Vec<Value> {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         NESTED.write(w)?;
         for v in self {
             match v {
-                &SingleValue::Empty => {
+                &Value::Empty => {
                     // Empty value in nested tuple is encoded with [NIL, ESCAPE] to disambiguate
                     // itself with end-of-tuple marker.
                     NIL.write(w)?;
@@ -276,7 +276,7 @@ impl Single for Vec<SingleValue> {
             if buf[0] == NIL {
                 if buf.len() > 1 && buf[1] == ESCAPE {
                     // nested Empty value, which is encoded to [NIL, ESCAPE]
-                    tuples.push(SingleValue::Empty);
+                    tuples.push(Value::Empty);
                     buf = &buf[2..];
                     continue;
                 }
@@ -285,7 +285,7 @@ impl Single for Vec<SingleValue> {
                 break;
             }
 
-            let (tuple, offset) = SingleValue::decode(buf)?;
+            let (tuple, offset) = Value::decode(buf)?;
             tuples.push(tuple);
             buf = &buf[offset..];
         }
@@ -425,9 +425,9 @@ impl Single for i64 {
     }
 }
 
-impl Single for SingleValue {
+impl Single for Value {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
-        use self::SingleValue::*;
+        use self::Value::*;
 
         match *self {
             Empty => Single::encode(&(), w),
@@ -449,37 +449,37 @@ impl Single for SingleValue {
 
         let code = buf[0];
         match code {
-            NIL => Ok((SingleValue::Empty, 1)),
+            NIL => Ok((Value::Empty, 1)),
             BYTES => {
                 let (v, offset) = Single::decode(buf)?;
-                Ok((SingleValue::Bytes(v), offset))
+                Ok((Value::Bytes(v), offset))
             }
             STRING => {
                 let (v, offset) = Single::decode(buf)?;
-                Ok((SingleValue::Str(v), offset))
+                Ok((Value::Str(v), offset))
             }
             FLOAT => {
                 let (v, offset) = Single::decode(buf)?;
-                Ok((SingleValue::Float(v), offset))
+                Ok((Value::Float(v), offset))
             }
             DOUBLE => {
                 let (v, offset) = Single::decode(buf)?;
-                Ok((SingleValue::Double(v), offset))
+                Ok((Value::Double(v), offset))
             }
-            FALSE => Ok((SingleValue::Boolean(false), 1)),
-            TRUE => Ok((SingleValue::Boolean(false), 1)),
+            FALSE => Ok((Value::Boolean(false), 1)),
+            TRUE => Ok((Value::Boolean(false), 1)),
             UUID => {
                 let (v, offset) = Single::decode(buf)?;
-                Ok((SingleValue::Uuid(v), offset))
+                Ok((Value::Uuid(v), offset))
             }
             NESTED => {
                 let (v, offset) = Single::decode(buf)?;
-                Ok((SingleValue::Nested(tuple::Value(v)), offset))
+                Ok((Value::Nested(tuple::Value(v)), offset))
             }
             val => {
                 if val >= NEGINTSTART && val <= POSINTEND {
                     let (v, offset) = Single::decode(buf)?;
-                    Ok((SingleValue::Int(v), offset))
+                    Ok((Value::Int(v), offset))
                 } else {
                     //TODO: Versionstamp, ...
                     Err(Error::InvalidData)
@@ -491,7 +491,7 @@ impl Single for SingleValue {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{*, Value as SingleValue};
     use tuple::{Tuple, Value as TupleValue};
 
     fn test_round_trip<S>(val: S, buf: &[u8])

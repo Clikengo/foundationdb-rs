@@ -179,7 +179,7 @@ impl Instr {
 
         let tup: tuple::Value = Tuple::decode(data).unwrap();
         let cmd = match tup.0[0] {
-            SingleValue::Str(ref s) => s.clone(),
+            single::Value::Str(ref s) => s.clone(),
             _ => panic!("unexpected instr"),
         };
 
@@ -723,7 +723,7 @@ impl StackMachine {
                 let mut data = data.as_slice();
 
                 while !data.is_empty() {
-                    let (val, offset): (SingleValue, _) = Single::decode(data).unwrap();
+                    let (val, offset): (single::Value, _) = Single::decode(data).unwrap();
                     let bytes = Single::encode_to_vec(&val);
                     self.push_single(number, &bytes);
                     data = &data[offset..];
