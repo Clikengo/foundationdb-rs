@@ -1,4 +1,6 @@
 use std::{self, io::Write};
+#[cfg(feature = "uuid")]
+use uuid::Uuid;
 
 use byteorder::{self, ByteOrder};
 use tuple::{self, Decode, Encode, Error, Result};
@@ -15,6 +17,7 @@ const FLOAT: u8 = 0x20;
 const DOUBLE: u8 = 0x21;
 const FALSE: u8 = 0x26;
 const TRUE: u8 = 0x27;
+#[cfg(feature = "uuid")]
 const UUID: u8 = 0x30;
 const VERSIONSTAMP: u8 = 0x33;
 
@@ -32,9 +35,6 @@ const SIZE_LIMITS: &[i64] = &[
 ];
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Uuid([u8; 16]);
-
-#[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Empty,
     Bytes(Vec<u8>),
@@ -44,6 +44,7 @@ pub enum Value {
     Float(f32),
     Double(f64),
     Boolean(bool),
+    #[cfg(feature = "uuid")]
     Uuid(Uuid),
 }
 
@@ -132,6 +133,7 @@ impl Type for u8 {
             DOUBLE => Ok(()),
             FALSE => Ok(()),
             TRUE => Ok(()),
+            #[cfg(feature = "uuid")]
             UUID => Ok(()),
             VERSIONSTAMP => Ok(()),
             _ => Err(Error::InvalidType { value: self }),
@@ -184,13 +186,15 @@ impl Decode for () {
     }
 }
 
+#[cfg(feature = "uuid")]
 impl Encode for Uuid {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         UUID.write(w)?;
-        w.write_all(&self.0)
+        w.write_all(self.as_bytes())
     }
 }
 
+#[cfg(feature = "uuid")]
 impl Decode for Uuid {
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.len() < 17 {
@@ -202,7 +206,7 @@ impl Decode for Uuid {
         let mut uuid = [0u8; 16];
         uuid.copy_from_slice(&buf[1..17]);
 
-        Ok((Uuid(uuid), 17))
+        Ok((Uuid::from_uuid_bytes(uuid), 17))
     }
 }
 
@@ -436,6 +440,7 @@ impl Encode for Value {
             Float(ref v) => Encode::encode(v, w),
             Double(ref v) => Encode::encode(v, w),
             Boolean(ref v) => Encode::encode(v, w),
+            #[cfg(feature = "uuid")]
             Uuid(ref v) => Encode::encode(v, w),
         }
     }
@@ -468,6 +473,7 @@ impl Decode for Value {
             }
             FALSE => Ok((Value::Boolean(false), 1)),
             TRUE => Ok((Value::Boolean(false), 1)),
+            #[cfg(feature = "uuid")]
             UUID => {
                 let (v, offset) = Decode::decode(buf)?;
                 Ok((Value::Uuid(v), offset))
