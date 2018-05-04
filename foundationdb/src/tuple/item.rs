@@ -46,6 +46,8 @@ pub enum Value {
     Bool(bool),
     #[cfg(feature = "uuid")]
     Uuid(Uuid),
+    #[doc(hidden)]
+    __Nonexhaustive,
 }
 
 trait Type: Copy {
@@ -442,6 +444,10 @@ impl Encode for Value {
             Bool(ref v) => Encode::encode(v, w),
             #[cfg(feature = "uuid")]
             Uuid(ref v) => Encode::encode(v, w),
+            // Ugly hack
+            // We will be able to drop this once #[non_exhaustive]
+            // lands on `stable`
+            __Nonexhaustive => panic!("__Nonexhaustive is private"),
         }
     }
 }
