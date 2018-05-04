@@ -543,7 +543,7 @@ impl Transaction {
     /// The API is exposed mainly for `bindingtester`, and it is not recommended to call the API
     /// directly from application.
     #[doc(hidden)]
-    pub fn reset(self) {
+    pub fn reset(&self) {
         let trx = self.inner.inner;
         unsafe { fdb::fdb_transaction_reset(trx) }
     }
@@ -828,7 +828,7 @@ impl Future for TrxCommit {
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         match self.inner.poll() {
-            Ok(Async::Ready((trx, _res))) => Ok(Async::Ready(trx.clone())),
+            Ok(Async::Ready((trx, _res))) => Ok(Async::Ready(trx)),
             Ok(Async::NotReady) => Ok(Async::NotReady),
             Err(e) => Err(e),
         }
@@ -1037,30 +1037,30 @@ impl Future for TrxFuture {
     type Error = FdbError;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
-        match self.f_err.take() {
-            Some(mut f_err) => match f_err.poll() {
-                Ok(Async::Ready(e)) => Err(e),
-                Ok(Async::NotReady) => {
-                    self.f_err = Some(f_err);
-                    Ok(Async::NotReady)
+        if self.f_err.is_none() {
+            match self.inner.poll() {
+                Ok(Async::Ready(res)) => {
+                    return Ok(Async::Ready((
+                        self.trx.take().expect("should not poll after ready"),
+                        res,
+                    )))
                 }
-                Err(e) => Err(e),
-            },
-            None => match self.inner.poll() {
-                Ok(Async::Ready(res)) => Ok(Async::Ready((
-                    self.trx.take().expect("should not poll after ready"),
-                    res,
-                ))),
-                Ok(Async::NotReady) => Ok(Async::NotReady),
+                Ok(Async::NotReady) => return Ok(Async::NotReady),
                 Err(e) => {
                     // The transaction will be dropped on `TrxErrFuture::new`. The `trx` is a last
                     // reference for the transaction, undering transaction will be destroyed at
                     // this point.
                     let trx = self.trx.take().expect("should not poll after error");
                     self.f_err = Some(TrxErrFuture::new(trx, e));
-                    self.poll()
+                    return self.poll();
                 }
-            },
+            }
+        }
+
+        match self.f_err.as_mut().unwrap().poll() {
+            Ok(Async::Ready(e)) => Err(e),
+            Ok(Async::NotReady) => Ok(Async::NotReady),
+            Err(e) => Err(e),
         }
     }
 }

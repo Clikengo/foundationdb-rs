@@ -1,0 +1,31 @@
+[package]
+name = "foundationdb-bench"
+version = "0.1.0"
+authors = ["Benjamin Fry <benjaminfry@me.com>"]
+
+description = """
+Bindings to the C api for FoundationDB
+"""
+
+repository = "https://github.com/bluejekyll/foundationdb-rs"
+
+readme = "README.md"
+keywords = ["foundationdb", "kv"]
+categories = ["database"]
+
+license = "MIT/Apache-2.0"
+
+[badges]
+travis-ci = { repository = "bluejekyll/foundationdb-rs" }
+
+
+[dependencies]
+rand = "0.4"
+futures = "0.1"
+foundationdb = { version = "0.1.0", path = "../foundationdb" }
+stopwatch = "0"
+log = "0.4"
+env_logger = "0.5"
+structopt = "0.2"
+
+[build-dependencies]

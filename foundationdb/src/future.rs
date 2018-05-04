@@ -87,7 +87,7 @@ extern "C" fn fdb_future_callback(
     callback_parameter: *mut ::std::os::raw::c_void,
 ) {
     let task: *const futures::task::Task = callback_parameter as *const _;
-    let task: &futures::task::Task = unsafe { std::mem::transmute(task) };
+    let task: &futures::task::Task = unsafe { &*task };
     task.notify();
 }
 
