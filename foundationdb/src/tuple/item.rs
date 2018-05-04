@@ -1,7 +1,7 @@
 use std::{self, io::Write};
 
-use tuple::{self, Error, Result};
 use byteorder::{self, ByteOrder};
+use tuple::{self, Decode, Encode, Error, Result};
 
 /// Various tuple types
 const NIL: u8 = 0x00;
@@ -140,28 +140,6 @@ impl Type for u8 {
 
     fn write<W: Write>(self, w: &mut W) -> std::io::Result<()> {
         w.write_all(&[self])
-    }
-}
-
-pub trait Encode {
-    fn encode<W: Write>(&self, _w: &mut W) -> std::io::Result<()>;
-    fn encode_to_vec(&self) -> Vec<u8> {
-        let mut v = Vec::new();
-        // `self.encode` should not fail because underlying `Write` does not return error.
-        self.encode(&mut v)
-            .expect("item encoding should never fail");
-        v
-    }
-}
-
-pub trait Decode: Sized {
-    fn decode(buf: &[u8]) -> Result<(Self, usize)>;
-    fn decode_full(buf: &[u8]) -> Result<Self> {
-        let (val, offset) = Self::decode(buf)?;
-        if offset != buf.len() {
-            return Err(Error::InvalidData);
-        }
-        Ok(val)
     }
 }
 
@@ -595,10 +573,7 @@ mod tests {
             Value::Nested(TupleValue(vec![
                 Value::Bytes(vec![0]),
                 Value::Empty,
-                Value::Nested(TupleValue(vec![
-                    Value::Bytes(vec![0]),
-                    Value::Empty,
-                ])),
+                Value::Nested(TupleValue(vec![Value::Bytes(vec![0]), Value::Empty])),
             ])),
             &[5, 1, 0, 255, 0, 0, 255, 5, 1, 0, 255, 0, 0, 255, 0, 0],
         );

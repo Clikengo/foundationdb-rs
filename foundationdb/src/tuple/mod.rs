@@ -43,7 +43,14 @@ pub trait Encode {
 }
 
 pub trait Decode: Sized {
-    fn decode(buf: &[u8]) -> Result<Self>;
+    fn decode(buf: &[u8]) -> Result<(Self, usize)>;
+    fn decode_full(buf: &[u8]) -> Result<Self> {
+        let (val, offset) = Self::decode(buf)?;
+        if offset != buf.len() {
+            return Err(Error::InvalidData);
+        }
+        Ok(val)
+    }
 }
 
 macro_rules! tuple_impls {
@@ -51,7 +58,7 @@ macro_rules! tuple_impls {
         $(
             impl<$($name),+> Encode for ($($name,)+)
             where
-                $($name: item::Encode + Default,)+
+                $($name: Encode + Default,)+
             {
                 #[allow(non_snake_case, unused_assignments, deprecated)]
                 fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
@@ -64,15 +71,18 @@ macro_rules! tuple_impls {
 
             impl<$($name),+> Decode for ($($name,)+)
             where
-                $($name: item::Decode + Default,)+
+                $($name: Decode + Default,)+
             {
                 #[allow(non_snake_case, unused_assignments, deprecated)]
-                fn decode(buf: &[u8]) -> Result<Self> {
+                fn decode(buf: &[u8]) -> Result<(Self, usize)> {
                     let mut buf = buf;
                     let mut out: Self = Default::default();
+                    let mut offset = 0_usize;
+
                     $(
                         let (v0, offset0) = $name::decode(buf)?;
                         out.$n = v0;
+                        offset += offset0;
                         buf = &buf[offset0..];
                     )*
 
@@ -80,7 +90,7 @@ macro_rules! tuple_impls {
                         return Err(Error::InvalidData);
                     }
 
-                    Ok(out)
+                    Ok((out, offset))
                 }
             }
         )+
@@ -107,7 +117,6 @@ pub struct Value(pub Vec<item::Value>);
 
 impl Encode for Value {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
-        use self::item::Encode;
         for item in self.0.iter() {
             item.encode(w)?;
         }
@@ -116,15 +125,17 @@ impl Encode for Value {
 }
 
 impl Decode for Value {
-    fn decode(buf: &[u8]) -> Result<Self> {
+    fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         let mut data = buf;
         let mut v = Vec::new();
+        let mut offset = 0_usize;
         while !data.is_empty() {
-            let (s, offset): (item::Value, _) = item::Decode::decode(data)?;
+            let (s, len): (item::Value, _) = item::Value::decode(data)?;
             v.push(s);
-            data = &data[offset..];
+            offset += len;
+            data = &data[len..];
         }
-        Ok(Value(v))
+        Ok((Value(v), offset))
     }
 }
 
@@ -145,14 +156,14 @@ mod tests {
 
     #[test]
     fn test_decode_tuple() {
-        assert_eq!((0, ()), Decode::decode(&[20, 0]).unwrap());
+        assert_eq!((0, ()), Decode::decode_full(&[20, 0]).unwrap());
     }
 
     #[test]
     fn test_decode_tuple_ty() {
         let data: &[u8] = &[2, 104, 101, 108, 108, 111, 0, 1, 119, 111, 114, 108, 100, 0];
 
-        let (v1, v2): (String, Vec<u8>) = Decode::decode(data).unwrap();
+        let (v1, v2): (String, Vec<u8>) = Decode::decode_full(data).unwrap();
         assert_eq!(v1, "hello");
         assert_eq!(v2, b"world");
     }
