@@ -26,8 +26,10 @@ use transaction::*;
 /// Modifications to a database are performed via transactions.
 #[derive(Clone)]
 pub struct Database {
-    cluster: Cluster,
+    // Order of fields should not be changed, because Rust drops field top-to-bottom (rfc1857), and
+    // database should be dropped before cluster.
     inner: Arc<DatabaseInner>,
+    cluster: Cluster,
 }
 impl Database {
     pub(crate) fn new(cluster: Cluster, db: *mut fdb::FDBDatabase) -> Self {

@@ -34,10 +34,11 @@ impl Cluster {
     /// TODO: implement Default for Cluster where: If cluster_file_path is NULL or an empty string, then a default cluster file will be used. see
     pub fn new(path: &str) -> ClusterGet {
         let path_str = std::ffi::CString::new(path).unwrap();
-        let f = unsafe { fdb::fdb_create_cluster(path_str.as_ptr()) };
-        ClusterGet {
-            inner: FdbFuture::new(f),
-        }
+        let inner = unsafe {
+            let f = fdb::fdb_create_cluster(path_str.as_ptr());
+            FdbFuture::new(f)
+        };
+        ClusterGet { inner }
     }
 
     // TODO: fdb_cluster_set_option impl
