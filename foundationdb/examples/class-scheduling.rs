@@ -15,20 +15,21 @@ extern crate rand;
 use std::borrow::Cow;
 use std::thread;
 
-use self::rand::Rng;
+use self::rand::{Rng, ThreadRng};
 use futures::future::{self, Future};
 
 use foundationdb as fdb;
 use foundationdb::transaction::RangeOptionBuilder;
-use foundationdb::tuple::Single;
-use foundationdb::{Cluster, Database, Transaction, Tuple};
+use foundationdb::tuple::item::{Decode as ItemDecode, Encode as ItemEncode};
+use foundationdb::tuple::Encode as TupleEncode;
+use foundationdb::{Cluster, Database, Transaction};
 
 // Data model:
 // ("attends", student, class) = ""
 // ("class", class_name) = seatsLeft
 
 // Generate 1,620 classes like '9:00 chem for dummies'
-const levels: &[&str] = &[
+const LEVELS: &[&str] = &[
     "intro",
     "for dummies",
     "remedial",
@@ -40,11 +41,11 @@ const levels: &[&str] = &[
     "seminar",
 ];
 
-const types: &[&str] = &[
+const TYPES: &[&str] = &[
     "chem", "bio", "cs", "geometry", "calc", "alg", "film", "music", "art", "dance",
 ];
 
-const times: &[&str] = &[
+const TIMES: &[&str] = &[
     "2:00", "3:00", "4:00", "5:00", "6:00", "7:00", "8:00", "9:00", "10:00", "11:00", "12:00",
     "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00",
 ];
@@ -56,9 +57,9 @@ lazy_static! {
 // TODO: make these tuples?
 fn all_classes() -> Vec<String> {
     let mut class_names: Vec<String> = Vec::new();
-    for level in levels {
-        for _type in types {
-            for time in times {
+    for level in LEVELS {
+        for _type in TYPES {
+            for time in TIMES {
                 class_names.push(format!("{} {} {}", time, _type, level));
             }
         }
@@ -251,14 +252,12 @@ enum Mood {
 
 fn perform_op(
     db: &Database,
-    rng: &mut Rng,
+    rng: &mut ThreadRng,
     mood: Mood,
     student_id: &str,
     all_classes: &[String],
     my_classes: &mut Vec<String>,
 ) -> Result<(), String> {
-    let mut rng = rand::thread_rng();
-
     match mood {
         Mood::Add => {
             let class = rng.choose(all_classes).unwrap();
@@ -291,11 +290,7 @@ fn simulate_students(student_id: usize, num_ops: usize) {
             let mut available_classes = Cow::Borrowed(&*ALL_CLASSES);
             let mut my_classes = Vec::<String>::new();
 
-            for j in 0..num_ops {
-                let class: String;
-                let old_class: String;
-                let new_class: String;
-
+            for _ in 0..num_ops {
                 let mut moods = Vec::<Mood>::new();
 
                 if my_classes.len() > 0 {
@@ -329,7 +324,7 @@ fn simulate_students(student_id: usize, num_ops: usize) {
         .expect("got error in simulation");
 }
 
-fn run_sim(db: &Database, students: usize, ops_per_student: usize) {
+fn run_sim(_db: &Database, students: usize, ops_per_student: usize) {
     let mut threads: Vec<thread::JoinHandle<()>> = Vec::with_capacity(students);
     for i in 0..students {
         // TODO: ClusterInner has a mutable pointer reference, if thread-safe, mark that trait as Sync, then we can clone DB here...
