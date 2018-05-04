@@ -8,7 +8,9 @@
 
 //! Tuple Key type like that of other FoundationDB libraries
 
-pub mod item;
+mod item;
+
+pub use self::item::Value as Item;
 
 use std::{self, io::Write, string::FromUtf8Error};
 
@@ -113,7 +115,7 @@ tuple_impls! {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Value(pub Vec<item::Value>);
+pub struct Value(pub Vec<Item>);
 
 impl Encode for Value {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
@@ -130,7 +132,7 @@ impl Decode for Value {
         let mut v = Vec::new();
         let mut offset = 0_usize;
         while !data.is_empty() {
-            let (s, len): (item::Value, _) = item::Value::decode(data)?;
+            let (s, len): (Item, _) = Item::decode(data)?;
             v.push(s);
             offset += len;
             data = &data[len..];
