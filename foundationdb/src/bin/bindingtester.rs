@@ -178,7 +178,7 @@ impl Instr {
 
         let tup: tuple::Value = tuple::Decode::decode_full(data).unwrap();
         let cmd = match tup.0[0] {
-            Item::Str(ref s) => s.clone(),
+            Item::String(ref s) => s.clone(),
             _ => panic!("unexpected instr"),
         };
 

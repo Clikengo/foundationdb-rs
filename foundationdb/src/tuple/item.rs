@@ -38,12 +38,12 @@ const SIZE_LIMITS: &[i64] = &[
 pub enum Value {
     Empty,
     Bytes(Vec<u8>),
-    Str(String),
+    String(String),
     Nested(tuple::Value),
-    Int(i64),
-    Float(f32),
-    Double(f64),
-    Boolean(bool),
+    I64(i64),
+    F32(f32),
+    F64(f64),
+    Bool(bool),
     #[cfg(feature = "uuid")]
     Uuid(Uuid),
 }
@@ -434,12 +434,12 @@ impl Encode for Value {
         match *self {
             Empty => Encode::encode(&(), w),
             Bytes(ref v) => Encode::encode(v, w),
-            Str(ref v) => Encode::encode(v, w),
+            String(ref v) => Encode::encode(v, w),
             Nested(ref v) => Encode::encode(&v.0, w),
-            Int(ref v) => Encode::encode(v, w),
-            Float(ref v) => Encode::encode(v, w),
-            Double(ref v) => Encode::encode(v, w),
-            Boolean(ref v) => Encode::encode(v, w),
+            I64(ref v) => Encode::encode(v, w),
+            F32(ref v) => Encode::encode(v, w),
+            F64(ref v) => Encode::encode(v, w),
+            Bool(ref v) => Encode::encode(v, w),
             #[cfg(feature = "uuid")]
             Uuid(ref v) => Encode::encode(v, w),
         }
@@ -461,18 +461,18 @@ impl Decode for Value {
             }
             STRING => {
                 let (v, offset) = Decode::decode(buf)?;
-                Ok((Value::Str(v), offset))
+                Ok((Value::String(v), offset))
             }
             FLOAT => {
                 let (v, offset) = Decode::decode(buf)?;
-                Ok((Value::Float(v), offset))
+                Ok((Value::F32(v), offset))
             }
             DOUBLE => {
                 let (v, offset) = Decode::decode(buf)?;
-                Ok((Value::Double(v), offset))
+                Ok((Value::F64(v), offset))
             }
-            FALSE => Ok((Value::Boolean(false), 1)),
-            TRUE => Ok((Value::Boolean(false), 1)),
+            FALSE => Ok((Value::Bool(false), 1)),
+            TRUE => Ok((Value::Bool(false), 1)),
             #[cfg(feature = "uuid")]
             UUID => {
                 let (v, offset) = Decode::decode(buf)?;
@@ -485,7 +485,7 @@ impl Decode for Value {
             val => {
                 if val >= NEGINTSTART && val <= POSINTEND {
                     let (v, offset) = Decode::decode(buf)?;
-                    Ok((Value::Int(v), offset))
+                    Ok((Value::I64(v), offset))
                 } else {
                     //TODO: Versionstamp, ...
                     Err(Error::InvalidData)
@@ -548,9 +548,9 @@ mod tests {
         test_round_trip(vec![0], &[1, 0, 0xff, 0]);
         test_round_trip(
             Value::Nested(TupleValue(vec![
-                Value::Str("hello".to_string()),
-                Value::Str("world".to_string()),
-                Value::Int(42),
+                Value::String("hello".to_string()),
+                Value::String("world".to_string()),
+                Value::I64(42),
             ])),
             &[
                 NESTED,
