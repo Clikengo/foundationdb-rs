@@ -57,5 +57,6 @@ script:
   - cargo test -p foundationdb-gen --all-features
   - cargo test -p foundationdb --all-features
   - cargo test -p foundationdb-bench --all-features
+  - cargo run -p foundationdb --example class-scheduling --all-features 
 
 # after_success: cargo kcov here...

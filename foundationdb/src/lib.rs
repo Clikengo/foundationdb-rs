@@ -140,7 +140,6 @@ pub use cluster::Cluster;
 pub use database::Database;
 pub use error::Error;
 pub use transaction::Transaction;
-pub use tuple::Tuple;
 
 /// Initialize the FoundationDB Client API, this can only be called once per process.
 ///
