@@ -176,7 +176,7 @@ impl Instr {
     fn from(data: &[u8]) -> Self {
         use InstrCode::*;
 
-        let tup: tuple::Value = tuple::Decode::decode(data).unwrap();
+        let tup: tuple::Value = tuple::Decode::decode_full(data).unwrap();
         let cmd = match tup.0[0] {
             item::Value::Str(ref s) => s.clone(),
             _ => panic!("unexpected instr"),
@@ -191,7 +191,7 @@ impl Instr {
 
         let code = match cmd {
             "PUSH" => {
-                let data = item::Encode::encode_to_vec(&tup.0[1]);
+                let data = tup.0[1].encode_to_vec();
                 Push(data)
             }
             "DUP" => Dup,
@@ -280,13 +280,13 @@ impl StackItem {
 
         //TODO: wait
         match self.fut.unwrap().wait() {
-            Ok((_trx, data)) => item::Encode::encode_to_vec(&data),
+            Ok((_trx, data)) => data.encode_to_vec(),
             Err(e) => {
                 let code = format!("{}", e.code());
                 let tup = (b"ERROR".to_vec(), code.into_bytes());
                 debug!("ERROR: {:?}", e);
-                let bytes = tuple::Encode::encode_to_vec(&tup);
-                item::Encode::encode_to_vec(&bytes)
+                let bytes = tup.encode_to_vec();
+                bytes.encode_to_vec()
             }
         }
     }
@@ -379,10 +379,10 @@ impl StackMachine {
 
     fn pop_item<S>(&mut self) -> S
     where
-        S: item::Decode,
+        S: Decode,
     {
         let data = self.pop().data();
-        match item::Decode::decode_full(&data) {
+        match Decode::decode_full(&data) {
             Ok(v) => v,
             Err(e) => {
                 panic!("failed to decode item {:?}: {:?}", data, e);
@@ -404,9 +404,9 @@ impl StackMachine {
 
     fn push_item<S>(&mut self, number: usize, s: &S)
     where
-        S: item::Encode,
+        S: Encode,
     {
-        let data = item::Encode::encode_to_vec(s);
+        let data = s.encode_to_vec();
         self.push(number, data);
     }
 
@@ -600,8 +600,8 @@ impl StackMachine {
                                     continue;
                                 }
                             }
-                            item::Encode::encode(&key.to_vec(), &mut out).expect("failed to encode");
-                            item::Encode::encode(&value.to_vec(), &mut out).expect("failed to encode");
+                            key.to_vec().encode(&mut out).expect("failed to encode");
+                            value.to_vec().encode(&mut out).expect("failed to encode");
                         }
                         Ok(out)
                     })
@@ -722,8 +722,8 @@ impl StackMachine {
                 let mut data = data.as_slice();
 
                 while !data.is_empty() {
-                    let (val, offset): (item::Value, _) = item::Decode::decode(data).unwrap();
-                    let bytes = item::Encode::encode_to_vec(&val);
+                    let (val, offset): (item::Value, _) = Decode::decode(data).unwrap();
+                    let bytes = val.encode_to_vec();
                     self.push_item(number, &bytes);
                     data = &data[offset..];
                 }

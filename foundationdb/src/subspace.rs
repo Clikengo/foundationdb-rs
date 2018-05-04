@@ -15,7 +15,7 @@
 //! general guidance on subspace usage, see the Subspaces section of the Developer Guide
 //! (https://apple.github.io/foundationdb/developer-guide.html#subspaces).
 
-use tuple::{self, Encode, Decode};
+use tuple::{self, Decode, Encode};
 
 /// Subspace represents a well-defined region of keyspace in a FoundationDB database.
 #[derive(Debug, Clone)]
@@ -72,7 +72,7 @@ impl Subspace {
             return Err(tuple::Error::InvalidData);
         }
         let key = &key[self.prefix.len()..];
-        Decode::decode(&key)
+        Decode::decode_full(&key)
     }
 
     /// `is_start_of` returns true if the provided key starts with the prefix of this Subspace,
