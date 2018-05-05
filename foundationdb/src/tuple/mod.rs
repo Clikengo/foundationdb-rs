@@ -15,7 +15,7 @@ pub use self::element::Element;
 use std::{self, io::Write, string::FromUtf8Error};
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Tuple(pub Vec<Element>);
+pub struct Tuple<'a>(pub Vec<Element<'a>>);
 
 #[derive(Debug, Fail)]
 pub enum Error {
@@ -111,7 +111,7 @@ tuple_impls! {
     12 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11)
 }
 
-impl Encode for Tuple {
+impl<'a> Encode for Tuple<'a> {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         for element in self.0.iter() {
             element.encode(w)?;
@@ -120,7 +120,7 @@ impl Encode for Tuple {
     }
 }
 
-impl Decode for Tuple {
+impl<'a> Decode for Tuple<'a> {
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         let mut data = buf;
         let mut v = Vec::new();
@@ -172,7 +172,7 @@ mod tests {
 
     #[test]
     fn test_encode_tuple_ty() {
-        let tup = (String::from("hello"), b"world".to_vec());
+        let tup = ("hello", b"world".to_vec());
 
         assert_eq!(
             &[2, 104, 101, 108, 108, 111, 0, 1, 119, 111, 114, 108, 100, 0],
