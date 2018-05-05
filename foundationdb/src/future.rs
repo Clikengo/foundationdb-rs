@@ -97,6 +97,7 @@ pub struct KeyValues<'a> {
     keyvalues: &'a [KeyValue<'a>],
     more: bool,
 }
+
 impl<'a> KeyValues<'a> {
     /// Returns true if (but not necessarily only if) values remain in the key range requested
     /// (possibly beyond the limits requested).

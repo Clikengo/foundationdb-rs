@@ -20,8 +20,7 @@ use futures::future::{self, Future};
 
 use foundationdb as fdb;
 use foundationdb::transaction::RangeOptionBuilder;
-use foundationdb::tuple::item::{Decode as ItemDecode, Encode as ItemEncode};
-use foundationdb::tuple::Encode as TupleEncode;
+use foundationdb::tuple::{Decode, Encode};
 use foundationdb::{Cluster, Database, Transaction};
 
 // Data model:
@@ -76,16 +75,8 @@ fn init_classes(trx: &Transaction, all_classes: &[String]) {
 
 fn init(db: &Database, all_classes: &[String]) {
     let trx = db.create_trx().expect("could not create transaction");
-    // TODO: we can probably clean up range, probably add a Tuple.range()
-    // FIXME: switch to subspace...
-    trx.clear_range(
-        &("attends".to_string(), vec![0x00_u8]).encode_to_vec(),
-        &("attends".to_string(), vec![0xFF_u8]).encode_to_vec(),
-    );
-    trx.clear_range(
-        &("class".to_string(), vec![0x00_u8]).encode_to_vec(),
-        &("class".to_string(), vec![0xFF_u8]).encode_to_vec(),
-    );
+    trx.clear_subspace_range(&"attends");
+    trx.clear_subspace_range(&"class");
     init_classes(&trx, all_classes);
 
     trx.commit().wait().expect("failed to initialize data");
@@ -94,8 +85,7 @@ fn init(db: &Database, all_classes: &[String]) {
 fn get_available_classes(db: &Database) -> Vec<String> {
     let trx = db.create_trx().expect("could not create transaction");
 
-    // TODO: can this be subspace?
-    let range = RangeOptionBuilder::from_tuple(&("class".to_string(),));
+    let range = RangeOptionBuilder::from_tuple(&"class");
 
     trx.get_range(range.build(), 1_024)
         .and_then(|got_range| {
@@ -118,14 +108,10 @@ fn get_available_classes(db: &Database) -> Vec<String> {
         .expect("failed to get classes")
 }
 
-// TODO: should Transaction require &mut self for mutations?
 fn ditch_trx(trx: &Transaction, student: &str, class: &str) {
-    // TODO: impl single::Encode for &str
-    let attends_key = (
-        "attends".to_string(),
-        student.to_string(),
-        class.to_string(),
-    ).encode_to_vec();
+    let attends_key = ("attends", student, class).encode_to_vec();
+
+    // TODO: should get take an &Encode? current impl does encourage &[u8] reuse...
     if trx.get(&attends_key, true)
         .wait()
         .expect("get failed")
@@ -136,8 +122,7 @@ fn ditch_trx(trx: &Transaction, student: &str, class: &str) {
         return;
     }
 
-    // TODO: impl single::Encode for &str
-    let class_key = ("class".to_string(), class.to_string()).encode_to_vec();
+    let class_key = ("class", class).encode_to_vec();
     let available_seats: i64 = i64::decode_full(
         trx.get(&class_key, true)
             .wait()
@@ -146,6 +131,8 @@ fn ditch_trx(trx: &Transaction, student: &str, class: &str) {
             .expect("value failed")
             .expect("class seats were not initialized"),
     ).expect("failed to decode i64") + 1;
+
+    println!("{} ditching class: {}", student, class);
     trx.set(&class_key, &available_seats.encode_to_vec());
     trx.clear(&attends_key);
 }
@@ -160,11 +147,7 @@ fn ditch(db: &Database, student: &str, class: &str) -> Result<(), String> {
 }
 
 fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(), String> {
-    let attends_key = (
-        "attends".to_string(),
-        student.to_string(),
-        class.to_string(),
-    ).encode_to_vec();
+    let attends_key = ("attends", student, class).encode_to_vec();
     if trx.get(&attends_key, true)
         .wait()
         .expect("get failed")
@@ -190,20 +173,19 @@ fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(), Strin
     }
 
     // TODO: impl Deref for [KeyValue] on KeyValues
-    let attends_range =
-        RangeOptionBuilder::from_tuple(&("attends".to_string(), student.to_string())).build();
+    let attends_range = RangeOptionBuilder::from_tuple(&("attends", student)).build();
     if trx.get_range(attends_range, 1_024)
         .wait()
         .expect("get_range failed")
         .keyvalues()
-        .as_ref()
         .len() >= 5
     {
         return Err(format!("Too many classes"));
     }
 
+    println!("{} taking class: {}", student, class);
     trx.set(&class_key, &(available_seats - 1).encode_to_vec());
-    trx.set(&attends_key, &(String::new(),).encode_to_vec());
+    trx.set(&attends_key, &"".encode_to_vec());
     Ok(())
 }
 
@@ -231,19 +213,7 @@ fn switch_classes(
     Ok(())
 }
 
-//   private static void switchClasses(TransactionContext db, final String s, final String oldC, final String newC) {
-//     db.run((Transaction tr) -> {
-//       drop(tr, s, oldC);
-//       signup(tr, s, newC);
-//       return null;
-//     });
-//   }
-
-//   //
-//   // Testing
-//   //
-
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Mood {
     Add,
     Ditch,
@@ -258,6 +228,8 @@ fn perform_op(
     all_classes: &[String],
     my_classes: &mut Vec<String>,
 ) -> Result<(), String> {
+    println!("{} performing op: {:?}", student_id, mood);
+
     match mood {
         Mood::Add => {
             let class = rng.choose(all_classes).unwrap();
@@ -314,6 +286,7 @@ fn simulate_students(student_id: usize, num_ops: usize) {
                     &mut my_classes,
                 ).is_err()
                 {
+                    println!("getting more classes");
                     available_classes = Cow::Owned(get_available_classes(&db));
                 }
             }

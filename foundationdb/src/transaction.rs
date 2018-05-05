@@ -364,6 +364,13 @@ impl Transaction {
         }
     }
 
+    /// Clears all keys based on the range of the Subspace
+    pub fn clear_subspace_range<S: Into<Subspace>>(&self, subspace: S) {
+        let subspace = subspace.into();
+        let range = subspace.range();
+        self.clear_range(&range.0, &range.1)
+    }
+
     /// Attempts to commit the sets and clears previously applied to the database snapshot represented by transaction to the actual database.
     ///
     /// The commit may or may not succeed – in particular, if a conflicting transaction previously committed, then the commit must fail in order to preserve transactional isolation. If the commit does succeed, the transaction is durably committed to the database and all subsequently started transactions will observe its effects.
