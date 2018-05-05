@@ -7,7 +7,6 @@ extern crate log;
 extern crate env_logger;
 #[macro_use]
 extern crate structopt;
-extern crate futures_cpupool;
 
 use std::sync::atomic::*;
 use std::sync::Arc;
@@ -74,12 +73,12 @@ impl BenchRunner {
     }
 
     //TODO: impl future
-    fn run(self) -> Box<Future<Item = (), Error = FdbError> + Send> {
+    fn run(self) -> Box<Future<Item = (), Error = FdbError>> {
         Box::new(loop_fn(self, Self::step))
     }
 
     //TODO: impl future
-    fn step(mut self) -> Box<Future<Item = Loop<(), Self>, Error = FdbError> + Send> {
+    fn step(mut self) -> Box<Future<Item = Loop<(), Self>, Error = FdbError>> {
         use rand::Rng;
 
         let trx = self.trx.take().unwrap();
@@ -105,6 +104,7 @@ impl BenchRunner {
     }
 }
 
+#[derive(Clone)]
 struct Bench {
     db: Database,
     opt: Opt,
@@ -114,23 +114,32 @@ impl Bench {
     fn run(self) {
         let opt = &self.opt;
         let counter = Counter::new(opt.count);
-        let pool = futures_cpupool::CpuPool::new(opt.threads);
 
-        let mut runners = Vec::new();
+        let mut handles = Vec::new();
+
+        let sw = Stopwatch::start_new();
 
         let step = (opt.queue_depth + opt.threads - 1) / opt.threads;
         let mut start = 0;
         for _ in 0..opt.threads {
             let end = std::cmp::min(start + step, opt.queue_depth);
 
-            let f = pool.spawn(self.run_range(start..end, counter.clone(), opt));
-            runners.push(f);
+            let range = start..end;
+            let counter = counter.clone();
+            let b = self.clone();
+            let handle = std::thread::spawn(move || b.run_range(range, counter).wait());
+            handles.push(handle);
 
             start = end;
         }
 
-        let sw = Stopwatch::start_new();
-        join_all(runners).wait().expect("failed to run bench");
+        for handle in handles {
+            handle
+                .join()
+                .expect("failed to join")
+                .expect("failed to run bench");
+        }
+
         let elapsed = sw.elapsed_ms() as usize;
 
         info!(
@@ -144,8 +153,7 @@ impl Bench {
         &self,
         r: std::ops::Range<usize>,
         counter: Counter,
-        opt: &Opt,
-    ) -> Box<Future<Item = (), Error = FdbError> + Send> {
+    ) -> Box<Future<Item = (), Error = FdbError>> {
         let runners = r.into_iter()
             .map(|n| {
                 // With deterministic Rng, benchmark with same parameters will overwrite same set
@@ -153,7 +161,7 @@ impl Bench {
                 let seed = [n as u32, 0, 0, 1];
                 let mut rng = rand::XorShiftRng::new_unseeded();
                 rng.reseed(seed);
-                BenchRunner::new(self.db.clone(), rng, counter.clone(), opt).run()
+                BenchRunner::new(self.db.clone(), rng, counter.clone(), &self.opt).run()
             })
             .collect::<Vec<_>>();
 
@@ -162,7 +170,7 @@ impl Bench {
     }
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(StructOpt, Debug, Clone)]
 #[structopt(name = "fdb-bench")]
 struct Opt {
     #[structopt(short = "t", long = "threads", default_value = "1")]
