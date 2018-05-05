@@ -147,6 +147,12 @@ impl Type for u8 {
     }
 }
 
+impl<'a, T: Encode> Encode for &'a T {
+    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+        T::encode(self, w)
+    }
+}
+
 impl Encode for bool {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         if *self {
@@ -209,6 +215,13 @@ impl Decode for Uuid {
         uuid.copy_from_slice(&buf[1..17]);
 
         Ok((Uuid::from_uuid_bytes(uuid), 17))
+    }
+}
+
+impl<'a> Encode for &'a str {
+    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+        STRING.write(w)?;
+        encode_bytes(w, self.as_bytes())
     }
 }
 
@@ -288,6 +301,13 @@ impl Decode for Vec<Element> {
 
         // skip the final null
         Ok((tuples, len - buf.len()))
+    }
+}
+
+impl<'a> Encode for &'a [u8] {
+    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+        BYTES.write(w)?;
+        encode_bytes(w, self)
     }
 }
 

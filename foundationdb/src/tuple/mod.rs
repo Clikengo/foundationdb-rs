@@ -57,7 +57,7 @@ macro_rules! tuple_impls {
         $(
             impl<$($name),+> Encode for ($($name,)+)
             where
-                $($name: Encode + Default,)+
+                $($name: Encode,)+
             {
                 #[allow(non_snake_case, unused_assignments, deprecated)]
                 fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
@@ -172,7 +172,7 @@ mod tests {
 
     #[test]
     fn test_encode_tuple_ty() {
-        let tup = (String::from("hello"), b"world".to_vec());
+        let tup = ("hello", b"world".to_vec());
 
         assert_eq!(
             &[2, 104, 101, 108, 108, 111, 0, 1, 119, 111, 114, 108, 100, 0],
