@@ -35,12 +35,11 @@ const SIZE_LIMITS: &[i64] = &[
 ];
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Element<'a> {
+pub enum Element {
     Empty,
     Bytes(Vec<u8>),
-    Str(&'a str),
     String(String),
-    Tuple(Tuple<'a>),
+    Tuple(Tuple),
     I64(i64),
     F32(f32),
     F64(f64),
@@ -213,13 +212,6 @@ impl Decode for Uuid {
     }
 }
 
-impl<'a> Encode for &'a str {
-    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
-        STRING.write(w)?;
-        encode_bytes(w, self.as_bytes())
-    }
-}
-
 impl Encode for String {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         STRING.write(w)?;
@@ -240,7 +232,7 @@ impl Decode for String {
     }
 }
 
-impl<'a> Encode for Vec<Element<'a>> {
+impl Encode for Vec<Element> {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         NESTED.write(w)?;
         for v in self {
@@ -260,7 +252,7 @@ impl<'a> Encode for Vec<Element<'a>> {
     }
 }
 
-impl<'a> Decode for Vec<Element<'a>> {
+impl Decode for Vec<Element> {
     fn decode(mut buf: &[u8]) -> Result<(Self, usize)> {
         if buf.len() < 2 {
             return Err(Error::EOF);
@@ -437,14 +429,13 @@ impl Decode for i64 {
     }
 }
 
-impl<'a> Encode for Element<'a> {
+impl Encode for Element {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         use self::Element::*;
 
         match *self {
             Empty => Encode::encode(&(), w),
             Bytes(ref v) => Encode::encode(v, w),
-            Str(ref v) => Encode::encode(v, w),
             String(ref v) => Encode::encode(v, w),
             Tuple(ref v) => Encode::encode(&v.0, w),
             I64(ref v) => Encode::encode(v, w),
@@ -461,7 +452,7 @@ impl<'a> Encode for Element<'a> {
     }
 }
 
-impl<'a> Decode for Element<'a> {
+impl Decode for Element {
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.is_empty() {
             return Err(Error::EOF);
@@ -556,15 +547,15 @@ mod tests {
         test_round_trip(1.6f64, &[33, 191, 249, 153, 153, 153, 153, 153, 154]);
 
         // string
-        test_round_trip("hello".to_string(), &[2, 104, 101, 108, 108, 111, 0]);
+        test_round_trip(String::from("hello"), &[2, 104, 101, 108, 108, 111, 0]);
 
         // binary
         test_round_trip(b"hello".to_vec(), &[1, 104, 101, 108, 108, 111, 0]);
         test_round_trip(vec![0], &[1, 0, 0xff, 0]);
         test_round_trip(
             Element::Tuple(Tuple(vec![
-                Element::String("hello".into()),
-                Element::String("world".into()),
+                Element::String("hello".to_string()),
+                Element::String("world".to_string()),
                 Element::I64(42),
             ])),
             &[
