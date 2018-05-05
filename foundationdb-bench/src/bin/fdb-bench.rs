@@ -7,11 +7,13 @@ extern crate log;
 extern crate env_logger;
 #[macro_use]
 extern crate structopt;
+extern crate futures_cpupool;
 
 use std::sync::atomic::*;
 use std::sync::Arc;
 
 use futures::future::*;
+use rand::SeedableRng;
 use stopwatch::Stopwatch;
 use structopt::StructOpt;
 
@@ -31,8 +33,8 @@ impl Counter {
         }
     }
 
-    fn decr(&self) -> bool {
-        let val = self.inner.fetch_add(1, Ordering::SeqCst);
+    fn decr(&self, n: usize) -> bool {
+        let val = self.inner.fetch_add(n, Ordering::SeqCst);
         val < self.size
     }
 }
@@ -46,17 +48,17 @@ struct BenchRunner {
 
     rng: rand::XorShiftRng,
     trx: Option<Transaction>,
+    trx_batch_size: usize,
 }
 
 impl BenchRunner {
-    fn new(db: Database, counter: Counter, opt: &Opt) -> Self {
+    fn new(db: Database, rng: rand::XorShiftRng, counter: Counter, opt: &Opt) -> Self {
         let mut key_buf = Vec::with_capacity(opt.key_len);
         key_buf.resize(opt.key_len, 0u8);
 
         let mut val_buf = Vec::with_capacity(opt.val_len);
         val_buf.resize(opt.val_len, 0u8);
 
-        let rng = rand::weak_rng();
         let trx = db.create_trx().expect("failed to create trx");
 
         Self {
@@ -67,31 +69,33 @@ impl BenchRunner {
 
             rng,
             trx: Some(trx),
+            trx_batch_size: opt.trx_batch_size,
         }
     }
 
     //TODO: impl future
-    fn run(self) -> Box<Future<Item = (), Error = FdbError>> {
+    fn run(self) -> Box<Future<Item = (), Error = FdbError> + Send> {
         Box::new(loop_fn(self, Self::step))
     }
 
     //TODO: impl future
-    fn step(mut self) -> Box<Future<Item = Loop<(), Self>, Error = FdbError>> {
+    fn step(mut self) -> Box<Future<Item = Loop<(), Self>, Error = FdbError> + Send> {
         use rand::Rng;
-
-        self.rng.fill_bytes(&mut self.key_buf);
-        self.rng.fill_bytes(&mut self.val_buf);
-
-        self.key_buf[0] = 0x01;
 
         let trx = self.trx.take().unwrap();
 
-        trx.set(&self.key_buf, &self.val_buf);
+        for _ in 0..self.trx_batch_size {
+            self.rng.fill_bytes(&mut self.key_buf);
+            self.rng.fill_bytes(&mut self.val_buf);
+            self.key_buf[0] = 0x01;
+            trx.set(&self.key_buf, &self.val_buf);
+        }
+
         let f = trx.commit().map(move |trx| {
             trx.reset();
             self.trx = Some(trx);
 
-            if self.counter.decr() {
+            if self.counter.decr(self.trx_batch_size) {
                 Loop::Continue(self)
             } else {
                 Loop::Break(())
@@ -108,12 +112,22 @@ struct Bench {
 
 impl Bench {
     fn run(self) {
-        let counter = Counter::new(self.opt.count);
+        let opt = &self.opt;
+        let counter = Counter::new(opt.count);
+        let pool = futures_cpupool::CpuPool::new(opt.threads);
 
-        let runners = (0..self.opt.threads)
-            .into_iter()
-            .map(|_n| BenchRunner::new(self.db.clone(), counter.clone(), &self.opt).run())
-            .collect::<Vec<_>>();
+        let mut runners = Vec::new();
+
+        let step = (opt.queue_depth + opt.threads - 1) / opt.threads;
+        let mut start = 0;
+        for _ in 0..opt.threads {
+            let end = std::cmp::min(start + step, opt.queue_depth);
+
+            let f = pool.spawn(self.run_range(start..end, counter.clone(), opt));
+            runners.push(f);
+
+            start = end;
+        }
 
         let sw = Stopwatch::start_new();
         join_all(runners).wait().expect("failed to run bench");
@@ -122,19 +136,46 @@ impl Bench {
         info!(
             "bench took: {:?} ms, {:?} tps",
             elapsed,
-            1000 * self.opt.count / elapsed
+            1000 * opt.count / elapsed
         );
+    }
+
+    fn run_range(
+        &self,
+        r: std::ops::Range<usize>,
+        counter: Counter,
+        opt: &Opt,
+    ) -> Box<Future<Item = (), Error = FdbError> + Send> {
+        let runners = r.into_iter()
+            .map(|n| {
+                // With deterministic Rng, benchmark with same parameters will overwrite same set
+                // of keys again, which makes benchmark result stable.
+                let seed = [n as u32, 0, 0, 1];
+                let mut rng = rand::XorShiftRng::new_unseeded();
+                rng.reseed(seed);
+                BenchRunner::new(self.db.clone(), rng, counter.clone(), opt).run()
+            })
+            .collect::<Vec<_>>();
+
+        let f = join_all(runners).map(|_| ());
+        Box::new(f)
     }
 }
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "fdb-bench")]
 struct Opt {
-    #[structopt(short = "t", long = "threads", default_value = "1000")]
+    #[structopt(short = "t", long = "threads", default_value = "1")]
     threads: usize,
+
+    #[structopt(short = "q", long = "queue-depth", default_value = "1000")]
+    queue_depth: usize,
 
     #[structopt(short = "c", long = "count", default_value = "300000")]
     count: usize,
+
+    #[structopt(long = "trx-batch-size", default_value = "10")]
+    trx_batch_size: usize,
 
     #[structopt(long = "key-len", default_value = "10")]
     key_len: usize,
@@ -146,12 +187,9 @@ fn main() {
     env_logger::init();
     let opt = Opt::from_args();
 
-    let network = fdb_api::FdbApiBuilder::default()
-        .build()
-        .expect("failed to init api")
-        .network()
-        .build()
-        .expect("failed to init network");
+    info!("opt: {:?}", opt);
+
+    let network = fdb::init().expect("failed to init network");
 
     let handle = std::thread::spawn(move || {
         let error = network.run();
