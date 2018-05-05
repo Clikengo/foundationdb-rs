@@ -8,11 +8,14 @@
 
 //! Tuple Key type like that of other FoundationDB libraries
 
-mod item;
+mod element;
 
-pub use self::item::Value as Item;
+pub use self::element::Element;
 
 use std::{self, io::Write, string::FromUtf8Error};
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Tuple(pub Vec<Element>);
 
 #[derive(Debug, Fail)]
 pub enum Error {
@@ -26,13 +29,7 @@ pub enum Error {
     FromUtf8Error(FromUtf8Error),
 }
 
-type Result<T> = std::result::Result<T, Error>;
-
-impl From<FromUtf8Error> for Error {
-    fn from(error: FromUtf8Error) -> Self {
-        Error::FromUtf8Error(error)
-    }
-}
+pub type Result<T> = std::result::Result<T, Error>;
 
 pub trait Encode {
     fn encode<W: Write>(&self, _w: &mut W) -> std::io::Result<()>;
@@ -114,30 +111,33 @@ tuple_impls! {
     12 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11)
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct Value(pub Vec<Item>);
-
-impl Encode for Value {
+impl Encode for Tuple {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
-        for item in self.0.iter() {
-            item.encode(w)?;
+        for element in self.0.iter() {
+            element.encode(w)?;
         }
         Ok(())
     }
 }
 
-impl Decode for Value {
+impl Decode for Tuple {
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         let mut data = buf;
         let mut v = Vec::new();
         let mut offset = 0_usize;
         while !data.is_empty() {
-            let (s, len): (Item, _) = Item::decode(data)?;
+            let (s, len): (Element, _) = Element::decode(data)?;
             v.push(s);
             offset += len;
             data = &data[len..];
         }
-        Ok((Value(v), offset))
+        Ok((Tuple(v), offset))
+    }
+}
+
+impl From<FromUtf8Error> for Error {
+    fn from(error: FromUtf8Error) -> Self {
+        Error::FromUtf8Error(error)
     }
 }
 
@@ -147,13 +147,13 @@ mod tests {
 
     #[test]
     fn test_malformed_int() {
-        assert!(Value::decode(&[21, 0]).is_ok());
-        assert!(Value::decode(&[22, 0]).is_err());
-        assert!(Value::decode(&[22, 0, 0]).is_ok());
+        assert!(Tuple::decode(&[21, 0]).is_ok());
+        assert!(Tuple::decode(&[22, 0]).is_err());
+        assert!(Tuple::decode(&[22, 0, 0]).is_ok());
 
-        assert!(Value::decode(&[19, 0]).is_ok());
-        assert!(Value::decode(&[18, 0]).is_err());
-        assert!(Value::decode(&[18, 0, 0]).is_ok());
+        assert!(Tuple::decode(&[19, 0]).is_ok());
+        assert!(Tuple::decode(&[18, 0]).is_err());
+        assert!(Tuple::decode(&[18, 0, 0]).is_ok());
     }
 
     #[test]

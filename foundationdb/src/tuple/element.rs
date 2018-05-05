@@ -3,7 +3,7 @@ use std::{self, io::Write};
 use uuid::Uuid;
 
 use byteorder::{self, ByteOrder};
-use tuple::{self, Decode, Encode, Error, Result};
+use tuple::{Tuple, Decode, Encode, Error, Result};
 
 /// Various tuple types
 const NIL: u8 = 0x00;
@@ -35,11 +35,11 @@ const SIZE_LIMITS: &[i64] = &[
 ];
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Value {
+pub enum Element {
     Empty,
     Bytes(Vec<u8>),
     String(String),
-    Nested(tuple::Value),
+    Tuple(Tuple),
     I64(i64),
     F32(f32),
     F64(f64),
@@ -232,12 +232,12 @@ impl Decode for String {
     }
 }
 
-impl Encode for Vec<Value> {
+impl Encode for Vec<Element> {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         NESTED.write(w)?;
         for v in self {
             match v {
-                &Value::Empty => {
+                &Element::Empty => {
                     // Empty value in nested tuple is encoded with [NIL, ESCAPE] to disambiguate
                     // itself with end-of-tuple marker.
                     NIL.write(w)?;
@@ -252,7 +252,7 @@ impl Encode for Vec<Value> {
     }
 }
 
-impl Decode for Vec<Value> {
+impl Decode for Vec<Element> {
     fn decode(mut buf: &[u8]) -> Result<(Self, usize)> {
         if buf.len() < 2 {
             return Err(Error::EOF);
@@ -272,7 +272,7 @@ impl Decode for Vec<Value> {
             if buf[0] == NIL {
                 if buf.len() > 1 && buf[1] == ESCAPE {
                     // nested Empty value, which is encoded to [NIL, ESCAPE]
-                    tuples.push(Value::Empty);
+                    tuples.push(Element::Empty);
                     buf = &buf[2..];
                     continue;
                 }
@@ -281,7 +281,7 @@ impl Decode for Vec<Value> {
                 break;
             }
 
-            let (tuple, offset) = Value::decode(buf)?;
+            let (tuple, offset) = Element::decode(buf)?;
             tuples.push(tuple);
             buf = &buf[offset..];
         }
@@ -429,15 +429,15 @@ impl Decode for i64 {
     }
 }
 
-impl Encode for Value {
+impl Encode for Element {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
-        use self::Value::*;
+        use self::Element::*;
 
         match *self {
             Empty => Encode::encode(&(), w),
             Bytes(ref v) => Encode::encode(v, w),
             String(ref v) => Encode::encode(v, w),
-            Nested(ref v) => Encode::encode(&v.0, w),
+            Tuple(ref v) => Encode::encode(&v.0, w),
             I64(ref v) => Encode::encode(v, w),
             F32(ref v) => Encode::encode(v, w),
             F64(ref v) => Encode::encode(v, w),
@@ -452,7 +452,7 @@ impl Encode for Value {
     }
 }
 
-impl Decode for Value {
+impl Decode for Element {
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.is_empty() {
             return Err(Error::EOF);
@@ -460,38 +460,38 @@ impl Decode for Value {
 
         let code = buf[0];
         match code {
-            NIL => Ok((Value::Empty, 1)),
+            NIL => Ok((Element::Empty, 1)),
             BYTES => {
                 let (v, offset) = Decode::decode(buf)?;
-                Ok((Value::Bytes(v), offset))
+                Ok((Element::Bytes(v), offset))
             }
             STRING => {
                 let (v, offset) = Decode::decode(buf)?;
-                Ok((Value::String(v), offset))
+                Ok((Element::String(v), offset))
             }
             FLOAT => {
                 let (v, offset) = Decode::decode(buf)?;
-                Ok((Value::F32(v), offset))
+                Ok((Element::F32(v), offset))
             }
             DOUBLE => {
                 let (v, offset) = Decode::decode(buf)?;
-                Ok((Value::F64(v), offset))
+                Ok((Element::F64(v), offset))
             }
-            FALSE => Ok((Value::Bool(false), 1)),
-            TRUE => Ok((Value::Bool(false), 1)),
+            FALSE => Ok((Element::Bool(false), 1)),
+            TRUE => Ok((Element::Bool(false), 1)),
             #[cfg(feature = "uuid")]
             UUID => {
                 let (v, offset) = Decode::decode(buf)?;
-                Ok((Value::Uuid(v), offset))
+                Ok((Element::Uuid(v), offset))
             }
             NESTED => {
                 let (v, offset) = Decode::decode(buf)?;
-                Ok((Value::Nested(tuple::Value(v)), offset))
+                Ok((Element::Tuple(Tuple(v)), offset))
             }
             val => {
                 if val >= NEGINTSTART && val <= POSINTEND {
                     let (v, offset) = Decode::decode(buf)?;
-                    Ok((Value::I64(v), offset))
+                    Ok((Element::I64(v), offset))
                 } else {
                     //TODO: Versionstamp, ...
                     Err(Error::InvalidData)
@@ -504,7 +504,7 @@ impl Decode for Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tuple::Value as TupleValue;
+    use tuple::Tuple;
 
     fn test_round_trip<S>(val: S, buf: &[u8])
     where
@@ -515,7 +515,7 @@ mod tests {
     }
 
     #[test]
-    fn test_item() {
+    fn test_element() {
         // Some testcases are generated by following python script
         // [ord(v) for v in fdb.tuple.pack(tup)]
 
@@ -553,10 +553,10 @@ mod tests {
         test_round_trip(b"hello".to_vec(), &[1, 104, 101, 108, 108, 111, 0]);
         test_round_trip(vec![0], &[1, 0, 0xff, 0]);
         test_round_trip(
-            Value::Nested(TupleValue(vec![
-                Value::String("hello".to_string()),
-                Value::String("world".to_string()),
-                Value::I64(42),
+            Element::Tuple(Tuple(vec![
+                Element::String("hello".to_string()),
+                Element::String("world".to_string()),
+                Element::I64(42),
             ])),
             &[
                 NESTED,
@@ -582,10 +582,10 @@ mod tests {
         );
 
         test_round_trip(
-            Value::Nested(TupleValue(vec![
-                Value::Bytes(vec![0]),
-                Value::Empty,
-                Value::Nested(TupleValue(vec![Value::Bytes(vec![0]), Value::Empty])),
+            Element::Tuple(Tuple(vec![
+                Element::Bytes(vec![0]),
+                Element::Empty,
+                Element::Tuple(Tuple(vec![Element::Bytes(vec![0]), Element::Empty])),
             ])),
             &[5, 1, 0, 255, 0, 0, 255, 5, 1, 0, 255, 0, 0, 255, 0, 0],
         );
@@ -595,10 +595,10 @@ mod tests {
     fn test_decode_nested() {
         use tuple::Decode;
 
-        assert!(TupleValue::decode(&[NESTED]).is_err());
-        assert!(TupleValue::decode(&[NESTED, NIL]).is_ok());
-        assert!(TupleValue::decode(&[NESTED, INTZERO]).is_err());
-        assert!(TupleValue::decode(&[NESTED, NIL, NESTED, NIL]).is_ok());
-        assert!(TupleValue::decode(&[NESTED, NESTED, NESTED, NIL, NIL, NIL]).is_ok());
+        assert!(Tuple::decode(&[NESTED]).is_err());
+        assert!(Tuple::decode(&[NESTED, NIL]).is_ok());
+        assert!(Tuple::decode(&[NESTED, INTZERO]).is_err());
+        assert!(Tuple::decode(&[NESTED, NIL, NESTED, NIL]).is_ok());
+        assert!(Tuple::decode(&[NESTED, NESTED, NESTED, NIL, NIL, NIL]).is_ok());
     }
 }
