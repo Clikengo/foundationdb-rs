@@ -613,6 +613,8 @@ impl Drop for TransactionInner {
         }
     }
 }
+unsafe impl Send for TransactionInner {}
+unsafe impl Sync for TransactionInner {}
 
 /// Represents the data of a `Transaction::get`
 pub struct GetResult {

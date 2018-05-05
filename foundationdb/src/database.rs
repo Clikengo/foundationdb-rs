@@ -115,3 +115,5 @@ impl Drop for DatabaseInner {
         }
     }
 }
+unsafe impl Send for DatabaseInner {}
+unsafe impl Sync for DatabaseInner {}

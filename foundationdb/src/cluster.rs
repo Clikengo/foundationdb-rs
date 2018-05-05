@@ -96,3 +96,5 @@ impl Drop for ClusterInner {
         }
     }
 }
+unsafe impl Send for ClusterInner {}
+unsafe impl Sync for ClusterInner {}
