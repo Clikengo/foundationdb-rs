@@ -75,8 +75,8 @@ fn init_classes(trx: &Transaction, all_classes: &[String]) {
 
 fn init(db: &Database, all_classes: &[String]) {
     let trx = db.create_trx().expect("could not create transaction");
-    trx.clear_subspace_range(&"attends");
-    trx.clear_subspace_range(&"class");
+    trx.clear_subspace_range(&("attends",));
+    trx.clear_subspace_range(&("class",));
     init_classes(&trx, all_classes);
 
     trx.commit().wait().expect("failed to initialize data");
@@ -141,6 +141,7 @@ fn ditch(db: &Database, student: &str, class: &str) -> Result<(), String> {
     let trx = db.create_trx().expect("could not create transaction");
 
     ditch_trx(&trx, student, class);
+    println!("{} ditch commit: {}", student, class);
     trx.commit().wait().map_err(|e| format!("error: {}", e))?;
 
     Ok(())
@@ -193,6 +194,8 @@ fn signup(db: &Database, student: &str, class: &str) -> Result<(), String> {
     let trx = db.create_trx().expect("could not create transaction");
 
     signup_trx(&trx, student, class)?;
+
+    println!("{} signup commit: {}", student, class);
     trx.commit().wait().map_err(|e| format!("error: {}", e))?;
 
     Ok(())
@@ -208,6 +211,8 @@ fn switch_classes(
 
     ditch_trx(&trx, student_id, old_class);
     signup_trx(&trx, student_id, new_class)?;
+
+    println!("{} switch commit: {}, {}", student_id, old_class, new_class);
     trx.commit().wait().map_err(|e| format!("error: {}", e))?;
 
     Ok(())
