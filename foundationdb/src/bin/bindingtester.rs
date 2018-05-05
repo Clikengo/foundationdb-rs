@@ -176,9 +176,9 @@ impl Instr {
     fn from(data: &[u8]) -> Self {
         use InstrCode::*;
 
-        let tup: tuple::Value = tuple::Decode::decode_full(data).unwrap();
+        let tup: Tuple = Decode::decode_full(data).unwrap();
         let cmd = match tup.0[0] {
-            Item::String(ref s) => s.clone(),
+            Element::String(ref s) => s.clone(),
             _ => panic!("unexpected instr"),
         };
 
@@ -722,7 +722,7 @@ impl StackMachine {
                 let mut data = data.as_slice();
 
                 while !data.is_empty() {
-                    let (val, offset): (Item, _) = Decode::decode(data).unwrap();
+                    let (val, offset): (Element, _) = Decode::decode(data).unwrap();
                     let bytes = val.encode_to_vec();
                     self.push_item(number, &bytes);
                     data = &data[offset..];

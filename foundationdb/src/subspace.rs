@@ -15,7 +15,7 @@
 //! general guidance on subspace usage, see the Subspaces section of the Developer Guide
 //! (https://apple.github.io/foundationdb/developer-guide.html#subspaces).
 
-use tuple::{self, Decode, Encode};
+use tuple::{Decode, Encode, Result, Error};
 
 /// Subspace represents a well-defined region of keyspace in a FoundationDB database.
 #[derive(Debug, Clone)]
@@ -67,9 +67,9 @@ impl Subspace {
     /// `unpack` returns the Tuple encoded by the given key with the prefix of this Subspace
     /// removed.  `unpack` will return an error if the key is not in this Subspace or does not
     /// encode a well-formed Tuple.
-    pub fn unpack<T: Decode>(&self, key: &[u8]) -> Result<T, tuple::Error> {
+    pub fn unpack<T: Decode>(&self, key: &[u8]) -> Result<T> {
         if !self.is_start_of(key) {
-            return Err(tuple::Error::InvalidData);
+            return Err(Error::InvalidData);
         }
         let key = &key[self.prefix.len()..];
         Decode::decode_full(&key)
@@ -96,7 +96,7 @@ impl Subspace {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tuple;
+    use tuple::Tuple;
 
     #[test]
     fn sub() {
@@ -143,7 +143,7 @@ mod tests {
             v
         };
 
-        assert!(ss0.unpack::<tuple::Value>(&malformed).is_err());
+        assert!(ss0.unpack::<Tuple>(&malformed).is_err());
     }
 
     #[test]
