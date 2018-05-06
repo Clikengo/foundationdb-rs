@@ -10,6 +10,7 @@ extern crate futures;
 #[macro_use]
 extern crate lazy_static;
 
+use foundationdb::error::Error;
 use foundationdb::*;
 use futures::future::*;
 use futures::prelude::*;
@@ -46,7 +47,7 @@ fn test_get_range() {
                 .map_err(|(_opt, e)| e)
                 .fold(0, |count, item| {
                     let kvs = item.keyvalues();
-                    Ok(count + kvs.as_ref().len())
+                    Ok::<_, Error>(count + kvs.as_ref().len())
                 })
                 .map(|count| {
                     if count != N {

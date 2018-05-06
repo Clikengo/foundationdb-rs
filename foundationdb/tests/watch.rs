@@ -78,7 +78,7 @@ fn test_watch_without_commit() {
             // should return error_code=1025, `Operation aborted because the transaction was
             // canceled`
             eprintln!("error as expected: {:?}", e);
-            Ok::<(), error::FdbError>(())
+            Ok::<(), error::Error>(())
         });
 
     fut.wait().expect("failed to run")

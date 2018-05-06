@@ -111,7 +111,7 @@ impl FdbScope {
 
         let mut s = String::new();
         s += &format!(
-            "pub unsafe fn apply(&self{}) -> std::result::Result<(), error::FdbError> {{\n",
+            "pub unsafe fn apply(&self{}) -> std::result::Result<(), error::Error> {{\n",
             first_arg
         );
         s += "let code = self.code();\n";
@@ -159,7 +159,7 @@ impl FdbScope {
         }
 
         s += "};\n";
-        s += "if err != 0 { Err(error::FdbError::from(err)) } else { Ok(()) }\n";
+        s += "if err != 0 { Err(error::Error::from(err)) } else { Ok(()) }\n";
         s += "}\n";
 
         s

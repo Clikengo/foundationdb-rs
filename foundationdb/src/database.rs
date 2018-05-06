@@ -10,11 +10,12 @@
 //!
 //! https://apple.github.io/foundationdb/api-c.html#database
 
+use std;
+use std::sync::Arc;
+
 use foundationdb_sys as fdb;
 use futures::future::*;
 use futures::Future;
-use std;
-use std::sync::Arc;
 
 use cluster::*;
 use error::{self, *};
@@ -64,11 +65,12 @@ impl Database {
     /// It might retry indefinitely if the transaction is highly contentious. It is recommended to
     /// set `TransactionOption::RetryLimit` or `TransactionOption::SetTimeout` on the transaction
     /// if the task need to be guaranteed to finish.
-    pub fn transact<F, Fut, Item>(&self, f: F) -> Box<Future<Item = Fut::Item, Error = FdbError>>
+    pub fn transact<F, Fut, Item, E>(&self, f: F) -> Box<Future<Item = Fut::Item, Error = Error>>
     where
         F: FnMut(Transaction) -> Fut + 'static,
-        Fut: Future<Item = Item, Error = FdbError> + 'static,
+        Fut: Future<Item = Item, Error = E> + 'static,
         Item: 'static,
+        E: Into<Error>,
     {
         let db = self.clone();
 
@@ -76,6 +78,7 @@ impl Database {
             loop_fn((trx, f), |(trx, mut f)| {
                 let trx0 = trx.clone();
                 f(trx.clone())
+                    .map_err(|e| Into::<Error>::into(e))
                     .and_then(move |res| {
                         // try to commit the transaction
                         trx0.commit().map(|_| res)
