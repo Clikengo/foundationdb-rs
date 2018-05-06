@@ -10,9 +10,10 @@
 
 mod element;
 
-pub use self::element::Element;
-
 use std::{self, io::Write, string::FromUtf8Error};
+
+pub use self::element::Element;
+use subspace::Subspace;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Tuple(pub Vec<Element>);
@@ -38,6 +39,12 @@ pub trait Encode {
         self.encode(&mut v)
             .expect("tuple encoding should never fail");
         v
+    }
+}
+
+impl<'a, E: Encode + ?Sized> From<&'a E> for Subspace {
+    fn from(encode: &'a E) -> Self {
+        Subspace::new(encode)
     }
 }
 
@@ -178,5 +185,15 @@ mod tests {
             &[2, 104, 101, 108, 108, 111, 0, 1, 119, 111, 114, 108, 100, 0],
             Encode::encode_to_vec(&tup).as_slice()
         );
+    }
+
+    #[test]
+    fn test_eq() {
+        assert_eq!(
+            "string".encode_to_vec(),
+            "string".to_string().encode_to_vec()
+        );
+
+        assert_eq!("string".encode_to_vec(), ("string",).encode_to_vec());
     }
 }
