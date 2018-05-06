@@ -10,30 +10,64 @@
 
 mod element;
 
+use std::ops::{Deref, DerefMut};
 use std::{self, io::Write, string::FromUtf8Error};
 
 pub use self::element::Element;
 use subspace::Subspace;
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct Tuple(pub Vec<Element>);
-
+/// Tuple encoding/decoding related errors
 #[derive(Debug, Fail)]
 pub enum Error {
+    /// Unexpected end of the byte stream
     #[fail(display = "Unexpected end of file")]
     EOF,
+    /// Invalid type specified
     #[fail(display = "Invalid type: {}", value)]
-    InvalidType { value: u8 },
+    InvalidType {
+        /// the type code as defined in FoundationDB
+        value: u8,
+    },
+    /// Data was not valid for the specified type
     #[fail(display = "Invalid data")]
     InvalidData,
+    /// Utf8 Conversion error of tuple data
     #[fail(display = "UTF8 conversion error")]
     FromUtf8Error(FromUtf8Error),
 }
 
+/// A result with tuple::Error defined
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Generic Tuple of elements
+#[derive(Clone, Debug, PartialEq)]
+pub struct Tuple(Vec<Element>);
+
+impl From<Vec<Element>> for Tuple {
+    fn from(tuple: Vec<Element>) -> Self {
+        Tuple(tuple)
+    }
+}
+
+impl Deref for Tuple {
+    type Target = Vec<Element>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Tuple {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+/// For types that are encodable as defined by the tuple definitions on FoundationDB
 pub trait Encode {
+    /// Encodes this tuple/elemnt into the associated Write
     fn encode<W: Write>(&self, _w: &mut W) -> std::io::Result<()>;
+    /// Encodes this tuple/elemnt into a new Vec
     fn encode_to_vec(&self) -> Vec<u8> {
         let mut v = Vec::new();
         self.encode(&mut v)
@@ -48,8 +82,16 @@ impl<'a, E: Encode + ?Sized> From<&'a E> for Subspace {
     }
 }
 
+/// For types that are decodable from the Tuple definitions in FoundationDB
 pub trait Decode: Sized {
+    /// Decodes Self from the byte slice
+    ///
+    /// # Return
+    ///
+    /// Self and the offset of the next byte after Self in the byte slice
     fn decode(buf: &[u8]) -> Result<(Self, usize)>;
+
+    /// Decodes returning Self only
     fn decode_full(buf: &[u8]) -> Result<Self> {
         let (val, offset) = Self::decode(buf)?;
         if offset != buf.len() {

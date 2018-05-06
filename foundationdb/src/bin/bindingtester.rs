@@ -177,7 +177,7 @@ impl Instr {
         use InstrCode::*;
 
         let tup: Tuple = Decode::decode_full(data).unwrap();
-        let cmd = match tup.0[0] {
+        let cmd = match tup[0] {
             Element::String(ref s) => s.clone(),
             _ => panic!("unexpected instr"),
         };
@@ -191,7 +191,7 @@ impl Instr {
 
         let code = match cmd {
             "PUSH" => {
-                let data = tup.0[1].encode_to_vec();
+                let data = tup[1].encode_to_vec();
                 Push(data)
             }
             "DUP" => Dup,
