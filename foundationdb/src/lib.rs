@@ -139,6 +139,7 @@ pub mod tuple;
 pub use cluster::Cluster;
 pub use database::Database;
 pub use error::Error;
+pub use subspace::Subspace;
 pub use transaction::Transaction;
 
 /// Initialize the FoundationDB Client API, this can only be called once per process.
