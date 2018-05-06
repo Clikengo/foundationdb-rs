@@ -556,7 +556,7 @@ impl Transaction {
     /// The API is exposed mainly for `bindingtester`, and it is not recommended to call the API
     /// directly from application. Use `Database::transact` instead.
     #[doc(hidden)]
-    pub fn on_error(&self, error: FdbError) -> TrxErrFuture {
+    pub fn on_error(&self, error: Error) -> TrxErrFuture {
         TrxErrFuture::new(self.clone(), error)
     }
 
@@ -635,7 +635,7 @@ pub struct TrxGet {
 }
 impl Future for TrxGet {
     type Item = GetResult;
-    type Error = FdbError;
+    type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         match self.inner.poll() {
@@ -669,7 +669,7 @@ pub struct TrxGetKey {
 }
 impl Future for TrxGetKey {
     type Item = GetKeyResult;
-    type Error = FdbError;
+    type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         match self.inner.poll() {
@@ -748,7 +748,7 @@ pub struct TrxGetRange {
 
 impl Future for TrxGetRange {
     type Item = GetRangeResult;
-    type Error = FdbError;
+    type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         match self.inner.poll() {
@@ -790,7 +790,7 @@ impl RangeStream {
 
 impl<'a> Stream for RangeStream {
     type Item = GetRangeResult;
-    type Error = (RangeOption, FdbError);
+    type Error = (RangeOption, Error);
 
     fn poll(&mut self) -> std::result::Result<Async<Option<Self::Item>>, Self::Error> {
         if self.inner.is_none() {
@@ -822,7 +822,7 @@ pub struct TrxCommit {
 
 impl Future for TrxCommit {
     type Item = Transaction;
-    type Error = FdbError;
+    type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         match self.inner.poll() {
@@ -856,7 +856,7 @@ pub struct TrxGetAddressesForKey {
 }
 impl Future for TrxGetAddressesForKey {
     type Item = GetAddressResult;
-    type Error = FdbError;
+    type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         match self.inner.poll() {
@@ -875,7 +875,7 @@ pub struct TrxWatch {
 }
 impl Future for TrxWatch {
     type Item = ();
-    type Error = FdbError;
+    type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         match self.inner.poll() {
@@ -906,7 +906,7 @@ pub struct TrxVersionstamp {
 }
 impl Future for TrxVersionstamp {
     type Item = Versionstamp;
-    type Error = FdbError;
+    type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         match self.inner.poll() {
@@ -934,7 +934,7 @@ pub struct TrxReadVersion {
 
 impl Future for TrxReadVersion {
     type Item = i64;
-    type Error = FdbError;
+    type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         match self.inner.poll() {
@@ -967,7 +967,7 @@ impl NonTrxFuture {
 
 impl Future for NonTrxFuture {
     type Item = FdbFutureResult;
-    type Error = FdbError;
+    type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         self.inner.poll()
@@ -980,10 +980,10 @@ pub struct TrxErrFuture {
     // undering transaction should be retried, and resolved to `Err(e)` if the error should be
     // reported to the user without retry.
     inner: NonTrxFuture,
-    err: Option<FdbError>,
+    err: Option<Error>,
 }
 impl TrxErrFuture {
-    fn new(trx: Transaction, err: FdbError) -> Self {
+    fn new(trx: Transaction, err: Error) -> Self {
         let inner = unsafe { fdb::fdb_transaction_on_error(trx.inner.inner, err.code()) };
 
         Self {
@@ -994,8 +994,8 @@ impl TrxErrFuture {
 }
 
 impl Future for TrxErrFuture {
-    type Item = FdbError;
-    type Error = FdbError;
+    type Item = Error;
+    type Error = Error;
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         match self.inner.poll() {
             Ok(Async::Ready(_res)) => {
@@ -1032,7 +1032,7 @@ impl TrxFuture {
 
 impl Future for TrxFuture {
     type Item = (Transaction, FdbFutureResult);
-    type Error = FdbError;
+    type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         if self.f_err.is_none() {

@@ -6,7 +6,7 @@ extern crate log;
 
 use std::collections::HashMap;
 
-use fdb::error::FdbError;
+use fdb::error::Error;
 use fdb::keyselector::KeySelector;
 use fdb::tuple::*;
 use fdb::*;
@@ -251,7 +251,7 @@ impl Instr {
     }
 }
 
-type StackFuture = Box<Future<Item = (Transaction, Vec<u8>), Error = FdbError>>;
+type StackFuture = Box<Future<Item = (Transaction, Vec<u8>), Error = Error>>;
 struct StackItem {
     number: usize,
     // TODO: enum
@@ -350,7 +350,7 @@ impl StackMachine {
         }
     }
 
-    fn fetch_instr(&self) -> Box<Future<Item = Vec<Instr>, Error = FdbError>> {
+    fn fetch_instr(&self) -> Box<Future<Item = Vec<Instr>, Error = Error>> {
         let db = self.db.clone();
 
         let prefix = (self.prefix.clone(),);
@@ -366,7 +366,7 @@ impl StackMachine {
                         let instr = Instr::from(kv.value());
                         instrs.push(instr);
                     }
-                    Ok(instrs)
+                    Ok::<_, Error>(instrs)
                 });
             f
         });
@@ -420,7 +420,7 @@ impl StackMachine {
 
     fn push_fut<F>(&mut self, number: usize, fut: F)
     where
-        F: Future<Item = (Transaction, Vec<u8>), Error = FdbError> + 'static,
+        F: Future<Item = (Transaction, Vec<u8>), Error = Error> + 'static,
     {
         let item = StackItem {
             number,
@@ -494,7 +494,7 @@ impl StackMachine {
             OnError => {
                 let code: i64 = self.pop_item();
                 let trx0 = trx.clone();
-                let f = trx.on_error(FdbError::from(code as i32))
+                let f = trx.on_error(Error::from(code as i32))
                     .map(move |_| (trx0, b"RESULT_NOT_PRESENT".to_vec()));
                 self.push_fut(number, f);
             }
@@ -603,7 +603,7 @@ impl StackMachine {
                             key.to_vec().encode(&mut out).expect("failed to encode");
                             value.to_vec().encode(&mut out).expect("failed to encode");
                         }
-                        Ok(out)
+                        Ok::<_, Error>(out)
                     })
                     .map(|out| (trx0, out));
 

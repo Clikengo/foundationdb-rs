@@ -73,12 +73,12 @@ impl BenchRunner {
     }
 
     //TODO: impl future
-    fn run(self) -> Box<Future<Item = (), Error = FdbError>> {
+    fn run(self) -> Box<Future<Item = (), Error = Error>> {
         Box::new(loop_fn(self, Self::step))
     }
 
     //TODO: impl future
-    fn step(mut self) -> Box<Future<Item = Loop<(), Self>, Error = FdbError>> {
+    fn step(mut self) -> Box<Future<Item = Loop<(), Self>, Error = Error>> {
         use rand::Rng;
 
         let trx = self.trx.take().unwrap();
@@ -153,7 +153,7 @@ impl Bench {
         &self,
         r: std::ops::Range<usize>,
         counter: Counter,
-    ) -> Box<Future<Item = (), Error = FdbError>> {
+    ) -> Box<Future<Item = (), Error = Error>> {
         let runners = r.into_iter()
             .map(|n| {
                 // With deterministic Rng, benchmark with same parameters will overwrite same set

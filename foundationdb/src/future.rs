@@ -21,7 +21,7 @@ use foundationdb_sys as fdb;
 use futures;
 use futures::Async;
 
-use error::{self, FdbError, Result};
+use error::{self, Error, Result};
 
 /// An opaque type that represents a Future in the FoundationDB C API.
 pub(crate) struct FdbFuture {
@@ -51,7 +51,7 @@ impl Drop for FdbFuture {
 
 impl futures::Future for FdbFuture {
     type Item = FdbFutureResult;
-    type Error = FdbError;
+    type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         let f = self.f.expect("cannot poll after resolve");
