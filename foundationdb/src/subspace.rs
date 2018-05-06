@@ -15,7 +15,7 @@
 //! general guidance on subspace usage, see the Subspaces section of the Developer Guide
 //! (https://apple.github.io/foundationdb/developer-guide.html#subspaces).
 
-use tuple::{Decode, Encode, Result, Error};
+use tuple::{Decode, Encode, Error, Result};
 
 /// Subspace represents a well-defined region of keyspace in a FoundationDB database.
 #[derive(Debug, Clone)]
@@ -37,13 +37,13 @@ impl Subspace {
     }
 
     /// Returns a new Subspace from the provided tuple encodable.
-    pub fn new<T: Encode>(t: &T) -> Self {
+    pub fn new<T: Encode + ?Sized>(t: &T) -> Self {
         let prefix = Encode::encode_to_vec(t);
         Self { prefix }
     }
 
     /// Returns a new Subspace whose prefix extends this Subspace with a given tuple encodable.
-    pub fn subspace<T: Encode>(&self, t: &T) -> Self {
+    pub fn subspace<T: Encode + ?Sized>(&self, t: &T) -> Self {
         Self {
             prefix: self.pack(t),
         }
@@ -56,7 +56,7 @@ impl Subspace {
 
     /// Returns the key encoding the specified Tuple with the prefix of this Subspace
     /// prepended.
-    pub fn pack<T: Encode>(&self, t: &T) -> Vec<u8> {
+    pub fn pack<T: Encode + ?Sized>(&self, t: &T) -> Vec<u8> {
         let mut packed = Encode::encode_to_vec(t);
         let mut out = Vec::with_capacity(self.prefix.len() + packed.len());
         out.extend_from_slice(&self.prefix);
@@ -83,10 +83,13 @@ impl Subspace {
 
     /// `range` returns first and last key of given Subspace
     pub fn range(&self) -> (Vec<u8>, Vec<u8>) {
-        let mut begin = self.prefix.clone();
+        let mut begin = Vec::with_capacity(self.prefix.len() + 1);
+        let mut end = Vec::with_capacity(self.prefix.len() + 1);
+
+        begin.extend_from_slice(&self.prefix);
         begin.push(0x00);
 
-        let mut end = self.prefix.clone();
+        end.extend_from_slice(&self.prefix);
         end.push(0xff);
 
         (begin, end)
@@ -131,6 +134,12 @@ mod tests {
 
         assert!(ss0.is_start_of(&ss0.pack(&tup)));
         assert!(!ss1.is_start_of(&ss0.pack(&tup)));
+        assert!(Subspace::from(&"start").is_start_of(&"start".encode_to_vec()));
+        assert!(Subspace::from(&"start").is_start_of(&"start".to_string().encode_to_vec()));
+        assert!(!Subspace::from(&"start").is_start_of(&"starting".encode_to_vec()));
+        assert!(Subspace::from(&("start",)).is_start_of(&"start".encode_to_vec()));
+        assert!(Subspace::from(&"start").is_start_of(&("start", "end").encode_to_vec()));
+        assert!(Subspace::from(&("start", 42)).is_start_of(&("start", 42, "end").encode_to_vec()));
     }
 
     #[test]

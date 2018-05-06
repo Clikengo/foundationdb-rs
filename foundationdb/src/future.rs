@@ -15,6 +15,7 @@
 //! The Rust API Client has been implemented to use the Rust futures crate, and should work within that ecosystem (suchas Tokio). See Rust [futures](https://docs.rs/crate/futures/0.1.21) documentation.
 
 use std;
+use std::ops::Deref;
 
 use foundationdb_sys as fdb;
 use futures;
@@ -103,9 +104,11 @@ impl<'a> KeyValues<'a> {
         self.more
     }
 }
-//TODO: maybe `as_slice()` for just `keyvalues()`? `as_ref()` is not intuitive in this case...
-impl<'a> AsRef<[KeyValue<'a>]> for KeyValues<'a> {
-    fn as_ref(&self) -> &[KeyValue<'a>] {
+
+impl<'a> Deref for KeyValues<'a> {
+    type Target = [KeyValue<'a>];
+
+    fn deref(&self) -> &Self::Target {
         self.keyvalues
     }
 }
