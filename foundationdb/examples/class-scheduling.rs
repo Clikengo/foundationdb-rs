@@ -21,7 +21,7 @@ use futures::future::{self, Future};
 use foundationdb as fdb;
 use foundationdb::transaction::RangeOptionBuilder;
 use foundationdb::tuple::{Decode, Encode};
-use foundationdb::{Cluster, Database, Transaction};
+use foundationdb::{Cluster, Database, Subspace, Transaction};
 
 // Data model:
 // ("attends", student, class) = ""
@@ -68,8 +68,9 @@ fn all_classes() -> Vec<String> {
 }
 
 fn init_classes(trx: &Transaction, all_classes: &[String]) {
+    let class_subspace = Subspace::from(&"class");
     for class in all_classes {
-        trx.set(&class.encode_to_vec(), &100_i64.encode_to_vec());
+        trx.set(&class_subspace.pack(class), &100_i64.encode_to_vec());
     }
 }
 
@@ -132,7 +133,7 @@ fn ditch_trx(trx: &Transaction, student: &str, class: &str) {
             .expect("class seats were not initialized"),
     ).expect("failed to decode i64") + 1;
 
-    println!("{} ditching class: {}", student, class);
+    //println!("{} ditching class: {}", student, class);
     trx.set(&class_key, &available_seats.encode_to_vec());
     trx.clear(&attends_key);
 }
@@ -141,7 +142,7 @@ fn ditch(db: &Database, student: &str, class: &str) -> Result<(), String> {
     let trx = db.create_trx().expect("could not create transaction");
 
     ditch_trx(&trx, student, class);
-    println!("{} ditch commit: {}", student, class);
+    //println!("{} ditch commit: {}", student, class);
     trx.commit().wait().map_err(|e| format!("error: {}", e))?;
 
     Ok(())
@@ -154,8 +155,9 @@ fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(), Strin
         .expect("get failed")
         .value()
         .expect("value failed")
-        .is_none()
+        .is_some()
     {
+        //println!("{} already taking class: {}", student, class);
         return Ok(());
     }
 
@@ -173,7 +175,6 @@ fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(), Strin
         return Err(format!("No remaining seats"));
     }
 
-    // TODO: impl Deref for [KeyValue] on KeyValues
     let attends_range = RangeOptionBuilder::from_tuple(&("attends", student)).build();
     if trx.get_range(attends_range, 1_024)
         .wait()
@@ -184,7 +185,7 @@ fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(), Strin
         return Err(format!("Too many classes"));
     }
 
-    println!("{} taking class: {}", student, class);
+    //println!("{} taking class: {}", student, class);
     trx.set(&class_key, &(available_seats - 1).encode_to_vec());
     trx.set(&attends_key, &"".encode_to_vec());
     Ok(())
@@ -195,7 +196,7 @@ fn signup(db: &Database, student: &str, class: &str) -> Result<(), String> {
 
     signup_trx(&trx, student, class)?;
 
-    println!("{} signup commit: {}", student, class);
+    //println!("{} signup commit: {}", student, class);
     trx.commit().wait().map_err(|e| format!("error: {}", e))?;
 
     Ok(())
@@ -212,7 +213,7 @@ fn switch_classes(
     ditch_trx(&trx, student_id, old_class);
     signup_trx(&trx, student_id, new_class)?;
 
-    println!("{} switch commit: {}, {}", student_id, old_class, new_class);
+    //println!("{} switch commit: {}, {}", student_id, old_class, new_class);
     trx.commit().wait().map_err(|e| format!("error: {}", e))?;
 
     Ok(())
@@ -233,8 +234,6 @@ fn perform_op(
     all_classes: &[String],
     my_classes: &mut Vec<String>,
 ) -> Result<(), String> {
-    println!("{} performing op: {:?}", student_id, mood);
-
     match mood {
         Mood::Add => {
             let class = rng.choose(all_classes).unwrap();
@@ -291,7 +290,7 @@ fn simulate_students(student_id: usize, num_ops: usize) {
                     &mut my_classes,
                 ).is_err()
                 {
-                    println!("getting more classes");
+                    println!("getting available classes");
                     available_classes = Cow::Owned(get_available_classes(&db));
                 }
             }
@@ -302,18 +301,38 @@ fn simulate_students(student_id: usize, num_ops: usize) {
         .expect("got error in simulation");
 }
 
-fn run_sim(_db: &Database, students: usize, ops_per_student: usize) {
-    let mut threads: Vec<thread::JoinHandle<()>> = Vec::with_capacity(students);
+fn run_sim(db: &Database, students: usize, ops_per_student: usize) {
+    let mut threads: Vec<(usize, thread::JoinHandle<()>)> = Vec::with_capacity(students);
     for i in 0..students {
         // TODO: ClusterInner has a mutable pointer reference, if thread-safe, mark that trait as Sync, then we can clone DB here...
-        threads.push(thread::spawn(move || {
-            simulate_students(i, ops_per_student);
-        }));
+        threads.push((
+            i,
+            thread::spawn(move || {
+                simulate_students(i, ops_per_student);
+            }),
+        ));
     }
 
     // explicitly join...
-    for thread in threads {
+    for (id, thread) in threads {
         thread.join().expect("failed to join thread");
+
+        let student_id = format!("s{}", id);
+        let attends_range = RangeOptionBuilder::from_tuple(&("attends", &student_id)).build();
+
+        for key_value in db.create_trx()
+            .unwrap()
+            .get_range(attends_range, 1_024)
+            .wait()
+            .expect("get_range failed")
+            .keyvalues()
+            .into_iter()
+        {
+            let (_, s, class) = <(String, String, String)>::decode_full(key_value.key()).unwrap();
+            assert_eq!(student_id, s);
+
+            println!("{} is taking: {}", student_id, class);
+        }
     }
 
     println!("Ran {} transactions", students * ops_per_student);
