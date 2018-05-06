@@ -8,6 +8,8 @@
 
 #[macro_use]
 extern crate lazy_static;
+#[macro_use]
+extern crate failure;
 extern crate foundationdb;
 extern crate futures;
 extern crate rand;
@@ -19,6 +21,7 @@ use self::rand::{Rng, ThreadRng};
 use futures::future::{self, Future};
 
 use foundationdb as fdb;
+use foundationdb::error::Error;
 use foundationdb::transaction::RangeOptionBuilder;
 use foundationdb::tuple::{Decode, Encode};
 use foundationdb::{Cluster, Database, Subspace, Transaction};
@@ -138,17 +141,15 @@ fn ditch_trx(trx: &Transaction, student: &str, class: &str) {
     trx.clear(&attends_key);
 }
 
-fn ditch(db: &Database, student: &str, class: &str) -> Result<(), String> {
-    let trx = db.create_trx().expect("could not create transaction");
-
-    ditch_trx(&trx, student, class);
-    //println!("{} ditch commit: {}", student, class);
-    trx.commit().wait().map_err(|e| format!("error: {}", e))?;
-
-    Ok(())
+fn ditch(db: &Database, student: String, class: String) -> Result<(), failure::Error> {
+    db.transact(move |trx| {
+        ditch_trx(&trx, &student, &class);
+        future::result(Ok::<(), Error>(()))
+    }).wait()
+        .map_err(|e| format_err!("error in signup: {}", e))
 }
 
-fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(), String> {
+fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(), failure::Error> {
     let attends_key = ("attends", student, class).encode_to_vec();
     if trx.get(&attends_key, true)
         .wait()
@@ -161,7 +162,7 @@ fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(), Strin
         return Ok(());
     }
 
-    let class_key = ("class".to_string(), class.to_string()).encode_to_vec();
+    let class_key = ("class", class).encode_to_vec();
     let available_seats: i64 = i64::decode_full(
         trx.get(&class_key, true)
             .wait()
@@ -172,7 +173,7 @@ fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(), Strin
     ).expect("failed to decode i64");
 
     if available_seats <= 0 {
-        return Err(format!("No remaining seats"));
+        bail!("No remaining seats");
     }
 
     let attends_range = RangeOptionBuilder::from_tuple(&("attends", student)).build();
@@ -182,7 +183,7 @@ fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(), Strin
         .keyvalues()
         .len() >= 5
     {
-        return Err(format!("Too many classes"));
+        bail!("Too many classes");
     }
 
     //println!("{} taking class: {}", student, class);
@@ -191,32 +192,24 @@ fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(), Strin
     Ok(())
 }
 
-fn signup(db: &Database, student: &str, class: &str) -> Result<(), String> {
-    let trx = db.create_trx().expect("could not create transaction");
-
-    signup_trx(&trx, student, class)?;
-
-    //println!("{} signup commit: {}", student, class);
-    trx.commit().wait().map_err(|e| format!("error: {}", e))?;
-
-    Ok(())
+fn signup(db: &Database, student: String, class: String) -> Result<(), failure::Error> {
+    db.transact(move |trx| {
+        future::result(signup_trx(&trx, &student, &class).map_err(|e| Error::from_other(e)))
+    }).wait()
+        .map_err(|e| format_err!("error in signup: {}", e))
 }
 
 fn switch_classes(
     db: &Database,
-    student_id: &str,
-    old_class: &str,
-    new_class: &str,
-) -> Result<(), String> {
-    let trx = db.create_trx().expect("could not create transaction");
-
-    ditch_trx(&trx, student_id, old_class);
-    signup_trx(&trx, student_id, new_class)?;
-
-    //println!("{} switch commit: {}, {}", student_id, old_class, new_class);
-    trx.commit().wait().map_err(|e| format!("error: {}", e))?;
-
-    Ok(())
+    student_id: String,
+    old_class: String,
+    new_class: String,
+) -> Result<(), failure::Error> {
+    db.transact(move |trx| {
+        ditch_trx(&trx, &student_id, &old_class);
+        future::result(signup_trx(&trx, &student_id, &new_class))
+    }).wait()
+        .map_err(|e| format_err!("error in switch: {}", e))
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -233,22 +226,27 @@ fn perform_op(
     student_id: &str,
     all_classes: &[String],
     my_classes: &mut Vec<String>,
-) -> Result<(), String> {
+) -> Result<(), Error> {
     match mood {
         Mood::Add => {
             let class = rng.choose(all_classes).unwrap();
-            signup(&db, &student_id, class)?;
+            signup(&db, student_id.to_string(), class.to_string())?;
             my_classes.push(class.to_string());
         }
         Mood::Ditch => {
             let class = rng.choose(all_classes).unwrap();
-            ditch(&db, student_id, class)?;
+            ditch(&db, student_id.to_string(), class.to_string())?;
             my_classes.retain(|s| s != class);
         }
         Mood::Switch => {
             let old_class = rng.choose(my_classes).unwrap().to_string();
             let new_class = rng.choose(all_classes).unwrap();
-            switch_classes(&db, student_id, &old_class, new_class)?;
+            switch_classes(
+                &db,
+                student_id.to_string(),
+                old_class.to_string(),
+                new_class.to_string(),
+            )?;
             my_classes.retain(|s| s != &old_class);
             my_classes.push(new_class.to_string());
         }
