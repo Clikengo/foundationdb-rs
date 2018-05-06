@@ -16,6 +16,7 @@ use failure::{self, Backtrace, Context, Fail};
 
 use foundationdb_sys as fdb_sys;
 use options;
+use tuple;
 
 pub(crate) fn eval(error_code: fdb_sys::fdb_error_t) -> Result<()> {
     let rust_code = error_code as i32;
@@ -53,6 +54,12 @@ pub enum ErrorKind {
     Other {
         /// The cause of this error
         error: failure::Error,
+    },
+    /// Encoding/Decoding errors related to Tuple
+    #[fail(display = "Internal error with tuple encoding/decoding: {}", error)]
+    Tuple {
+        /// The cause of this error
+        error: tuple::Error,
     },
 }
 

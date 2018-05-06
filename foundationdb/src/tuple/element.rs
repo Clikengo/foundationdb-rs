@@ -3,7 +3,7 @@ use std::{self, io::Write};
 use uuid::Uuid;
 
 use byteorder::{self, ByteOrder};
-use tuple::{Tuple, Decode, Encode, Error, Result};
+use tuple::{Decode, Encode, Error, Result, Tuple};
 
 /// Various tuple types
 const NIL: u8 = 0x00;
@@ -34,16 +34,26 @@ const SIZE_LIMITS: &[i64] = &[
     (1 << (7 * 8)) - 1,
 ];
 
+/// A single tuple element
 #[derive(Clone, Debug, PartialEq)]
 pub enum Element {
+    /// Corresponse with nothing, ie the Nil byte
     Empty,
+    /// A sequence of bytes to be written to the stream
     Bytes(Vec<u8>),
+    /// A string
     String(String),
+    /// A recursive Tuple
     Tuple(Tuple),
+    /// An i64
     I64(i64),
+    /// An f32
     F32(f32),
+    /// An f64
     F64(f64),
+    /// A bool
     Bool(bool),
+    /// A UUID, requires the uuid feature/library
     #[cfg(feature = "uuid")]
     Uuid(Uuid),
     #[doc(hidden)]

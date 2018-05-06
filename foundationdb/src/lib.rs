@@ -133,7 +133,6 @@ pub mod network;
 pub mod options;
 pub mod subspace;
 pub mod transaction;
-#[allow(missing_docs)]
 pub mod tuple;
 
 //move to prelude?
