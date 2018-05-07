@@ -70,7 +70,7 @@ fn all_classes() -> Vec<String> {
 }
 
 fn init_classes(trx: &Transaction, all_classes: &[String]) {
-    let class_subspace = Subspace::from("class");
+    let class_subspace = Subspace::from(&"class");
     for class in all_classes {
         trx.set(&class_subspace.pack(class), &100_i64.to_vec());
     }
@@ -78,8 +78,8 @@ fn init_classes(trx: &Transaction, all_classes: &[String]) {
 
 fn init(db: &Database, all_classes: &[String]) {
     let trx = db.create_trx().expect("could not create transaction");
-    trx.clear_subspace_range(("attends",));
-    trx.clear_subspace_range(("class",));
+    trx.clear_subspace_range(&"attends");
+    trx.clear_subspace_range(&"class");
     init_classes(&trx, all_classes);
 
     trx.commit().wait().expect("failed to initialize data");

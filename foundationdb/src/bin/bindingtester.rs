@@ -353,7 +353,7 @@ impl StackMachine {
     fn fetch_instr(&self) -> Box<Future<Item = Vec<Instr>, Error = Error>> {
         let db = self.db.clone();
 
-        let prefix = (self.prefix.clone(),);
+        let prefix = self.prefix.clone();
         let f = db.transact(move |trx| {
             let opt = transaction::RangeOptionBuilder::from_tuple(&prefix).build();
             let instrs = Vec::new();
