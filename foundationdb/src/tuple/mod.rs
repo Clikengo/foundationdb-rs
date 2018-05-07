@@ -249,7 +249,10 @@ mod tests {
     fn test_eq() {
         assert_eq!("string".to_vec(), "string".to_string().to_vec());
 
-        assert_eq!("string".to_vec(), ("string",).to_vec());
+        assert_eq!(
+            ("string", "string".to_string()).to_vec(),
+            ("string".to_string(), "string").to_vec()
+        );
     }
 
     #[test]
