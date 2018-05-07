@@ -24,6 +24,14 @@ pub struct Subspace {
     prefix: Vec<u8>,
 }
 
+impl<E: Encode> From<E> for Subspace {
+    fn from(e: E) -> Self {
+        Self {
+            prefix: e.encode_to_vec(),
+        }
+    }
+}
+
 impl Subspace {
     /// `all` returns the Subspace corresponding to all keys in a FoundationDB database.
     pub fn all() -> Subspace {
@@ -34,13 +42,6 @@ impl Subspace {
     pub fn from_bytes(bytes: &[u8]) -> Self {
         Self {
             prefix: bytes.to_vec(),
-        }
-    }
-
-    /// Returns a new Subspace from the provided tuple encodable.
-    pub fn new<T: Encode>(t: T) -> Self {
-        Self {
-            prefix: t.encode_to_vec(),
         }
     }
 
@@ -105,17 +106,17 @@ mod tests {
 
     #[test]
     fn sub() {
-        let ss0 = Subspace::new((1,));
+        let ss0: Subspace = (1,).into();
         let ss1 = ss0.subspace((2,));
 
-        let ss2 = Subspace::new((1, 2));
+        let ss2: Subspace = (1, 2).into();
 
         assert_eq!(ss1.bytes(), ss2.bytes());
     }
 
     #[test]
     fn pack_unpack() {
-        let ss0 = Subspace::new((1,));
+        let ss0: Subspace = (1,).into();
         let tup = (2, 3);
 
         let packed = ss0.pack(&tup);
@@ -130,8 +131,8 @@ mod tests {
 
     #[test]
     fn is_start_of() {
-        let ss0 = Subspace::new((1,));
-        let ss1 = Subspace::new((2,));
+        let ss0: Subspace = (1,).into();
+        let ss1: Subspace = (2,).into();
         let tup = (2, 3);
 
         assert!(ss0.is_start_of(&ss0.pack(&tup)));
@@ -146,7 +147,7 @@ mod tests {
 
     #[test]
     fn unpack_malformed() {
-        let ss0 = Subspace::new(((),));
+        let ss0: Subspace = ((),).into();
 
         let malformed = {
             let mut v = ss0.bytes().to_vec();
@@ -159,7 +160,7 @@ mod tests {
 
     #[test]
     fn range() {
-        let ss = Subspace::new((1,));
+        let ss: Subspace = (1,).into();
         let tup = (2, 3);
         let packed = ss.pack(&tup);
 
