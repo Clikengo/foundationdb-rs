@@ -12,7 +12,7 @@ use std;
 use std::ffi::CStr;
 use std::fmt::{self, Display};
 
-use failure::{self, Backtrace, Context, Fail};
+use failure::{Backtrace, Context, Fail};
 
 use foundationdb_sys as fdb_sys;
 use options;
@@ -49,12 +49,6 @@ pub enum ErrorKind {
         /// The error string as defined by FoundationDB
         error_str: &'static str,
     },
-    /// Other errors not directly attributed to the FoundationDB layers
-    #[fail(display = "FoundationDB-RS error: {}", error)]
-    Other {
-        /// The cause of this error
-        error: failure::Error,
-    },
     /// Encoding/Decoding errors related to Tuple
     #[fail(display = "Internal error with tuple encoding/decoding: {}", error)]
     Tuple {
@@ -82,9 +76,12 @@ impl Display for Error {
     }
 }
 
-impl From<failure::Error> for Error {
-    fn from(error: failure::Error) -> Self {
-        Error::from_other(error)
+impl From<tuple::Error> for Error {
+    fn from(error: tuple::Error) -> Self {
+        Error {
+            kind: Context::new(ErrorKind::Tuple { error }),
+            should_retry: false,
+        }
     }
 }
 
@@ -100,14 +97,6 @@ impl Error {
                     .to_str()
                     .expect("bad error string from FoundationDB"),
             }),
-            should_retry: false,
-        }
-    }
-
-    /// Creates an error from another error or failure
-    pub fn from_other(error: failure::Error) -> Self {
-        Error {
-            kind: Context::new(ErrorKind::Other { error }),
             should_retry: false,
         }
     }
