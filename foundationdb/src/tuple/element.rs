@@ -72,7 +72,7 @@ fn encode_bytes<W: Write>(w: &mut W, buf: &[u8]) -> std::io::Result<()> {
 }
 
 fn decode_bytes(buf: &[u8]) -> Result<(Vec<u8>, usize)> {
-    let mut out = Vec::<u8>::new();
+    let mut out = Vec::<u8>::with_capacity(buf.len());
     let mut offset = 0;
     loop {
         if offset >= buf.len() {
