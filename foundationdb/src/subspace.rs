@@ -6,18 +6,19 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
-//! subspace provides a convenient way to use FoundationDB tuples to define namespaces for
-//! different categories of data. The namespace is specified by a prefix tuple which is prepended
-//! to all tuples packed by the subspace. When unpacking a key with the subspace, the prefix tuple
-//! will be removed from the result.
-//!
-//! As a best practice, API clients should use at least one subspace for application data. For
-//! general guidance on subspace usage, see the Subspaces section of the Developer Guide
-//! (https://apple.github.io/foundationdb/developer-guide.html#subspaces).
-
 use tuple::{Decode, Encode, Error, Result};
 
-/// Subspace represents a well-defined region of keyspace in a FoundationDB database.
+/// Represents a well-defined region of keyspace in a FoundationDB database
+///
+/// It provides a convenient way to use FoundationDB tuples to define namespaces for
+/// different categories of data. The namespace is specified by a prefix tuple which is prepended
+/// to all tuples packed by the subspace. When unpacking a key with the subspace, the prefix tuple
+/// will be removed from the result.
+///
+/// As a best practice, API clients should use at least one subspace for application data. For
+/// general guidance on subspace usage, see the Subspaces section of the [Developer Guide].
+///
+/// [Developer Guide]: https://apple.github.io/foundationdb/developer-guide.html#subspaces
 #[derive(Debug, Clone)]
 pub struct Subspace {
     prefix: Vec<u8>,
