@@ -6,10 +6,10 @@ use byteorder::{self, ByteOrder};
 use tuple::{Decode, Encode, Error, Result, Tuple};
 
 /// Various tuple types
-const NIL: u8 = 0x00;
+pub(super) const NIL: u8 = 0x00;
 const BYTES: u8 = 0x01;
 const STRING: u8 = 0x02;
-const NESTED: u8 = 0x05;
+pub(super) const NESTED: u8 = 0x05;
 const INTZERO: u8 = 0x14;
 const POSINTEND: u8 = 0x1d;
 const NEGINTSTART: u8 = 0x0b;
@@ -21,7 +21,7 @@ const TRUE: u8 = 0x27;
 const UUID: u8 = 0x30;
 const VERSIONSTAMP: u8 = 0x33;
 
-const ESCAPE: u8 = 0xff;
+pub(super) const ESCAPE: u8 = 0xff;
 
 const SIZE_LIMITS: &[i64] = &[
     0,
@@ -60,7 +60,7 @@ pub enum Element {
     __Nonexhaustive,
 }
 
-trait Type: Copy {
+pub(super) trait Type: Copy {
     /// verifies the value matches this type
     fn expect(self, value: u8) -> Result<()>;
 
@@ -158,13 +158,13 @@ impl Type for u8 {
 }
 
 impl<'a, T: Encode> Encode for &'a T {
-    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
-        T::encode(self, w)
+    fn encode<W: Write>(&self, w: &mut W, in_tuple: bool) -> std::io::Result<()> {
+        T::encode(self, w, in_tuple)
     }
 }
 
 impl Encode for bool {
-    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+    fn encode<W: Write>(&self, w: &mut W, _in_tuple: bool) -> std::io::Result<()> {
         if *self {
             TRUE.write(w)
         } else {
@@ -174,7 +174,7 @@ impl Encode for bool {
 }
 
 impl Decode for bool {
-    fn decode(buf: &[u8]) -> Result<(Self, usize)> {
+    fn decode(buf: &[u8], _in_tuple: bool) -> Result<(Self, usize)> {
         if buf.is_empty() {
             return Err(Error::EOF);
         }
@@ -188,13 +188,13 @@ impl Decode for bool {
 }
 
 impl Encode for () {
-    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+    fn encode<W: Write>(&self, w: &mut W, _in_tuple: bool) -> std::io::Result<()> {
         NIL.write(w)
     }
 }
 
 impl Decode for () {
-    fn decode(buf: &[u8]) -> Result<(Self, usize)> {
+    fn decode(buf: &[u8], _in_tuple: bool) -> Result<(Self, usize)> {
         if buf.is_empty() {
             return Err(Error::EOF);
         }
@@ -206,7 +206,7 @@ impl Decode for () {
 
 #[cfg(feature = "uuid")]
 impl Encode for Uuid {
-    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+    fn encode<W: Write>(&self, w: &mut W, _in_tuple: bool) -> std::io::Result<()> {
         UUID.write(w)?;
         w.write_all(self.as_bytes())
     }
@@ -214,7 +214,7 @@ impl Encode for Uuid {
 
 #[cfg(feature = "uuid")]
 impl Decode for Uuid {
-    fn decode(buf: &[u8]) -> Result<(Self, usize)> {
+    fn decode(buf: &[u8], _in_tuple: bool) -> Result<(Self, usize)> {
         if buf.len() < 17 {
             return Err(Error::EOF);
         }
@@ -229,21 +229,21 @@ impl Decode for Uuid {
 }
 
 impl<'a> Encode for &'a str {
-    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+    fn encode<W: Write>(&self, w: &mut W, _in_tuple: bool) -> std::io::Result<()> {
         STRING.write(w)?;
         encode_bytes(w, self.as_bytes())
     }
 }
 
 impl Encode for String {
-    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+    fn encode<W: Write>(&self, w: &mut W, _in_tuple: bool) -> std::io::Result<()> {
         STRING.write(w)?;
         encode_bytes(w, self.as_bytes())
     }
 }
 
 impl Decode for String {
-    fn decode(buf: &[u8]) -> Result<(Self, usize)> {
+    fn decode(buf: &[u8], _in_tuple: bool) -> Result<(Self, usize)> {
         if buf.len() < 2 {
             return Err(Error::EOF);
         }
@@ -256,7 +256,8 @@ impl Decode for String {
 }
 
 impl Encode for Vec<Element> {
-    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+    fn encode<W: Write>(&self, w: &mut W, _in_tuple: bool) -> std::io::Result<()> {
+        // TODO: should this only write the Nested markers in the case of in_tuple?
         NESTED.write(w)?;
         for v in self {
             match v {
@@ -267,7 +268,7 @@ impl Encode for Vec<Element> {
                     ESCAPE.write(w)?;
                 }
                 v => {
-                    v.encode(w)?;
+                    v.encode(w, true)?;
                 }
             }
         }
@@ -276,11 +277,12 @@ impl Encode for Vec<Element> {
 }
 
 impl Decode for Vec<Element> {
-    fn decode(mut buf: &[u8]) -> Result<(Self, usize)> {
+    fn decode(mut buf: &[u8], _in_tuple: bool) -> Result<(Self, usize)> {
         if buf.len() < 2 {
             return Err(Error::EOF);
         }
 
+        // TODO: should this only write the Nested markers in the case of in_tuple?
         NESTED.expect(buf[0])?;
         let len = buf.len();
         buf = &buf[1..];
@@ -304,7 +306,7 @@ impl Decode for Vec<Element> {
                 break;
             }
 
-            let (tuple, offset) = Element::decode(buf)?;
+            let (tuple, offset) = Element::decode(buf, true)?;
             tuples.push(tuple);
             buf = &buf[offset..];
         }
@@ -315,21 +317,21 @@ impl Decode for Vec<Element> {
 }
 
 impl<'a> Encode for &'a [u8] {
-    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+    fn encode<W: Write>(&self, w: &mut W, _in_tuple: bool) -> std::io::Result<()> {
         BYTES.write(w)?;
         encode_bytes(w, self)
     }
 }
 
 impl Encode for Vec<u8> {
-    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+    fn encode<W: Write>(&self, w: &mut W, _in_tuple: bool) -> std::io::Result<()> {
         BYTES.write(w)?;
         encode_bytes(w, self.as_slice())
     }
 }
 
 impl Decode for Vec<u8> {
-    fn decode(buf: &[u8]) -> Result<(Self, usize)> {
+    fn decode(buf: &[u8], _in_tuple: bool) -> Result<(Self, usize)> {
         if buf.len() < 2 {
             return Err(Error::EOF);
         }
@@ -342,7 +344,7 @@ impl Decode for Vec<u8> {
 }
 
 impl Encode for f32 {
-    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+    fn encode<W: Write>(&self, w: &mut W, _in_tuple: bool) -> std::io::Result<()> {
         FLOAT.write(w)?;
 
         let mut buf: [u8; 4] = Default::default();
@@ -354,7 +356,7 @@ impl Encode for f32 {
 }
 
 impl Decode for f32 {
-    fn decode(buf: &[u8]) -> Result<(Self, usize)> {
+    fn decode(buf: &[u8], _in_tuple: bool) -> Result<(Self, usize)> {
         if buf.len() < 5 {
             return Err(Error::EOF);
         }
@@ -371,7 +373,7 @@ impl Decode for f32 {
 }
 
 impl Encode for f64 {
-    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+    fn encode<W: Write>(&self, w: &mut W, _in_tuple: bool) -> std::io::Result<()> {
         DOUBLE.write(w)?;
 
         let mut buf: [u8; 8] = Default::default();
@@ -383,7 +385,7 @@ impl Encode for f64 {
 }
 
 impl Decode for f64 {
-    fn decode(buf: &[u8]) -> Result<(Self, usize)> {
+    fn decode(buf: &[u8], _in_tuple: bool) -> Result<(Self, usize)> {
         if buf.len() < 9 {
             return Err(Error::EOF);
         }
@@ -400,7 +402,7 @@ impl Decode for f64 {
 }
 
 impl Encode for i64 {
-    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+    fn encode<W: Write>(&self, w: &mut W, _in_tuple: bool) -> std::io::Result<()> {
         let mut code = INTZERO;
         let n;
         let mut buf: [u8; 8] = Default::default();
@@ -421,7 +423,7 @@ impl Encode for i64 {
 }
 
 impl Decode for i64 {
-    fn decode(buf: &[u8]) -> Result<(Self, usize)> {
+    fn decode(buf: &[u8], _in_tuple: bool) -> Result<(Self, usize)> {
         if buf.is_empty() {
             return Err(Error::EOF);
         }
@@ -460,20 +462,20 @@ impl Decode for i64 {
 }
 
 impl Encode for Element {
-    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+    fn encode<W: Write>(&self, w: &mut W, in_tuple: bool) -> std::io::Result<()> {
         use self::Element::*;
 
         match *self {
-            Empty => Encode::encode(&(), w),
-            Bytes(ref v) => Encode::encode(v, w),
-            String(ref v) => Encode::encode(v, w),
-            Tuple(ref v) => Encode::encode(&v.0, w),
-            I64(ref v) => Encode::encode(v, w),
-            F32(ref v) => Encode::encode(v, w),
-            F64(ref v) => Encode::encode(v, w),
-            Bool(ref v) => Encode::encode(v, w),
+            Empty => Encode::encode(&(), w, in_tuple),
+            Bytes(ref v) => Encode::encode(v, w, in_tuple),
+            String(ref v) => Encode::encode(v, w, in_tuple),
+            Tuple(ref v) => Encode::encode(&v.0, w, in_tuple),
+            I64(ref v) => Encode::encode(v, w, in_tuple),
+            F32(ref v) => Encode::encode(v, w, in_tuple),
+            F64(ref v) => Encode::encode(v, w, in_tuple),
+            Bool(ref v) => Encode::encode(v, w, in_tuple),
             #[cfg(feature = "uuid")]
-            Uuid(ref v) => Encode::encode(v, w),
+            Uuid(ref v) => Encode::encode(v, w, in_tuple),
             // Ugly hack
             // We will be able to drop this once #[non_exhaustive]
             // lands on `stable`
@@ -483,7 +485,7 @@ impl Encode for Element {
 }
 
 impl Decode for Element {
-    fn decode(buf: &[u8]) -> Result<(Self, usize)> {
+    fn decode(buf: &[u8], in_tuple: bool) -> Result<(Self, usize)> {
         if buf.is_empty() {
             return Err(Error::EOF);
         }
@@ -492,35 +494,35 @@ impl Decode for Element {
         match code {
             NIL => Ok((Element::Empty, 1)),
             BYTES => {
-                let (v, offset) = Decode::decode(buf)?;
+                let (v, offset) = Decode::decode(buf, in_tuple)?;
                 Ok((Element::Bytes(v), offset))
             }
             STRING => {
-                let (v, offset) = Decode::decode(buf)?;
+                let (v, offset) = Decode::decode(buf, in_tuple)?;
                 Ok((Element::String(v), offset))
             }
             FLOAT => {
-                let (v, offset) = Decode::decode(buf)?;
+                let (v, offset) = Decode::decode(buf, in_tuple)?;
                 Ok((Element::F32(v), offset))
             }
             DOUBLE => {
-                let (v, offset) = Decode::decode(buf)?;
+                let (v, offset) = Decode::decode(buf, in_tuple)?;
                 Ok((Element::F64(v), offset))
             }
             FALSE => Ok((Element::Bool(false), 1)),
             TRUE => Ok((Element::Bool(false), 1)),
             #[cfg(feature = "uuid")]
             UUID => {
-                let (v, offset) = Decode::decode(buf)?;
+                let (v, offset) = Decode::decode(buf, in_tuple)?;
                 Ok((Element::Uuid(v), offset))
             }
             NESTED => {
-                let (v, offset) = Decode::decode(buf)?;
+                let (v, offset) = Decode::decode(buf, in_tuple)?;
                 Ok((Element::Tuple(Tuple(v)), offset))
             }
             val => {
                 if val >= NEGINTSTART && val <= POSINTEND {
-                    let (v, offset) = Decode::decode(buf)?;
+                    let (v, offset) = Decode::decode(buf, in_tuple)?;
                     Ok((Element::I64(v), offset))
                 } else {
                     //TODO: Versionstamp, ...
@@ -625,10 +627,10 @@ mod tests {
     fn test_decode_nested() {
         use tuple::Decode;
 
-        assert!(Tuple::decode(&[NESTED]).is_err());
-        assert!(Tuple::decode(&[NESTED, NIL]).is_ok());
-        assert!(Tuple::decode(&[NESTED, INTZERO]).is_err());
-        assert!(Tuple::decode(&[NESTED, NIL, NESTED, NIL]).is_ok());
-        assert!(Tuple::decode(&[NESTED, NESTED, NESTED, NIL, NIL, NIL]).is_ok());
+        assert!(Tuple::decode(&[NESTED], false).is_err());
+        assert!(Tuple::decode(&[NESTED, NIL], false).is_ok());
+        assert!(Tuple::decode(&[NESTED, INTZERO], false).is_err());
+        assert!(Tuple::decode(&[NESTED, NIL, NESTED, NIL], false).is_ok());
+        assert!(Tuple::decode(&[NESTED, NESTED, NESTED, NIL, NIL, NIL], false).is_ok());
     }
 }
