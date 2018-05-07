@@ -355,7 +355,7 @@ impl StackMachine {
 
         let prefix = (self.prefix.clone(),);
         let f = db.transact(move |trx| {
-            let opt = transaction::RangeOptionBuilder::from_tuple(&prefix).build();
+            let opt = transaction::RangeOptionBuilder::from(&prefix).build();
             let instrs = Vec::new();
             let f = trx.get_ranges(opt)
                 .map_err(|(_opt, e)| e)
