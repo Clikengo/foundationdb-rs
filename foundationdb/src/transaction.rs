@@ -21,7 +21,7 @@ use future::*;
 use keyselector::*;
 use options;
 use subspace::Subspace;
-use tuple;
+use tuple::Encode;
 
 /// In FoundationDB, a transaction is a mutable snapshot of a database.
 ///
@@ -101,9 +101,9 @@ impl RangeOptionBuilder {
     }
 
     /// Create new builder with a tuple as a prefix
-    pub fn from_tuple<T>(tup: &T) -> Self
+    pub fn from_tuple<T>(tup: T) -> Self
     where
-        T: tuple::Encode + ?Sized,
+        T: Encode,
     {
         let (begin, end) = Subspace::from(tup).range();
 

@@ -76,8 +76,8 @@ pub trait Encode {
     }
 }
 
-impl<'a, E: Encode + ?Sized> From<&'a E> for Subspace {
-    fn from(encode: &'a E) -> Self {
+impl<E: Encode> From<E> for Subspace {
+    fn from(encode: E) -> Self {
         Subspace::new(encode)
     }
 }

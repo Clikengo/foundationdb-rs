@@ -37,13 +37,14 @@ impl Subspace {
     }
 
     /// Returns a new Subspace from the provided tuple encodable.
-    pub fn new<T: Encode + ?Sized>(t: &T) -> Self {
-        let prefix = Encode::encode_to_vec(t);
-        Self { prefix }
+    pub fn new<T: Encode>(t: T) -> Self {
+        Self {
+            prefix: t.encode_to_vec(),
+        }
     }
 
     /// Returns a new Subspace whose prefix extends this Subspace with a given tuple encodable.
-    pub fn subspace<T: Encode + ?Sized>(&self, t: &T) -> Self {
+    pub fn subspace<T: Encode>(&self, t: T) -> Self {
         Self {
             prefix: self.pack(t),
         }
@@ -56,8 +57,8 @@ impl Subspace {
 
     /// Returns the key encoding the specified Tuple with the prefix of this Subspace
     /// prepended.
-    pub fn pack<T: Encode + ?Sized>(&self, t: &T) -> Vec<u8> {
-        let mut packed = Encode::encode_to_vec(t);
+    pub fn pack<T: Encode>(&self, t: T) -> Vec<u8> {
+        let mut packed = t.encode_to_vec();
         let mut out = Vec::with_capacity(self.prefix.len() + packed.len());
         out.extend_from_slice(&self.prefix);
         out.append(&mut packed);
@@ -103,21 +104,21 @@ mod tests {
 
     #[test]
     fn sub() {
-        let ss0 = Subspace::new(&(1,));
-        let ss1 = ss0.subspace(&(2,));
+        let ss0 = Subspace::new((1,));
+        let ss1 = ss0.subspace((2,));
 
-        let ss2 = Subspace::new(&(1, 2));
+        let ss2 = Subspace::new((1, 2));
 
         assert_eq!(ss1.bytes(), ss2.bytes());
     }
 
     #[test]
     fn pack_unpack() {
-        let ss0 = Subspace::new(&(1,));
+        let ss0 = Subspace::new((1,));
         let tup = (2, 3);
 
         let packed = ss0.pack(&tup);
-        let expected = Encode::encode_to_vec(&(1, 2, 3));
+        let expected = (1, 2, 3).encode_to_vec();
         assert_eq!(expected, packed);
 
         let tup_unpack: (i64, i64) = ss0.unpack(&packed).unwrap();
@@ -128,23 +129,23 @@ mod tests {
 
     #[test]
     fn is_start_of() {
-        let ss0 = Subspace::new(&(1,));
-        let ss1 = Subspace::new(&(2,));
+        let ss0 = Subspace::new((1,));
+        let ss1 = Subspace::new((2,));
         let tup = (2, 3);
 
         assert!(ss0.is_start_of(&ss0.pack(&tup)));
         assert!(!ss1.is_start_of(&ss0.pack(&tup)));
-        assert!(Subspace::from(&"start").is_start_of(&"start".encode_to_vec()));
-        assert!(Subspace::from(&"start").is_start_of(&"start".to_string().encode_to_vec()));
-        assert!(!Subspace::from(&"start").is_start_of(&"starting".encode_to_vec()));
-        assert!(Subspace::from(&("start",)).is_start_of(&"start".encode_to_vec()));
-        assert!(Subspace::from(&"start").is_start_of(&("start", "end").encode_to_vec()));
-        assert!(Subspace::from(&("start", 42)).is_start_of(&("start", 42, "end").encode_to_vec()));
+        assert!(Subspace::from("start").is_start_of(&"start".encode_to_vec()));
+        assert!(Subspace::from("start").is_start_of(&"start".to_string().encode_to_vec()));
+        assert!(!Subspace::from("start").is_start_of(&"starting".encode_to_vec()));
+        assert!(Subspace::from(("start",)).is_start_of(&"start".encode_to_vec()));
+        assert!(Subspace::from("start").is_start_of(&("start", "end").encode_to_vec()));
+        assert!(Subspace::from(("start", 42)).is_start_of(&("start", 42, "end").encode_to_vec()));
     }
 
     #[test]
     fn unpack_malformed() {
-        let ss0 = Subspace::new(&((),));
+        let ss0 = Subspace::new(((),));
 
         let malformed = {
             let mut v = ss0.bytes().to_vec();
@@ -157,7 +158,7 @@ mod tests {
 
     #[test]
     fn range() {
-        let ss = Subspace::new(&(1,));
+        let ss = Subspace::new((1,));
         let tup = (2, 3);
         let packed = ss.pack(&tup);
 
