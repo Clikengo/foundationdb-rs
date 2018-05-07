@@ -106,8 +106,8 @@ mod tests {
 
     #[test]
     fn sub() {
-        let ss0: Subspace = (1,).into();
-        let ss1 = ss0.subspace((2,));
+        let ss0: Subspace = 1.into();
+        let ss1 = ss0.subspace(2);
 
         let ss2: Subspace = (1, 2).into();
 
@@ -116,7 +116,7 @@ mod tests {
 
     #[test]
     fn pack_unpack() {
-        let ss0: Subspace = (1,).into();
+        let ss0: Subspace = 1.into();
         let tup = (2, 3);
 
         let packed = ss0.pack(&tup);
@@ -131,8 +131,8 @@ mod tests {
 
     #[test]
     fn is_start_of() {
-        let ss0: Subspace = (1,).into();
-        let ss1: Subspace = (2,).into();
+        let ss0: Subspace = 1.into();
+        let ss1: Subspace = 2.into();
         let tup = (2, 3);
 
         assert!(ss0.is_start_of(&ss0.pack(&tup)));
@@ -160,7 +160,7 @@ mod tests {
 
     #[test]
     fn range() {
-        let ss: Subspace = (1,).into();
+        let ss: Subspace = 1.into();
         let tup = (2, 3);
         let packed = ss.pack(&tup);
 
