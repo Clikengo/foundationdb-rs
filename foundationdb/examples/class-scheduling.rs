@@ -21,7 +21,6 @@ use self::rand::{Rng, ThreadRng};
 use futures::future::{self, Future};
 
 use foundationdb as fdb;
-use foundationdb::error::Error;
 use foundationdb::transaction::RangeOptionBuilder;
 use foundationdb::tuple::{Decode, Encode};
 use foundationdb::{Cluster, Database, Subspace, Transaction};
@@ -144,7 +143,7 @@ fn ditch_trx(trx: &Transaction, student: &str, class: &str) {
 fn ditch(db: &Database, student: String, class: String) -> Result<(), failure::Error> {
     db.transact(move |trx| {
         ditch_trx(&trx, &student, &class);
-        future::result(Ok::<(), Error>(()))
+        future::result(Ok::<(), failure::Error>(()))
     }).wait()
         .map_err(|e| format_err!("error in signup: {}", e))
 }
@@ -193,9 +192,8 @@ fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(), failu
 }
 
 fn signup(db: &Database, student: String, class: String) -> Result<(), failure::Error> {
-    db.transact(move |trx| {
-        future::result(signup_trx(&trx, &student, &class).map_err(|e| Error::from_other(e)))
-    }).wait()
+    db.transact(move |trx| future::result(signup_trx(&trx, &student, &class)))
+        .wait()
         .map_err(|e| format_err!("error in signup: {}", e))
 }
 
@@ -226,7 +224,7 @@ fn perform_op(
     student_id: &str,
     all_classes: &[String],
     my_classes: &mut Vec<String>,
-) -> Result<(), Error> {
+) -> Result<(), failure::Error> {
     match mood {
         Mood::Add => {
             let class = rng.choose(all_classes).unwrap();
