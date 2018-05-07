@@ -131,7 +131,7 @@ pub mod network;
 /// Generated configuration types for use with the various `set_option` functions
 #[allow(missing_docs)]
 pub mod options;
-pub mod subspace;
+mod subspace;
 pub mod transaction;
 pub mod tuple;
 
@@ -139,8 +139,8 @@ pub mod tuple;
 pub use cluster::Cluster;
 pub use database::Database;
 pub use error::Error;
-pub use subspace::Subspace;
 pub use transaction::Transaction;
+pub use subspace::Subspace;
 
 /// Initialize the FoundationDB Client API, this can only be called once per process.
 ///
