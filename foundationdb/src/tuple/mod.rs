@@ -14,7 +14,6 @@ use std::ops::{Deref, DerefMut};
 use std::{self, io::Write, string::FromUtf8Error};
 
 pub use self::element::Element;
-use subspace::Subspace;
 
 /// Tuple encoding/decoding related errors
 #[derive(Debug, Fail)]
@@ -73,12 +72,6 @@ pub trait Encode {
         self.encode(&mut v)
             .expect("tuple encoding should never fail");
         v
-    }
-}
-
-impl<E: Encode> From<E> for Subspace {
-    fn from(encode: E) -> Self {
-        Subspace::new(encode)
     }
 }
 
