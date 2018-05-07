@@ -18,7 +18,7 @@ use futures::future::*;
 use futures::Future;
 
 use cluster::*;
-use error::{self, *};
+use error::{self, Error as FdbError, Result};
 use options;
 use transaction::*;
 
@@ -65,54 +65,40 @@ impl Database {
     /// It might retry indefinitely if the transaction is highly contentious. It is recommended to
     /// set `TransactionOption::RetryLimit` or `TransactionOption::SetTimeout` on the transaction
     /// if the task need to be guaranteed to finish.
-    pub fn transact<F, Fut, Item, E>(&self, f: F) -> Box<Future<Item = Fut::Item, Error = E>>
+    pub fn transact<F, Fut, Item, Error>(
+        &self,
+        f: F,
+    ) -> Box<Future<Item = Fut::Item, Error = Error>>
     where
         F: FnMut(Transaction) -> Fut + 'static,
-        Fut: Future<Item = Item, Error = E> + 'static,
+        Fut: IntoFuture<Item = Item, Error = Error> + 'static,
         Item: 'static,
-        E: From<Error> + Send + Sync + 'static,
+        Error: From<FdbError> + 'static,
     {
-        // This will be used to temporarily capture the internal error of the FnMut, F.
-        enum EitherError<E> {
-            Fdb(Error),
-            Other(E),
-        }
-
         let db = self.clone();
 
         let f = result(db.create_trx())
-            // capture any initial FdbError
-            .map_err(EitherError::Fdb)
+            .map_err(Error::from)
             .and_then(|trx| {
                 loop_fn((trx, f), |(trx, mut f)| {
                     let trx0 = trx.clone();
-                    f(trx.clone())
-                        .map_err(EitherError::Other)
-                        .and_then(move |res| {
-                            // try to commit the transaction
-                            trx0.commit().map(|_| res).map_err(EitherError::Fdb)
-                        })
-                        .then(|res| match res {
+                    f(trx.clone()).into_future().and_then(move |res| {
+                        // try to commit the transaction
+                        trx0.commit().map(|_| res).then(|res| match res {
                             Ok(v) => {
                                 // committed
                                 Ok(Loop::Break(v))
                             }
-                            Err(EitherError::Fdb(e)) => {
+                            Err(e) => {
                                 if e.should_retry() {
                                     Ok(Loop::Continue((trx, f)))
                                 } else {
-                                    Err(EitherError::Fdb(e))
+                                    Err(Error::from(e))
                                 }
                             }
-                            // Eearly return on internal error...
-                            Err(EitherError::Other(e)) => Err(EitherError::Other(e)),
                         })
+                    })
                 })
-            })
-            // finally unwrap any error into the final error result...
-            .map_err(|e| match e {
-                EitherError::Fdb(e) => E::from(e),
-                EitherError::Other(e) => e,
             });
 
         Box::new(f)
