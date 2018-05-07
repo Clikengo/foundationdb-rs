@@ -70,7 +70,7 @@ fn all_classes() -> Vec<String> {
 }
 
 fn init_classes(trx: &Transaction, all_classes: &[String]) {
-    let class_subspace = Subspace::from(&"class");
+    let class_subspace = Subspace::from("class");
     for class in all_classes {
         trx.set(&class_subspace.pack(class), &100_i64.encode_to_vec());
     }
@@ -78,8 +78,8 @@ fn init_classes(trx: &Transaction, all_classes: &[String]) {
 
 fn init(db: &Database, all_classes: &[String]) {
     let trx = db.create_trx().expect("could not create transaction");
-    trx.clear_subspace_range(&("attends",));
-    trx.clear_subspace_range(&("class",));
+    trx.clear_subspace_range(("attends",));
+    trx.clear_subspace_range(("class",));
     init_classes(&trx, all_classes);
 
     trx.commit().wait().expect("failed to initialize data");
@@ -88,7 +88,7 @@ fn init(db: &Database, all_classes: &[String]) {
 fn get_available_classes(db: &Database) -> Vec<String> {
     let trx = db.create_trx().expect("could not create transaction");
 
-    let range = RangeOptionBuilder::from_tuple(&"class");
+    let range = RangeOptionBuilder::from_tuple("class");
 
     trx.get_range(range.build(), 1_024)
         .and_then(|got_range| {
@@ -314,7 +314,7 @@ fn run_sim(db: &Database, students: usize, ops_per_student: usize) {
         thread.join().expect("failed to join thread");
 
         let student_id = format!("s{}", id);
-        let attends_range = RangeOptionBuilder::from_tuple(&("attends", &student_id)).build();
+        let attends_range = RangeOptionBuilder::from_tuple(("attends", &student_id)).build();
 
         for key_value in db.create_trx()
             .unwrap()
