@@ -238,39 +238,4 @@ mod tests {
 
         assert_eq!("string".encode_to_vec(), ("string",).encode_to_vec());
     }
-
-    #[test]
-    fn test_recursive_tuple() {
-        assert_eq!(
-            &("one", ("two", 42)).encode_to_vec(),
-            &[2, 111, 110, 101, 0, 2, 116, 119, 111, 0, 21, 42]
-        );
-        assert_eq!(
-            &("one", ("two", 42, ("three", 33))).encode_to_vec(),
-            &[
-                2, 111, 110, 101, 0, 2, 116, 119, 111, 0, 21, 42, 2, 116, 104, 114, 101, 101, 0,
-                21, 33,
-            ]
-        );
-
-        let two_decode = <(String, (String, i64))>::decode_full(&[
-            2, 111, 110, 101, 0, 2, 116, 119, 111, 0, 21, 42,
-        ]).expect("failed two");
-
-        // TODO: can we get eq for borrows of the inner types?
-        assert_eq!(("one".to_string(), ("two".to_string(), 42)), two_decode);
-
-        let three_decode = <(String, (String, i64, (String, i64)))>::decode_full(&[
-            2, 111, 110, 101, 0, 2, 116, 119, 111, 0, 21, 42, 2, 116, 104, 114, 101, 101, 0, 21,
-            33,
-        ]).expect("failed three");
-
-        assert_eq!(
-            &(
-                "one".to_string(),
-                ("two".to_string(), 42, ("three".to_string(), 33))
-            ),
-            &three_decode
-        );
-    }
 }
