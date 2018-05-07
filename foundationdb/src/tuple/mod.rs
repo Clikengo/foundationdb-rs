@@ -14,6 +14,8 @@ use std::ops::{Deref, DerefMut};
 use std::{self, io::Write, string::FromUtf8Error};
 
 pub use self::element::Element;
+use self::element::Type;
+use subspace::Subspace;
 
 /// Tuple encoding/decoding related errors
 #[derive(Debug, Fail)]
@@ -65,11 +67,11 @@ impl DerefMut for Tuple {
 /// For types that are encodable as defined by the tuple definitions on FoundationDB
 pub trait Encode {
     /// Encodes this tuple/elemnt into the associated Write
-    fn encode<W: Write>(&self, _w: &mut W) -> std::io::Result<()>;
+    fn encode<W: Write>(&self, _w: &mut W, in_tuple: bool) -> std::io::Result<()>;
     /// Encodes this tuple/elemnt into a new Vec
     fn to_vec(&self) -> Vec<u8> {
         let mut v = Vec::new();
-        self.encode(&mut v)
+        self.encode(&mut v, false)
             .expect("tuple encoding should never fail");
         v
     }
@@ -82,11 +84,11 @@ pub trait Decode: Sized {
     /// # Return
     ///
     /// Self and the offset of the next byte after Self in the byte slice
-    fn decode(buf: &[u8]) -> Result<(Self, usize)>;
+    fn decode(buf: &[u8], in_tuple: bool) -> Result<(Self, usize)>;
 
     /// Decodes returning Self only
     fn try_from(buf: &[u8]) -> Result<Self> {
-        let (val, offset) = Self::decode(buf)?;
+        let (val, offset) = Self::decode(buf, false)?;
         if offset != buf.len() {
             return Err(Error::InvalidData);
         }
@@ -102,10 +104,18 @@ macro_rules! tuple_impls {
                 $($name: Encode,)+
             {
                 #[allow(non_snake_case, unused_assignments, deprecated)]
-                fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+                fn encode<W: Write>(&self, w: &mut W, in_tuple: bool) -> std::io::Result<()> {
+                    if in_tuple {
+                        element::NESTED.write(w)?;
+                    }
+
                     $(
-                        self.$n.encode(w)?;
+                        self.$n.encode(w, true)?;
                     )*
+
+                    if in_tuple {
+                        element::NIL.write(w)?;
+                    }
                     Ok(())
                 }
             }
@@ -115,19 +125,33 @@ macro_rules! tuple_impls {
                 $($name: Decode + Default,)+
             {
                 #[allow(non_snake_case, unused_assignments, deprecated)]
-                fn decode(buf: &[u8]) -> Result<(Self, usize)> {
+                fn decode(buf: &[u8], in_tuple: bool) -> Result<(Self, usize)> {
                     let mut buf = buf;
                     let mut out: Self = Default::default();
                     let mut offset = 0_usize;
 
+                    if in_tuple {
+                        element::NESTED.expect(buf[0])?;
+                        offset += 1;
+                        buf = &buf[1..];
+                    }
+
                     $(
-                        let (v0, offset0) = $name::decode(buf)?;
+                        let (v0, offset0) = $name::decode(buf, true)?;
                         out.$n = v0;
                         offset += offset0;
                         buf = &buf[offset0..];
                     )*
 
-                    if !buf.is_empty() {
+                    if in_tuple {
+                        element::NIL.expect(buf[0])?;
+                        offset += 1;
+                        buf = &buf[1..];
+                    }
+
+                    // will not be empty if we're decoding as a tuple in a tuple
+                    //   (the outer tuple has more...)
+                    if !buf.is_empty() && !in_tuple {
                         return Err(Error::InvalidData);
                     }
 
@@ -154,21 +178,21 @@ tuple_impls! {
 }
 
 impl Encode for Tuple {
-    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+    fn encode<W: Write>(&self, w: &mut W, _in_tuple: bool) -> std::io::Result<()> {
         for element in self.0.iter() {
-            element.encode(w)?;
+            element.encode(w, true)?;
         }
         Ok(())
     }
 }
 
 impl Decode for Tuple {
-    fn decode(buf: &[u8]) -> Result<(Self, usize)> {
+    fn decode(buf: &[u8], _in_tuple: bool) -> Result<(Self, usize)> {
         let mut data = buf;
         let mut v = Vec::new();
         let mut offset = 0_usize;
         while !data.is_empty() {
-            let (s, len): (Element, _) = Element::decode(data)?;
+            let (s, len): (Element, _) = Element::decode(data, true)?;
             v.push(s);
             offset += len;
             data = &data[len..];
@@ -189,13 +213,13 @@ mod tests {
 
     #[test]
     fn test_malformed_int() {
-        assert!(Tuple::decode(&[21, 0]).is_ok());
-        assert!(Tuple::decode(&[22, 0]).is_err());
-        assert!(Tuple::decode(&[22, 0, 0]).is_ok());
+        assert!(Tuple::decode(&[21, 0], false).is_ok());
+        assert!(Tuple::decode(&[22, 0], false).is_err());
+        assert!(Tuple::decode(&[22, 0, 0], false).is_ok());
 
-        assert!(Tuple::decode(&[19, 0]).is_ok());
-        assert!(Tuple::decode(&[18, 0]).is_err());
-        assert!(Tuple::decode(&[18, 0, 0]).is_ok());
+        assert!(Tuple::decode(&[19, 0], false).is_ok());
+        assert!(Tuple::decode(&[18, 0], false).is_err());
+        assert!(Tuple::decode(&[18, 0, 0], false).is_ok());
     }
 
     #[test]
@@ -224,11 +248,46 @@ mod tests {
 
     #[test]
     fn test_eq() {
-        assert_eq!(
-            "string".to_vec(),
-            "string".to_string().to_vec()
-        );
+        assert_eq!("string".to_vec(), "string".to_string().to_vec());
 
         assert_eq!("string".to_vec(), ("string",).to_vec());
+    }
+
+    #[test]
+    fn test_encode_recursive_tuple() {
+        assert_eq!(
+            &("one", ("two", 42)).encode_to_vec(),
+            &[2, 111, 110, 101, 0, 5, 2, 116, 119, 111, 0, 21, 42, 0]
+        );
+        assert_eq!(
+            &("one", ("two", 42, ("three", 33))).encode_to_vec(),
+            &[
+                2, 111, 110, 101, 0, 5, 2, 116, 119, 111, 0, 21, 42, 5, 2, 116, 104, 114, 101, 101,
+                0, 21, 33, 0, 0,
+            ]
+        );
+    }
+
+    #[test]
+    fn test_decode_recursive_tuple() {
+        let two_decode = <(String, (String, i64))>::decode_full(&[
+            2, 111, 110, 101, 0, 5, 2, 116, 119, 111, 0, 21, 42, 0,
+        ]).expect("failed two");
+
+        // TODO: can we get eq for borrows of the inner types?
+        assert_eq!(("one".to_string(), ("two".to_string(), 42)), two_decode);
+
+        let three_decode = <(String, (String, i64, (String, i64)))>::decode_full(&[
+            2, 111, 110, 101, 0, 5, 2, 116, 119, 111, 0, 21, 42, 5, 2, 116, 104, 114, 101, 101, 0,
+            21, 33, 0, 0,
+        ]).expect("failed three");
+
+        assert_eq!(
+            &(
+                "one".to_string(),
+                ("two".to_string(), 42, ("three".to_string(), 33))
+            ),
+            &three_decode
+        );
     }
 }
