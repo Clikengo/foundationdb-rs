@@ -678,7 +678,7 @@ mod tests {
 
     #[test]
     fn test_option() {
-        assert_eq!(&Some(42_i64).encode_to_vec(), &[21, 42]);
-        assert_eq!(&None::<i64>.encode_to_vec(), &[0]);
+        assert_eq!(&Some(42_i64).to_vec(), &[21, 42]);
+        assert_eq!(&None::<i64>.to_vec(), &[0]);
     }
 }
