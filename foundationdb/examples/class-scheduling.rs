@@ -95,11 +95,11 @@ fn get_available_classes(db: &Database) -> Vec<String> {
             let mut available_classes = Vec::<String>::new();
 
             for key_value in got_range.key_values().as_ref() {
-                let count = i64::decode_full(key_value.value()).expect("failed to decode count");
+                let count = i64::try_from(key_value.value()).expect("failed to decode count");
 
                 if count > 0 {
                     let class =
-                        String::decode_full(key_value.key()).expect("failed to decode class");
+                        String::try_from(key_value.key()).expect("failed to decode class");
                     available_classes.push(class);
                 }
             }
@@ -125,7 +125,7 @@ fn ditch_trx(trx: &Transaction, student: &str, class: &str) {
     }
 
     let class_key = ("class", class).to_vec();
-    let available_seats: i64 = i64::decode_full(
+    let available_seats: i64 = i64::try_from(
         trx.get(&class_key, true)
             .wait()
             .expect("get failed")
@@ -161,7 +161,7 @@ fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(), failu
     }
 
     let class_key = ("class", class).to_vec();
-    let available_seats: i64 = i64::decode_full(
+    let available_seats: i64 = i64::try_from(
         trx.get(&class_key, true)
             .wait()
             .expect("get failed")
@@ -323,7 +323,7 @@ fn run_sim(db: &Database, students: usize, ops_per_student: usize) {
             .key_values()
             .into_iter()
         {
-            let (_, s, class) = <(String, String, String)>::decode_full(key_value.key()).unwrap();
+            let (_, s, class) = <(String, String, String)>::try_from(key_value.key()).unwrap();
             assert_eq!(student_id, s);
 
             println!("{} is taking: {}", student_id, class);

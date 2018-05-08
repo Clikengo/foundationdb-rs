@@ -176,7 +176,7 @@ impl Instr {
     fn from(data: &[u8]) -> Self {
         use InstrCode::*;
 
-        let tup: Tuple = Decode::decode_full(data).unwrap();
+        let tup: Tuple = Decode::try_from(data).unwrap();
         let cmd = match tup[0] {
             Element::String(ref s) => s.clone(),
             _ => panic!("unexpected instr"),
@@ -382,7 +382,7 @@ impl StackMachine {
         S: Decode,
     {
         let data = self.pop().data();
-        match Decode::decode_full(&data) {
+        match Decode::try_from(&data) {
             Ok(v) => v,
             Err(e) => {
                 panic!("failed to decode item {:?}: {:?}", data, e);
