@@ -212,13 +212,13 @@ mod tests {
 
     #[test]
     fn test_malformed_int() {
-        assert!(Tuple::decode(&[21, 0], 0).is_ok());
-        assert!(Tuple::decode(&[22, 0], 0).is_err());
-        assert!(Tuple::decode(&[22, 0, 0], 0).is_ok());
+        assert!(Tuple::try_from(&[21, 0]).is_ok());
+        assert!(Tuple::try_from(&[22, 0]).is_err());
+        assert!(Tuple::try_from(&[22, 0, 0]).is_ok());
 
-        assert!(Tuple::decode(&[19, 0], 0).is_ok());
-        assert!(Tuple::decode(&[18, 0], 0).is_err());
-        assert!(Tuple::decode(&[18, 0, 0], 0).is_ok());
+        assert!(Tuple::try_from(&[19, 0]).is_ok());
+        assert!(Tuple::try_from(&[18, 0]).is_err());
+        assert!(Tuple::try_from(&[18, 0, 0]).is_ok());
     }
 
     #[test]

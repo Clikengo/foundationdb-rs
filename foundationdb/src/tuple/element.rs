@@ -486,13 +486,12 @@ where
     T: Decode,
 {
     fn decode(buf: &[u8], tuple_depth: usize) -> Result<(Self, usize)> {
-        match buf[0] {
+        match *buf.get(0).ok_or(Error::EOF)? {
             NIL => {
-                let buf = &buf[1..];
-
                 // custom escape markers are only needed in Nested tuples...
                 if tuple_depth > 1 {
-                    ESCAPE.expect(buf[0])?;
+                    let byte = *buf.get(1).ok_or(Error::InvalidData)?;
+                    ESCAPE.expect(byte)?;
                     Ok((None, 2))
                 } else {
                     Ok((None, 1))
@@ -680,5 +679,15 @@ mod tests {
     fn test_option() {
         assert_eq!(&Some(42_i64).to_vec(), &[21, 42]);
         assert_eq!(&None::<i64>.to_vec(), &[0]);
+
+        assert_eq!(Some(42), Decode::try_from(&[21, 42]).expect("Some(42)"));
+        assert_eq!(None::<i64>, Decode::try_from(&[0]).expect("None::<i64>"));
+
+        assert!(<(i64, Option<i64>)>::try_from(&[0]).is_err());
+        assert!(<(i64, Option<i64>)>::try_from(&[21, 42, 0]).is_ok());
+        assert!(
+            // one of the inner Nones, is missing the final escape byte...
+            <(i64, (Option<i64>, Option<i64>))>::try_from(&[21, 42, 5, 0, 255, 0, 0]).is_err()
+        );
     }
 }
