@@ -75,7 +75,7 @@ impl Subspace {
             return Err(Error::InvalidData);
         }
         let key = &key[self.prefix.len()..];
-        Decode::decode_full(&key)
+        Decode::try_from(&key)
     }
 
     /// `is_start_of` returns true if the provided key starts with the prefix of this Subspace,

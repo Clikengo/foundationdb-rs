@@ -85,7 +85,7 @@ pub trait Decode: Sized {
     fn decode(buf: &[u8]) -> Result<(Self, usize)>;
 
     /// Decodes returning Self only
-    fn decode_full(buf: &[u8]) -> Result<Self> {
+    fn try_from(buf: &[u8]) -> Result<Self> {
         let (val, offset) = Self::decode(buf)?;
         if offset != buf.len() {
             return Err(Error::InvalidData);
@@ -200,14 +200,14 @@ mod tests {
 
     #[test]
     fn test_decode_tuple() {
-        assert_eq!((0, ()), Decode::decode_full(&[20, 0]).unwrap());
+        assert_eq!((0, ()), Decode::try_from(&[20, 0]).unwrap());
     }
 
     #[test]
     fn test_decode_tuple_ty() {
         let data: &[u8] = &[2, 104, 101, 108, 108, 111, 0, 1, 119, 111, 114, 108, 100, 0];
 
-        let (v1, v2): (String, Vec<u8>) = Decode::decode_full(data).unwrap();
+        let (v1, v2): (String, Vec<u8>) = Decode::try_from(data).unwrap();
         assert_eq!(v1, "hello");
         assert_eq!(v2, b"world");
     }
