@@ -78,8 +78,8 @@ fn init_classes(trx: &Transaction, all_classes: &[String]) {
 
 fn init(db: &Database, all_classes: &[String]) {
     let trx = db.create_trx().expect("could not create transaction");
-    trx.clear_subspace_range(&"attends");
-    trx.clear_subspace_range(&"class");
+    trx.clear_subspace_range("attends");
+    trx.clear_subspace_range("class");
     init_classes(&trx, all_classes);
 
     trx.commit().wait().expect("failed to initialize data");
@@ -98,8 +98,7 @@ fn get_available_classes(db: &Database) -> Vec<String> {
                 let count = i64::try_from(key_value.value()).expect("failed to decode count");
 
                 if count > 0 {
-                    let class =
-                        String::try_from(key_value.key()).expect("failed to decode class");
+                    let class = String::try_from(key_value.key()).expect("failed to decode class");
                     available_classes.push(class);
                 }
             }
