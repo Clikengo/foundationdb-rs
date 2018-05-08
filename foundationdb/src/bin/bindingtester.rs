@@ -360,7 +360,7 @@ impl StackMachine {
             let f = trx.get_ranges(opt)
                 .map_err(|(_opt, e)| e)
                 .fold(instrs, |mut instrs, res| {
-                    let kvs = res.keyvalues();
+                    let kvs = res.key_values();
 
                     for kv in kvs.as_ref() {
                         let instr = Instr::from(kv.value());
@@ -587,7 +587,7 @@ impl StackMachine {
                 let f = trx.get_ranges(opt)
                     .map_err(|(_, e)| e)
                     .fold(out, move |mut out, res| {
-                        let kvs = res.keyvalues();
+                        let kvs = res.key_values();
 
                         debug!("range: len={:?}", kvs.as_ref().len());
 

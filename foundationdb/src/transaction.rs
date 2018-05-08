@@ -689,7 +689,7 @@ impl Future for TrxGetKey {
 
 /// Represents the data of a `Transaction::get_range`. The result might not contains all results
 /// specified by `Transaction::get_range`. A caller can test if the result is complete by either
-/// checking `GetRangeResult::keyvalues().more()` is `true`, or checking `GetRangeResult::next` is
+/// checking `GetRangeResult::key_values().more()` is `true`, or checking `GetRangeResult::next` is
 /// not `None`.
 /// If a caller wants to fetch all matching results, they should call `Transcation::get_range` with
 /// following `RangeOption` returned by `GetRangeResult::next`. The caller might want to use
@@ -709,7 +709,7 @@ impl GetRangeResult {
     }
 
     /// Returns the values associated with this get
-    pub fn keyvalues(&self) -> KeyValues {
+    pub fn key_values(&self) -> KeyValues {
         self.inner.get_keyvalue_array().unwrap()
     }
 
@@ -717,7 +717,7 @@ impl GetRangeResult {
     /// to fetch. In this case, user can fetch remaining results by calling
     /// `Transaction::get_range` with returned `RangeOption`.
     pub fn next(&self) -> Option<RangeOption> {
-        let kva = self.keyvalues();
+        let kva = self.key_values();
         if !kva.more() {
             return None;
         }

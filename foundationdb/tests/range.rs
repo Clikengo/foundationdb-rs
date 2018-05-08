@@ -46,7 +46,7 @@ fn test_get_range() {
             trx.get_ranges(opt)
                 .map_err(|(_opt, e)| e)
                 .fold(0, |count, item| {
-                    let kvs = item.keyvalues();
+                    let kvs = item.key_values();
                     Ok::<_, Error>(count + kvs.as_ref().len())
                 })
                 .map(|count| {

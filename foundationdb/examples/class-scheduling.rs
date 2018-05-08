@@ -94,8 +94,7 @@ fn get_available_classes(db: &Database) -> Vec<String> {
         .and_then(|got_range| {
             let mut available_classes = Vec::<String>::new();
 
-            // TODO: change keyvalues to key_values
-            for key_value in got_range.keyvalues().as_ref() {
+            for key_value in got_range.key_values().as_ref() {
                 let count = i64::decode_full(key_value.value()).expect("failed to decode count");
 
                 if count > 0 {
@@ -179,7 +178,7 @@ fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(), failu
     if trx.get_range(attends_range, 1_024)
         .wait()
         .expect("get_range failed")
-        .keyvalues()
+        .key_values()
         .len() >= 5
     {
         bail!("Too many classes");
@@ -321,7 +320,7 @@ fn run_sim(db: &Database, students: usize, ops_per_student: usize) {
             .get_range(attends_range, 1_024)
             .wait()
             .expect("get_range failed")
-            .keyvalues()
+            .key_values()
             .into_iter()
         {
             let (_, s, class) = <(String, String, String)>::decode_full(key_value.key()).unwrap();
