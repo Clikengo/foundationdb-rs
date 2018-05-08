@@ -36,6 +36,25 @@ pub enum Error {
     FromUtf8Error(FromUtf8Error),
 }
 
+/// Tracks the depth of a Tuple decoding chain
+#[derive(Copy, Clone)]
+pub struct TupleDepth(usize);
+
+impl TupleDepth {
+    fn new() -> Self {
+        TupleDepth(0)
+    }
+
+    fn increment(&self) -> Self {
+        TupleDepth(self.0 + 1)
+    }
+
+    /// returns the current depth in any recursive tuple processing
+    pub fn depth(&self) -> usize {
+        self.0
+    }
+}
+
 /// A result with tuple::Error defined
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -66,11 +85,17 @@ impl DerefMut for Tuple {
 /// For types that are encodable as defined by the tuple definitions on FoundationDB
 pub trait Encode {
     /// Encodes this tuple/elemnt into the associated Write
-    fn encode<W: Write>(&self, _w: &mut W, tuple_depth: usize) -> std::io::Result<()>;
+    fn encode<W: Write>(&self, _w: &mut W, tuple_depth: TupleDepth) -> std::io::Result<()>;
+
+    /// Encodes this tuple/elemnt into the associated Write
+    fn encode_to<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+        self.encode(w, TupleDepth::new())
+    }
+
     /// Encodes this tuple/elemnt into a new Vec
     fn to_vec(&self) -> Vec<u8> {
         let mut v = Vec::new();
-        self.encode(&mut v, 0)
+        self.encode_to(&mut v)
             .expect("tuple encoding should never fail");
         v
     }
@@ -80,14 +105,20 @@ pub trait Encode {
 pub trait Decode: Sized {
     /// Decodes Self from the byte slice
     ///
+    fn decode(buf: &[u8], tuple_depth: TupleDepth) -> Result<(Self, usize)>;
+
+    /// Decodes Self from the byte slice
+    ///
     /// # Return
     ///
     /// Self and the offset of the next byte after Self in the byte slice
-    fn decode(buf: &[u8], tuple_depth: usize) -> Result<(Self, usize)>;
+    fn decode_from(buf: &[u8]) -> Result<(Self, usize)> {
+        Self::decode(buf, TupleDepth::new())
+    }
 
     /// Decodes returning Self only
     fn try_from(buf: &[u8]) -> Result<Self> {
-        let (val, offset) = Self::decode(buf, 0)?;
+        let (val, offset) = Self::decode_from(buf)?;
         if offset != buf.len() {
             return Err(Error::InvalidData);
         }
@@ -103,16 +134,16 @@ macro_rules! tuple_impls {
                 $($name: Encode,)+
             {
                 #[allow(non_snake_case, unused_assignments, deprecated)]
-                fn encode<W: Write>(&self, w: &mut W, tuple_depth: usize) -> std::io::Result<()> {
-                    if tuple_depth > 0 {
+                fn encode<W: Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> std::io::Result<()> {
+                    if tuple_depth.depth() > 0 {
                         element::NESTED.write(w)?;
                     }
 
                     $(
-                        self.$n.encode(w, tuple_depth + 1)?;
+                        self.$n.encode(w, tuple_depth.increment())?;
                     )*
 
-                    if tuple_depth > 0 {
+                    if tuple_depth.depth() > 0 {
                         element::NIL.write(w)?;
                     }
                     Ok(())
@@ -124,25 +155,25 @@ macro_rules! tuple_impls {
                 $($name: Decode + Default,)+
             {
                 #[allow(non_snake_case, unused_assignments, deprecated)]
-                fn decode(buf: &[u8], tuple_depth: usize) -> Result<(Self, usize)> {
+                fn decode(buf: &[u8], tuple_depth: TupleDepth) -> Result<(Self, usize)> {
                     let mut buf = buf;
                     let mut out: Self = Default::default();
                     let mut offset = 0_usize;
 
-                    if tuple_depth > 0{
+                    if tuple_depth.depth() > 0{
                         element::NESTED.expect(buf[0])?;
                         offset += 1;
                         buf = &buf[1..];
                     }
 
                     $(
-                        let (v0, offset0) = $name::decode(buf, tuple_depth + 1)?;
+                        let (v0, offset0) = $name::decode(buf, tuple_depth.increment())?;
                         out.$n = v0;
                         offset += offset0;
                         buf = &buf[offset0..];
                     )*
 
-                    if tuple_depth > 0 {
+                    if tuple_depth.depth() > 0 {
                         element::NIL.expect(buf[0])?;
                         offset += 1;
                         buf = &buf[1..];
@@ -150,7 +181,7 @@ macro_rules! tuple_impls {
 
                     // will not be empty if we're decoding as a tuple in a tuple
                     //   (the outer tuple has more...)
-                    if !buf.is_empty() && tuple_depth == 0 {
+                    if !buf.is_empty() && tuple_depth.depth() == 0 {
                         return Err(Error::InvalidData);
                     }
 
@@ -177,21 +208,21 @@ tuple_impls! {
 }
 
 impl Encode for Tuple {
-    fn encode<W: Write>(&self, w: &mut W, tuple_depth: usize) -> std::io::Result<()> {
+    fn encode<W: Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> std::io::Result<()> {
         for element in self.0.iter() {
-            element.encode(w, tuple_depth + 1)?;
+            element.encode(w, tuple_depth.increment())?;
         }
         Ok(())
     }
 }
 
 impl Decode for Tuple {
-    fn decode(buf: &[u8], tuple_depth: usize) -> Result<(Self, usize)> {
+    fn decode(buf: &[u8], tuple_depth: TupleDepth) -> Result<(Self, usize)> {
         let mut data = buf;
         let mut v = Vec::new();
         let mut offset = 0_usize;
         while !data.is_empty() {
-            let (s, len): (Element, _) = Element::decode(data, tuple_depth + 1)?;
+            let (s, len): (Element, _) = Element::decode(data, tuple_depth.increment())?;
             v.push(s);
             offset += len;
             data = &data[len..];
