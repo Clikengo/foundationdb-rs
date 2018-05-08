@@ -20,7 +20,8 @@ use error::{self, *};
 use future::*;
 use keyselector::*;
 use options;
-use tuple;
+use subspace::Subspace;
+use tuple::Encode;
 
 /// In FoundationDB, a transaction is a mutable snapshot of a database.
 ///
@@ -90,6 +91,18 @@ impl<'a> Default for RangeOption {
 
 /// A Builder with which options need to used for a range query.
 pub struct RangeOptionBuilder(RangeOption);
+
+impl<T: Encode> From<T> for RangeOptionBuilder {
+    fn from(t: T) -> Self {
+        let (begin, end) = Subspace::from(t).range();
+
+        Self::new(
+            KeySelector::first_greater_or_equal(&begin),
+            KeySelector::first_greater_or_equal(&end),
+        )
+    }
+}
+
 impl RangeOptionBuilder {
     /// Creates new builder with given key selectors.
     pub fn new(begin: KeySelector, end: KeySelector) -> Self {
@@ -97,24 +110,6 @@ impl RangeOptionBuilder {
         opt.begin = begin.to_owned();
         opt.end = end.to_owned();
         RangeOptionBuilder(opt)
-    }
-
-    /// Create new builder with a tuple as a prefix
-    pub fn from_tuple<T>(tup: &T) -> Self
-    where
-        T: tuple::Encode,
-    {
-        let bytes = tuple::Encode::encode_to_vec(tup);
-        let mut begin = bytes.clone();
-        begin.push(0x00);
-
-        let mut end = bytes;
-        end.push(0xff);
-
-        Self::new(
-            KeySelector::first_greater_or_equal(&begin),
-            KeySelector::first_greater_or_equal(&end),
-        )
     }
 
     /// If non-zero, indicates the maximum number of key-value pairs to return.
@@ -368,6 +363,13 @@ impl Transaction {
         }
     }
 
+    /// Clears all keys based on the range of the Subspace
+    pub fn clear_subspace_range<S: Into<Subspace>>(&self, subspace: S) {
+        let subspace = subspace.into();
+        let range = subspace.range();
+        self.clear_range(&range.0, &range.1)
+    }
+
     /// Attempts to commit the sets and clears previously applied to the database snapshot represented by transaction to the actual database.
     ///
     /// The commit may or may not succeed – in particular, if a conflicting transaction previously committed, then the commit must fail in order to preserve transactional isolation. If the commit does succeed, the transaction is durably committed to the database and all subsequently started transactions will observe its effects.
@@ -560,7 +562,7 @@ impl Transaction {
     /// The API is exposed mainly for `bindingtester`, and it is not recommended to call the API
     /// directly from application. Use `Database::transact` instead.
     #[doc(hidden)]
-    pub fn on_error(&self, error: FdbError) -> TrxErrFuture {
+    pub fn on_error(&self, error: Error) -> TrxErrFuture {
         TrxErrFuture::new(self.clone(), error)
     }
 
@@ -639,7 +641,7 @@ pub struct TrxGet {
 }
 impl Future for TrxGet {
     type Item = GetResult;
-    type Error = FdbError;
+    type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         match self.inner.poll() {
@@ -673,7 +675,7 @@ pub struct TrxGetKey {
 }
 impl Future for TrxGetKey {
     type Item = GetKeyResult;
-    type Error = FdbError;
+    type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         match self.inner.poll() {
@@ -686,7 +688,7 @@ impl Future for TrxGetKey {
 
 /// Represents the data of a `Transaction::get_range`. The result might not contains all results
 /// specified by `Transaction::get_range`. A caller can test if the result is complete by either
-/// checking `GetRangeResult::keyvalues().more()` is `true`, or checking `GetRangeResult::next` is
+/// checking `GetRangeResult::key_values().more()` is `true`, or checking `GetRangeResult::next` is
 /// not `None`.
 /// If a caller wants to fetch all matching results, they should call `Transcation::get_range` with
 /// following `RangeOption` returned by `GetRangeResult::next`. The caller might want to use
@@ -706,7 +708,7 @@ impl GetRangeResult {
     }
 
     /// Returns the values associated with this get
-    pub fn keyvalues(&self) -> KeyValues {
+    pub fn key_values(&self) -> KeyValues {
         self.inner.get_keyvalue_array().unwrap()
     }
 
@@ -714,7 +716,7 @@ impl GetRangeResult {
     /// to fetch. In this case, user can fetch remaining results by calling
     /// `Transaction::get_range` with returned `RangeOption`.
     pub fn next(&self) -> Option<RangeOption> {
-        let kva = self.keyvalues();
+        let kva = self.key_values();
         if !kva.more() {
             return None;
         }
@@ -752,7 +754,7 @@ pub struct TrxGetRange {
 
 impl Future for TrxGetRange {
     type Item = GetRangeResult;
-    type Error = FdbError;
+    type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         match self.inner.poll() {
@@ -794,7 +796,7 @@ impl RangeStream {
 
 impl<'a> Stream for RangeStream {
     type Item = GetRangeResult;
-    type Error = (RangeOption, FdbError);
+    type Error = (RangeOption, Error);
 
     fn poll(&mut self) -> std::result::Result<Async<Option<Self::Item>>, Self::Error> {
         if self.inner.is_none() {
@@ -826,7 +828,7 @@ pub struct TrxCommit {
 
 impl Future for TrxCommit {
     type Item = Transaction;
-    type Error = FdbError;
+    type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         match self.inner.poll() {
@@ -860,7 +862,7 @@ pub struct TrxGetAddressesForKey {
 }
 impl Future for TrxGetAddressesForKey {
     type Item = GetAddressResult;
-    type Error = FdbError;
+    type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         match self.inner.poll() {
@@ -879,7 +881,7 @@ pub struct TrxWatch {
 }
 impl Future for TrxWatch {
     type Item = ();
-    type Error = FdbError;
+    type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         match self.inner.poll() {
@@ -910,7 +912,7 @@ pub struct TrxVersionstamp {
 }
 impl Future for TrxVersionstamp {
     type Item = Versionstamp;
-    type Error = FdbError;
+    type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         match self.inner.poll() {
@@ -938,7 +940,7 @@ pub struct TrxReadVersion {
 
 impl Future for TrxReadVersion {
     type Item = i64;
-    type Error = FdbError;
+    type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         match self.inner.poll() {
@@ -971,7 +973,7 @@ impl NonTrxFuture {
 
 impl Future for NonTrxFuture {
     type Item = FdbFutureResult;
-    type Error = FdbError;
+    type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         self.inner.poll()
@@ -984,10 +986,10 @@ pub struct TrxErrFuture {
     // undering transaction should be retried, and resolved to `Err(e)` if the error should be
     // reported to the user without retry.
     inner: NonTrxFuture,
-    err: Option<FdbError>,
+    err: Option<Error>,
 }
 impl TrxErrFuture {
-    fn new(trx: Transaction, err: FdbError) -> Self {
+    fn new(trx: Transaction, err: Error) -> Self {
         let inner = unsafe { fdb::fdb_transaction_on_error(trx.inner.inner, err.code()) };
 
         Self {
@@ -998,8 +1000,8 @@ impl TrxErrFuture {
 }
 
 impl Future for TrxErrFuture {
-    type Item = FdbError;
-    type Error = FdbError;
+    type Item = Error;
+    type Error = Error;
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         match self.inner.poll() {
             Ok(Async::Ready(_res)) => {
@@ -1036,7 +1038,7 @@ impl TrxFuture {
 
 impl Future for TrxFuture {
     type Item = (Transaction, FdbFutureResult);
-    type Error = FdbError;
+    type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         if self.f_err.is_none() {

@@ -10,14 +10,15 @@
 //!
 //! https://apple.github.io/foundationdb/api-c.html#database
 
-use foundationdb_sys as fdb;
-use futures::future::*;
-use futures::Future;
 use std;
 use std::sync::Arc;
 
+use foundationdb_sys as fdb;
+use futures::future::*;
+use futures::Future;
+
 use cluster::*;
-use error::{self, *};
+use error::{self, Error as FdbError, Result};
 use options;
 use transaction::*;
 
@@ -64,37 +65,41 @@ impl Database {
     /// It might retry indefinitely if the transaction is highly contentious. It is recommended to
     /// set `TransactionOption::RetryLimit` or `TransactionOption::SetTimeout` on the transaction
     /// if the task need to be guaranteed to finish.
-    pub fn transact<F, Fut, Item>(&self, f: F) -> Box<Future<Item = Fut::Item, Error = FdbError>>
+    pub fn transact<F, Fut, Item, Error>(
+        &self,
+        f: F,
+    ) -> Box<Future<Item = Fut::Item, Error = Error>>
     where
         F: FnMut(Transaction) -> Fut + 'static,
-        Fut: Future<Item = Item, Error = FdbError> + 'static,
+        Fut: IntoFuture<Item = Item, Error = Error> + 'static,
         Item: 'static,
+        Error: From<FdbError> + 'static,
     {
         let db = self.clone();
 
-        let f = result(db.create_trx()).and_then(|trx| {
-            loop_fn((trx, f), |(trx, mut f)| {
-                let trx0 = trx.clone();
-                f(trx.clone())
-                    .and_then(move |res| {
+        let f = result(db.create_trx())
+            .map_err(Error::from)
+            .and_then(|trx| {
+                loop_fn((trx, f), |(trx, mut f)| {
+                    let trx0 = trx.clone();
+                    f(trx.clone()).into_future().and_then(move |res| {
                         // try to commit the transaction
-                        trx0.commit().map(|_| res)
-                    })
-                    .then(|res| match res {
-                        Ok(v) => {
-                            // committed
-                            Ok(Loop::Break(v))
-                        }
-                        Err(e) => {
-                            if e.should_retry() {
-                                Ok(Loop::Continue((trx, f)))
-                            } else {
-                                Err(e)
+                        trx0.commit().map(|_| res).then(|res| match res {
+                            Ok(v) => {
+                                // committed
+                                Ok(Loop::Break(v))
                             }
-                        }
+                            Err(e) => {
+                                if e.should_retry() {
+                                    Ok(Loop::Continue((trx, f)))
+                                } else {
+                                    Err(Error::from(e))
+                                }
+                            }
+                        })
                     })
-            })
-        });
+                })
+            });
 
         Box::new(f)
     }

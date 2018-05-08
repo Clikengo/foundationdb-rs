@@ -6,7 +6,7 @@ extern crate log;
 
 use std::collections::HashMap;
 
-use fdb::error::FdbError;
+use fdb::error::Error;
 use fdb::keyselector::KeySelector;
 use fdb::tuple::*;
 use fdb::*;
@@ -176,8 +176,8 @@ impl Instr {
     fn from(data: &[u8]) -> Self {
         use InstrCode::*;
 
-        let tup: Tuple = Decode::decode_full(data).unwrap();
-        let cmd = match tup.0[0] {
+        let tup: Tuple = Decode::try_from(data).unwrap();
+        let cmd = match tup[0] {
             Element::String(ref s) => s.clone(),
             _ => panic!("unexpected instr"),
         };
@@ -191,7 +191,7 @@ impl Instr {
 
         let code = match cmd {
             "PUSH" => {
-                let data = tup.0[1].encode_to_vec();
+                let data = tup[1].to_vec();
                 Push(data)
             }
             "DUP" => Dup,
@@ -251,7 +251,7 @@ impl Instr {
     }
 }
 
-type StackFuture = Box<Future<Item = (Transaction, Vec<u8>), Error = FdbError>>;
+type StackFuture = Box<Future<Item = (Transaction, Vec<u8>), Error = Error>>;
 struct StackItem {
     number: usize,
     // TODO: enum
@@ -280,13 +280,13 @@ impl StackItem {
 
         //TODO: wait
         match self.fut.unwrap().wait() {
-            Ok((_trx, data)) => data.encode_to_vec(),
+            Ok((_trx, data)) => data.to_vec(),
             Err(e) => {
                 let code = format!("{}", e.code());
                 let tup = (b"ERROR".to_vec(), code.into_bytes());
                 debug!("ERROR: {:?}", e);
-                let bytes = tup.encode_to_vec();
-                bytes.encode_to_vec()
+                let bytes = tup.to_vec();
+                bytes.to_vec()
             }
         }
     }
@@ -350,23 +350,23 @@ impl StackMachine {
         }
     }
 
-    fn fetch_instr(&self) -> Box<Future<Item = Vec<Instr>, Error = FdbError>> {
+    fn fetch_instr(&self) -> Box<Future<Item = Vec<Instr>, Error = Error>> {
         let db = self.db.clone();
 
         let prefix = (self.prefix.clone(),);
         let f = db.transact(move |trx| {
-            let opt = transaction::RangeOptionBuilder::from_tuple(&prefix).build();
+            let opt = transaction::RangeOptionBuilder::from(&prefix).build();
             let instrs = Vec::new();
             let f = trx.get_ranges(opt)
                 .map_err(|(_opt, e)| e)
                 .fold(instrs, |mut instrs, res| {
-                    let kvs = res.keyvalues();
+                    let kvs = res.key_values();
 
                     for kv in kvs.as_ref() {
                         let instr = Instr::from(kv.value());
                         instrs.push(instr);
                     }
-                    Ok(instrs)
+                    Ok::<_, Error>(instrs)
                 });
             f
         });
@@ -382,7 +382,7 @@ impl StackMachine {
         S: Decode,
     {
         let data = self.pop().data();
-        match Decode::decode_full(&data) {
+        match Decode::try_from(&data) {
             Ok(v) => v,
             Err(e) => {
                 panic!("failed to decode item {:?}: {:?}", data, e);
@@ -406,7 +406,7 @@ impl StackMachine {
     where
         S: Encode,
     {
-        let data = s.encode_to_vec();
+        let data = s.to_vec();
         self.push(number, data);
     }
 
@@ -420,7 +420,7 @@ impl StackMachine {
 
     fn push_fut<F>(&mut self, number: usize, fut: F)
     where
-        F: Future<Item = (Transaction, Vec<u8>), Error = FdbError> + 'static,
+        F: Future<Item = (Transaction, Vec<u8>), Error = Error> + 'static,
     {
         let item = StackItem {
             number,
@@ -494,7 +494,7 @@ impl StackMachine {
             OnError => {
                 let code: i64 = self.pop_item();
                 let trx0 = trx.clone();
-                let f = trx.on_error(FdbError::from(code as i32))
+                let f = trx.on_error(Error::from(code as i32))
                     .map(move |_| (trx0, b"RESULT_NOT_PRESENT".to_vec()));
                 self.push_fut(number, f);
             }
@@ -587,7 +587,7 @@ impl StackMachine {
                 let f = trx.get_ranges(opt)
                     .map_err(|(_, e)| e)
                     .fold(out, move |mut out, res| {
-                        let kvs = res.keyvalues();
+                        let kvs = res.key_values();
 
                         debug!("range: len={:?}", kvs.as_ref().len());
 
@@ -603,7 +603,7 @@ impl StackMachine {
                             key.to_vec().encode(&mut out).expect("failed to encode");
                             value.to_vec().encode(&mut out).expect("failed to encode");
                         }
-                        Ok(out)
+                        Ok::<_, Error>(out)
                     })
                     .map(|out| (trx0, out));
 
@@ -723,7 +723,7 @@ impl StackMachine {
 
                 while !data.is_empty() {
                     let (val, offset): (Element, _) = Decode::decode(data).unwrap();
-                    let bytes = val.encode_to_vec();
+                    let bytes = val.to_vec();
                     self.push_item(number, &bytes);
                     data = &data[offset..];
                 }

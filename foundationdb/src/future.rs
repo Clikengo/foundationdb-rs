@@ -15,12 +15,13 @@
 //! The Rust API Client has been implemented to use the Rust futures crate, and should work within that ecosystem (suchas Tokio). See Rust [futures](https://docs.rs/crate/futures/0.1.21) documentation.
 
 use std;
+use std::ops::Deref;
 
 use foundationdb_sys as fdb;
 use futures;
 use futures::Async;
 
-use error::{self, FdbError, Result};
+use error::{self, Error, Result};
 
 /// An opaque type that represents a Future in the FoundationDB C API.
 pub(crate) struct FdbFuture {
@@ -50,7 +51,7 @@ impl Drop for FdbFuture {
 
 impl futures::Future for FdbFuture {
     type Item = FdbFutureResult;
-    type Error = FdbError;
+    type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         let f = self.f.expect("cannot poll after resolve");
@@ -96,6 +97,7 @@ pub struct KeyValues<'a> {
     keyvalues: &'a [KeyValue<'a>],
     more: bool,
 }
+
 impl<'a> KeyValues<'a> {
     /// Returns true if (but not necessarily only if) values remain in the key range requested
     /// (possibly beyond the limits requested).
@@ -103,9 +105,11 @@ impl<'a> KeyValues<'a> {
         self.more
     }
 }
-//TODO: maybe `as_slice()` for just `keyvalues()`? `as_ref()` is not intuitive in this case...
-impl<'a> AsRef<[KeyValue<'a>]> for KeyValues<'a> {
-    fn as_ref(&self) -> &[KeyValue<'a>] {
+
+impl<'a> Deref for KeyValues<'a> {
+    type Target = [KeyValue<'a>];
+
+    fn deref(&self) -> &Self::Target {
         self.keyvalues
     }
 }

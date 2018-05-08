@@ -3,7 +3,7 @@ use std::{self, io::Write};
 use uuid::Uuid;
 
 use byteorder::{self, ByteOrder};
-use tuple::{Tuple, Decode, Encode, Error, Result};
+use tuple::{Decode, Encode, Error, Result, Tuple};
 
 /// Various tuple types
 const NIL: u8 = 0x00;
@@ -34,17 +34,26 @@ const SIZE_LIMITS: &[i64] = &[
     (1 << (7 * 8)) - 1,
 ];
 
+/// A single tuple element
 #[derive(Clone, Debug, PartialEq)]
-pub enum Element<'a> {
+pub enum Element {
+    /// Corresponse with nothing, ie the Nil byte
     Empty,
+    /// A sequence of bytes to be written to the stream
     Bytes(Vec<u8>),
-    Str(&'a str),
+    /// A string
     String(String),
-    Tuple(Tuple<'a>),
+    /// A recursive Tuple
+    Tuple(Tuple),
+    /// An i64
     I64(i64),
+    /// An f32
     F32(f32),
+    /// An f64
     F64(f64),
+    /// A bool
     Bool(bool),
+    /// A UUID, requires the uuid feature/library
     #[cfg(feature = "uuid")]
     Uuid(Uuid),
     #[doc(hidden)]
@@ -73,7 +82,7 @@ fn encode_bytes<W: Write>(w: &mut W, buf: &[u8]) -> std::io::Result<()> {
 }
 
 fn decode_bytes(buf: &[u8]) -> Result<(Vec<u8>, usize)> {
-    let mut out = Vec::<u8>::new();
+    let mut out = Vec::<u8>::with_capacity(buf.len());
     let mut offset = 0;
     loop {
         if offset >= buf.len() {
@@ -145,6 +154,12 @@ impl Type for u8 {
 
     fn write<W: Write>(self, w: &mut W) -> std::io::Result<()> {
         w.write_all(&[self])
+    }
+}
+
+impl<'a, T: Encode> Encode for &'a T {
+    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+        T::encode(self, w)
     }
 }
 
@@ -240,7 +255,7 @@ impl Decode for String {
     }
 }
 
-impl<'a> Encode for Vec<Element<'a>> {
+impl Encode for Vec<Element> {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         NESTED.write(w)?;
         for v in self {
@@ -260,7 +275,7 @@ impl<'a> Encode for Vec<Element<'a>> {
     }
 }
 
-impl<'a> Decode for Vec<Element<'a>> {
+impl Decode for Vec<Element> {
     fn decode(mut buf: &[u8]) -> Result<(Self, usize)> {
         if buf.len() < 2 {
             return Err(Error::EOF);
@@ -296,6 +311,13 @@ impl<'a> Decode for Vec<Element<'a>> {
 
         // skip the final null
         Ok((tuples, len - buf.len()))
+    }
+}
+
+impl<'a> Encode for &'a [u8] {
+    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+        BYTES.write(w)?;
+        encode_bytes(w, self)
     }
 }
 
@@ -437,14 +459,13 @@ impl Decode for i64 {
     }
 }
 
-impl<'a> Encode for Element<'a> {
+impl Encode for Element {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         use self::Element::*;
 
         match *self {
             Empty => Encode::encode(&(), w),
             Bytes(ref v) => Encode::encode(v, w),
-            Str(ref v) => Encode::encode(v, w),
             String(ref v) => Encode::encode(v, w),
             Tuple(ref v) => Encode::encode(&v.0, w),
             I64(ref v) => Encode::encode(v, w),
@@ -461,7 +482,7 @@ impl<'a> Encode for Element<'a> {
     }
 }
 
-impl<'a> Decode for Element<'a> {
+impl Decode for Element {
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         if buf.is_empty() {
             return Err(Error::EOF);
@@ -519,8 +540,8 @@ mod tests {
     where
         S: Encode + Decode + std::fmt::Debug + PartialEq,
     {
-        assert_eq!(val, Decode::decode_full(buf).unwrap());
-        assert_eq!(buf, Encode::encode_to_vec(&val).as_slice());
+        assert_eq!(val, Decode::try_from(buf).unwrap());
+        assert_eq!(buf, Encode::to_vec(&val).as_slice());
     }
 
     #[test]
@@ -556,15 +577,15 @@ mod tests {
         test_round_trip(1.6f64, &[33, 191, 249, 153, 153, 153, 153, 153, 154]);
 
         // string
-        test_round_trip("hello".to_string(), &[2, 104, 101, 108, 108, 111, 0]);
+        test_round_trip(String::from("hello"), &[2, 104, 101, 108, 108, 111, 0]);
 
         // binary
         test_round_trip(b"hello".to_vec(), &[1, 104, 101, 108, 108, 111, 0]);
         test_round_trip(vec![0], &[1, 0, 0xff, 0]);
         test_round_trip(
             Element::Tuple(Tuple(vec![
-                Element::String("hello".into()),
-                Element::String("world".into()),
+                Element::String("hello".to_string()),
+                Element::String("world".to_string()),
                 Element::I64(42),
             ])),
             &[

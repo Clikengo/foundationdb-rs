@@ -6,21 +6,30 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
-//! subspace provides a convenient way to use FoundationDB tuples to define namespaces for
-//! different categories of data. The namespace is specified by a prefix tuple which is prepended
-//! to all tuples packed by the subspace. When unpacking a key with the subspace, the prefix tuple
-//! will be removed from the result.
-//!
-//! As a best practice, API clients should use at least one subspace for application data. For
-//! general guidance on subspace usage, see the Subspaces section of the Developer Guide
-//! (https://apple.github.io/foundationdb/developer-guide.html#subspaces).
+use tuple::{Decode, Encode, Error, Result};
 
-use tuple::{Decode, Encode, Result, Error};
-
-/// Subspace represents a well-defined region of keyspace in a FoundationDB database.
+/// Represents a well-defined region of keyspace in a FoundationDB database
+///
+/// It provides a convenient way to use FoundationDB tuples to define namespaces for
+/// different categories of data. The namespace is specified by a prefix tuple which is prepended
+/// to all tuples packed by the subspace. When unpacking a key with the subspace, the prefix tuple
+/// will be removed from the result.
+///
+/// As a best practice, API clients should use at least one subspace for application data. For
+/// general guidance on subspace usage, see the Subspaces section of the [Developer Guide].
+///
+/// [Developer Guide]: https://apple.github.io/foundationdb/developer-guide.html#subspaces
 #[derive(Debug, Clone)]
 pub struct Subspace {
     prefix: Vec<u8>,
+}
+
+impl<E: Encode> From<E> for Subspace {
+    fn from(e: E) -> Self {
+        Self {
+            prefix: e.to_vec(),
+        }
+    }
 }
 
 impl Subspace {
@@ -36,14 +45,8 @@ impl Subspace {
         }
     }
 
-    /// Returns a new Subspace from the provided tuple encodable.
-    pub fn new<T: Encode>(t: &T) -> Self {
-        let prefix = Encode::encode_to_vec(t);
-        Self { prefix }
-    }
-
     /// Returns a new Subspace whose prefix extends this Subspace with a given tuple encodable.
-    pub fn subspace<T: Encode>(&self, t: &T) -> Self {
+    pub fn subspace<T: Encode>(&self, t: T) -> Self {
         Self {
             prefix: self.pack(t),
         }
@@ -56,8 +59,8 @@ impl Subspace {
 
     /// Returns the key encoding the specified Tuple with the prefix of this Subspace
     /// prepended.
-    pub fn pack<T: Encode>(&self, t: &T) -> Vec<u8> {
-        let mut packed = Encode::encode_to_vec(t);
+    pub fn pack<T: Encode>(&self, t: T) -> Vec<u8> {
+        let mut packed = t.to_vec();
         let mut out = Vec::with_capacity(self.prefix.len() + packed.len());
         out.extend_from_slice(&self.prefix);
         out.append(&mut packed);
@@ -72,7 +75,7 @@ impl Subspace {
             return Err(Error::InvalidData);
         }
         let key = &key[self.prefix.len()..];
-        Decode::decode_full(&key)
+        Decode::try_from(&key)
     }
 
     /// `is_start_of` returns true if the provided key starts with the prefix of this Subspace,
@@ -83,10 +86,13 @@ impl Subspace {
 
     /// `range` returns first and last key of given Subspace
     pub fn range(&self) -> (Vec<u8>, Vec<u8>) {
-        let mut begin = self.prefix.clone();
+        let mut begin = Vec::with_capacity(self.prefix.len() + 1);
+        let mut end = Vec::with_capacity(self.prefix.len() + 1);
+
+        begin.extend_from_slice(&self.prefix);
         begin.push(0x00);
 
-        let mut end = self.prefix.clone();
+        end.extend_from_slice(&self.prefix);
         end.push(0xff);
 
         (begin, end)
@@ -100,21 +106,21 @@ mod tests {
 
     #[test]
     fn sub() {
-        let ss0 = Subspace::new(&(1,));
-        let ss1 = ss0.subspace(&(2,));
+        let ss0: Subspace = (1,).into();
+        let ss1 = ss0.subspace((2,));
 
-        let ss2 = Subspace::new(&(1, 2));
+        let ss2: Subspace = (1, 2).into();
 
         assert_eq!(ss1.bytes(), ss2.bytes());
     }
 
     #[test]
     fn pack_unpack() {
-        let ss0 = Subspace::new(&(1,));
+        let ss0: Subspace = (1,).into();
         let tup = (2, 3);
 
         let packed = ss0.pack(&tup);
-        let expected = Encode::encode_to_vec(&(1, 2, 3));
+        let expected = (1, 2, 3).to_vec();
         assert_eq!(expected, packed);
 
         let tup_unpack: (i64, i64) = ss0.unpack(&packed).unwrap();
@@ -125,17 +131,23 @@ mod tests {
 
     #[test]
     fn is_start_of() {
-        let ss0 = Subspace::new(&(1,));
-        let ss1 = Subspace::new(&(2,));
+        let ss0: Subspace = (1,).into();
+        let ss1: Subspace = (2,).into();
         let tup = (2, 3);
 
         assert!(ss0.is_start_of(&ss0.pack(&tup)));
         assert!(!ss1.is_start_of(&ss0.pack(&tup)));
+        assert!(Subspace::from("start").is_start_of(&"start".to_vec()));
+        assert!(Subspace::from("start").is_start_of(&"start".to_string().to_vec()));
+        assert!(!Subspace::from("start").is_start_of(&"starting".to_vec()));
+        assert!(Subspace::from(("start",)).is_start_of(&"start".to_vec()));
+        assert!(Subspace::from("start").is_start_of(&("start", "end").to_vec()));
+        assert!(Subspace::from(("start", 42)).is_start_of(&("start", 42, "end").to_vec()));
     }
 
     #[test]
     fn unpack_malformed() {
-        let ss0 = Subspace::new(&((),));
+        let ss0: Subspace = ((),).into();
 
         let malformed = {
             let mut v = ss0.bytes().to_vec();
@@ -148,7 +160,7 @@ mod tests {
 
     #[test]
     fn range() {
-        let ss = Subspace::new(&(1,));
+        let ss: Subspace = (1,).into();
         let tup = (2, 3);
         let packed = ss.pack(&tup);
 

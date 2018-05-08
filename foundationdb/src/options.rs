@@ -147,7 +147,7 @@ impl NetworkOption {
             }
         }
     }
-    pub unsafe fn apply(&self) -> std::result::Result<(), error::FdbError> {
+    pub unsafe fn apply(&self) -> std::result::Result<(), error::Error> {
         let code = self.code();
         let err = match *self {
             NetworkOption::LocalAddress(ref v) => {
@@ -224,7 +224,7 @@ impl NetworkOption {
             }
         };
         if err != 0 {
-            Err(error::FdbError::from(err))
+            Err(error::Error::from(err))
         } else {
             Ok(())
         }
@@ -267,7 +267,7 @@ impl DatabaseOption {
     pub unsafe fn apply(
         &self,
         target: *mut fdb::FDBDatabase,
-    ) -> std::result::Result<(), error::FdbError> {
+    ) -> std::result::Result<(), error::Error> {
         let code = self.code();
         let err = match *self {
             DatabaseOption::LocationCacheSize(v) => {
@@ -286,7 +286,7 @@ impl DatabaseOption {
             }
         };
         if err != 0 {
-            Err(error::FdbError::from(err))
+            Err(error::Error::from(err))
         } else {
             Ok(())
         }
@@ -437,7 +437,7 @@ impl TransactionOption {
     pub unsafe fn apply(
         &self,
         target: *mut fdb::FDBTransaction,
-    ) -> std::result::Result<(), error::FdbError> {
+    ) -> std::result::Result<(), error::Error> {
         let code = self.code();
         let err = match *self {
             TransactionOption::CausalWriteRisky => {
@@ -532,7 +532,7 @@ impl TransactionOption {
             }
         };
         if err != 0 {
-            Err(error::FdbError::from(err))
+            Err(error::Error::from(err))
         } else {
             Ok(())
         }

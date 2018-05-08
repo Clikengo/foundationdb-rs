@@ -10,30 +10,64 @@
 
 mod element;
 
-pub use self::element::Element;
-
+use std::ops::{Deref, DerefMut};
 use std::{self, io::Write, string::FromUtf8Error};
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct Tuple<'a>(pub Vec<Element<'a>>);
+pub use self::element::Element;
 
+/// Tuple encoding/decoding related errors
 #[derive(Debug, Fail)]
 pub enum Error {
+    /// Unexpected end of the byte stream
     #[fail(display = "Unexpected end of file")]
     EOF,
+    /// Invalid type specified
     #[fail(display = "Invalid type: {}", value)]
-    InvalidType { value: u8 },
+    InvalidType {
+        /// the type code as defined in FoundationDB
+        value: u8,
+    },
+    /// Data was not valid for the specified type
     #[fail(display = "Invalid data")]
     InvalidData,
+    /// Utf8 Conversion error of tuple data
     #[fail(display = "UTF8 conversion error")]
     FromUtf8Error(FromUtf8Error),
 }
 
+/// A result with tuple::Error defined
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Generic Tuple of elements
+#[derive(Clone, Debug, PartialEq)]
+pub struct Tuple(Vec<Element>);
+
+impl From<Vec<Element>> for Tuple {
+    fn from(tuple: Vec<Element>) -> Self {
+        Tuple(tuple)
+    }
+}
+
+impl Deref for Tuple {
+    type Target = Vec<Element>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Tuple {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+/// For types that are encodable as defined by the tuple definitions on FoundationDB
 pub trait Encode {
+    /// Encodes this tuple/elemnt into the associated Write
     fn encode<W: Write>(&self, _w: &mut W) -> std::io::Result<()>;
-    fn encode_to_vec(&self) -> Vec<u8> {
+    /// Encodes this tuple/elemnt into a new Vec
+    fn to_vec(&self) -> Vec<u8> {
         let mut v = Vec::new();
         self.encode(&mut v)
             .expect("tuple encoding should never fail");
@@ -41,9 +75,17 @@ pub trait Encode {
     }
 }
 
+/// For types that are decodable from the Tuple definitions in FoundationDB
 pub trait Decode: Sized {
+    /// Decodes Self from the byte slice
+    ///
+    /// # Return
+    ///
+    /// Self and the offset of the next byte after Self in the byte slice
     fn decode(buf: &[u8]) -> Result<(Self, usize)>;
-    fn decode_full(buf: &[u8]) -> Result<Self> {
+
+    /// Decodes returning Self only
+    fn try_from(buf: &[u8]) -> Result<Self> {
         let (val, offset) = Self::decode(buf)?;
         if offset != buf.len() {
             return Err(Error::InvalidData);
@@ -57,7 +99,7 @@ macro_rules! tuple_impls {
         $(
             impl<$($name),+> Encode for ($($name,)+)
             where
-                $($name: Encode + Default,)+
+                $($name: Encode,)+
             {
                 #[allow(non_snake_case, unused_assignments, deprecated)]
                 fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
@@ -111,7 +153,7 @@ tuple_impls! {
     12 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11)
 }
 
-impl<'a> Encode for Tuple<'a> {
+impl Encode for Tuple {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         for element in self.0.iter() {
             element.encode(w)?;
@@ -120,7 +162,7 @@ impl<'a> Encode for Tuple<'a> {
     }
 }
 
-impl<'a> Decode for Tuple<'a> {
+impl Decode for Tuple {
     fn decode(buf: &[u8]) -> Result<(Self, usize)> {
         let mut data = buf;
         let mut v = Vec::new();
@@ -158,14 +200,14 @@ mod tests {
 
     #[test]
     fn test_decode_tuple() {
-        assert_eq!((0, ()), Decode::decode_full(&[20, 0]).unwrap());
+        assert_eq!((0, ()), Decode::try_from(&[20, 0]).unwrap());
     }
 
     #[test]
     fn test_decode_tuple_ty() {
         let data: &[u8] = &[2, 104, 101, 108, 108, 111, 0, 1, 119, 111, 114, 108, 100, 0];
 
-        let (v1, v2): (String, Vec<u8>) = Decode::decode_full(data).unwrap();
+        let (v1, v2): (String, Vec<u8>) = Decode::try_from(data).unwrap();
         assert_eq!(v1, "hello");
         assert_eq!(v2, b"world");
     }
@@ -176,7 +218,17 @@ mod tests {
 
         assert_eq!(
             &[2, 104, 101, 108, 108, 111, 0, 1, 119, 111, 114, 108, 100, 0],
-            Encode::encode_to_vec(&tup).as_slice()
+            Encode::to_vec(&tup).as_slice()
         );
+    }
+
+    #[test]
+    fn test_eq() {
+        assert_eq!(
+            "string".to_vec(),
+            "string".to_string().to_vec()
+        );
+
+        assert_eq!("string".to_vec(), ("string",).to_vec());
     }
 }
