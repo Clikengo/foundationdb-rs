@@ -91,6 +91,18 @@ impl<'a> Default for RangeOption {
 
 /// A Builder with which options need to used for a range query.
 pub struct RangeOptionBuilder(RangeOption);
+
+impl<T: Encode> From<T> for RangeOptionBuilder {
+    fn from(t: T) -> Self {
+        let (begin, end) = Subspace::from(t).range();
+
+        Self::new(
+            KeySelector::first_greater_or_equal(&begin),
+            KeySelector::first_greater_or_equal(&end),
+        )
+    }
+}
+
 impl RangeOptionBuilder {
     /// Creates new builder with given key selectors.
     pub fn new(begin: KeySelector, end: KeySelector) -> Self {
@@ -98,19 +110,6 @@ impl RangeOptionBuilder {
         opt.begin = begin.to_owned();
         opt.end = end.to_owned();
         RangeOptionBuilder(opt)
-    }
-
-    /// Create new builder with a tuple as a prefix
-    pub fn from_tuple<T>(tup: T) -> Self
-    where
-        T: Encode,
-    {
-        let (begin, end) = Subspace::from(tup).range();
-
-        Self::new(
-            KeySelector::first_greater_or_equal(&begin),
-            KeySelector::first_greater_or_equal(&end),
-        )
     }
 
     /// If non-zero, indicates the maximum number of key-value pairs to return.

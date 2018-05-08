@@ -88,7 +88,7 @@ fn init(db: &Database, all_classes: &[String]) {
 fn get_available_classes(db: &Database) -> Vec<String> {
     let trx = db.create_trx().expect("could not create transaction");
 
-    let range = RangeOptionBuilder::from_tuple("class");
+    let range = RangeOptionBuilder::from("class");
 
     trx.get_range(range.build(), 1_024)
         .and_then(|got_range| {
@@ -174,7 +174,7 @@ fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(), failu
         bail!("No remaining seats");
     }
 
-    let attends_range = RangeOptionBuilder::from_tuple(&("attends", student)).build();
+    let attends_range = RangeOptionBuilder::from(("attends", student)).build();
     if trx.get_range(attends_range, 1_024)
         .wait()
         .expect("get_range failed")
@@ -313,7 +313,7 @@ fn run_sim(db: &Database, students: usize, ops_per_student: usize) {
         thread.join().expect("failed to join thread");
 
         let student_id = format!("s{}", id);
-        let attends_range = RangeOptionBuilder::from_tuple(("attends", &student_id)).build();
+        let attends_range = RangeOptionBuilder::from(("attends", &student_id)).build();
 
         for key_value in db.create_trx()
             .unwrap()
