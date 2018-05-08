@@ -67,11 +67,11 @@ impl DerefMut for Tuple {
 /// For types that are encodable as defined by the tuple definitions on FoundationDB
 pub trait Encode {
     /// Encodes this tuple/elemnt into the associated Write
-    fn encode<W: Write>(&self, _w: &mut W, in_tuple: bool) -> std::io::Result<()>;
+    fn encode<W: Write>(&self, _w: &mut W, tuple_depth: usize) -> std::io::Result<()>;
     /// Encodes this tuple/elemnt into a new Vec
     fn to_vec(&self) -> Vec<u8> {
         let mut v = Vec::new();
-        self.encode(&mut v, false)
+        self.encode(&mut v, 0)
             .expect("tuple encoding should never fail");
         v
     }
@@ -84,11 +84,11 @@ pub trait Decode: Sized {
     /// # Return
     ///
     /// Self and the offset of the next byte after Self in the byte slice
-    fn decode(buf: &[u8], in_tuple: bool) -> Result<(Self, usize)>;
+    fn decode(buf: &[u8], tuple_depth: usize) -> Result<(Self, usize)>;
 
     /// Decodes returning Self only
     fn try_from(buf: &[u8]) -> Result<Self> {
-        let (val, offset) = Self::decode(buf, false)?;
+        let (val, offset) = Self::decode(buf, 0)?;
         if offset != buf.len() {
             return Err(Error::InvalidData);
         }
@@ -104,16 +104,16 @@ macro_rules! tuple_impls {
                 $($name: Encode,)+
             {
                 #[allow(non_snake_case, unused_assignments, deprecated)]
-                fn encode<W: Write>(&self, w: &mut W, in_tuple: bool) -> std::io::Result<()> {
-                    if in_tuple {
+                fn encode<W: Write>(&self, w: &mut W, tuple_depth: usize) -> std::io::Result<()> {
+                    if tuple_depth > 0 {
                         element::NESTED.write(w)?;
                     }
 
                     $(
-                        self.$n.encode(w, true)?;
+                        self.$n.encode(w, tuple_depth + 1)?;
                     )*
 
-                    if in_tuple {
+                    if tuple_depth > 0 {
                         element::NIL.write(w)?;
                     }
                     Ok(())
@@ -125,25 +125,25 @@ macro_rules! tuple_impls {
                 $($name: Decode + Default,)+
             {
                 #[allow(non_snake_case, unused_assignments, deprecated)]
-                fn decode(buf: &[u8], in_tuple: bool) -> Result<(Self, usize)> {
+                fn decode(buf: &[u8], tuple_depth: usize) -> Result<(Self, usize)> {
                     let mut buf = buf;
                     let mut out: Self = Default::default();
                     let mut offset = 0_usize;
 
-                    if in_tuple {
+                    if tuple_depth > 0{
                         element::NESTED.expect(buf[0])?;
                         offset += 1;
                         buf = &buf[1..];
                     }
 
                     $(
-                        let (v0, offset0) = $name::decode(buf, true)?;
+                        let (v0, offset0) = $name::decode(buf, tuple_depth + 1)?;
                         out.$n = v0;
                         offset += offset0;
                         buf = &buf[offset0..];
                     )*
 
-                    if in_tuple {
+                    if tuple_depth > 0 {
                         element::NIL.expect(buf[0])?;
                         offset += 1;
                         buf = &buf[1..];
@@ -151,7 +151,7 @@ macro_rules! tuple_impls {
 
                     // will not be empty if we're decoding as a tuple in a tuple
                     //   (the outer tuple has more...)
-                    if !buf.is_empty() && !in_tuple {
+                    if !buf.is_empty() && tuple_depth == 0 {
                         return Err(Error::InvalidData);
                     }
 
@@ -177,21 +177,21 @@ tuple_impls! {
 }
 
 impl Encode for Tuple {
-    fn encode<W: Write>(&self, w: &mut W, _in_tuple: bool) -> std::io::Result<()> {
+    fn encode<W: Write>(&self, w: &mut W, tuple_depth: usize) -> std::io::Result<()> {
         for element in self.0.iter() {
-            element.encode(w, true)?;
+            element.encode(w, tuple_depth + 1)?;
         }
         Ok(())
     }
 }
 
 impl Decode for Tuple {
-    fn decode(buf: &[u8], _in_tuple: bool) -> Result<(Self, usize)> {
+    fn decode(buf: &[u8], tuple_depth: usize) -> Result<(Self, usize)> {
         let mut data = buf;
         let mut v = Vec::new();
         let mut offset = 0_usize;
         while !data.is_empty() {
-            let (s, len): (Element, _) = Element::decode(data, true)?;
+            let (s, len): (Element, _) = Element::decode(data, tuple_depth + 1)?;
             v.push(s);
             offset += len;
             data = &data[len..];
@@ -212,13 +212,13 @@ mod tests {
 
     #[test]
     fn test_malformed_int() {
-        assert!(Tuple::decode(&[21, 0], false).is_ok());
-        assert!(Tuple::decode(&[22, 0], false).is_err());
-        assert!(Tuple::decode(&[22, 0, 0], false).is_ok());
+        assert!(Tuple::decode(&[21, 0], 0).is_ok());
+        assert!(Tuple::decode(&[22, 0], 0).is_err());
+        assert!(Tuple::decode(&[22, 0, 0], 0).is_ok());
 
-        assert!(Tuple::decode(&[19, 0], false).is_ok());
-        assert!(Tuple::decode(&[18, 0], false).is_err());
-        assert!(Tuple::decode(&[18, 0, 0], false).is_ok());
+        assert!(Tuple::decode(&[19, 0], 0).is_ok());
+        assert!(Tuple::decode(&[18, 0], 0).is_err());
+        assert!(Tuple::decode(&[18, 0, 0], 0).is_ok());
     }
 
     #[test]
@@ -268,6 +268,14 @@ mod tests {
                 0, 21, 33, 0, 0,
             ]
         );
+
+        //
+        // from Python impl:
+        //  >>> [ord(x) for x in fdb.tuple.pack( (None, (None, None)) )]
+        assert_eq!(
+            &(None::<i64>, (None::<i64>, None::<i64>)).encode_to_vec(),
+            &[0, 5, 0, 255, 0, 255, 0]
+        )
     }
 
     #[test]
@@ -291,5 +299,14 @@ mod tests {
             ),
             &three_decode
         );
+
+        //
+        // from Python impl:
+        //  >>> [ord(x) for x in fdb.tuple.pack( (None, (None, None)) )]
+        let option_decode = <(Option<i64>, (Option<i64>, Option<i64>))>::decode_full(&[
+            0, 5, 0, 255, 0, 255, 0,
+        ]).expect("failed option");
+
+        assert_eq!(&(None::<i64>, (None::<i64>, None::<i64>)), &option_decode)
     }
 }

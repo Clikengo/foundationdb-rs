@@ -600,12 +600,10 @@ impl StackMachine {
                                     continue;
                                 }
                             }
-                            key.to_vec()
-                                .encode(&mut out, false)
-                                .expect("failed to encode");
+                            key.to_vec().encode(&mut out, 0).expect("failed to encode");
                             value
                                 .to_vec()
-                                .encode(&mut out, false)
+                                .encode(&mut out, 0)
                                 .expect("failed to encode");
                         }
                         Ok::<_, Error>(out)
@@ -727,8 +725,10 @@ impl StackMachine {
                 let mut data = data.as_slice();
 
                 while !data.is_empty() {
-                    let (val, offset): (Element, _) = Decode::decode(data, false).unwrap();
+                    let (val, offset): (Element, _) = Decode::decode(data, 0).unwrap();
                     let bytes = val.to_vec();
+
+                    let bytes = val.encode_to_vec();
                     self.push_item(number, &bytes);
                     data = &data[offset..];
                 }
