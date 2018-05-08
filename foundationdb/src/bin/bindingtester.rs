@@ -727,8 +727,6 @@ impl StackMachine {
                 while !data.is_empty() {
                     let (val, offset): (Element, _) = Decode::decode(data, 0).unwrap();
                     let bytes = val.to_vec();
-
-                    let bytes = val.encode_to_vec();
                     self.push_item(number, &bytes);
                     data = &data[offset..];
                 }

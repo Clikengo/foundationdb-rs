@@ -15,7 +15,6 @@ use std::{self, io::Write, string::FromUtf8Error};
 
 pub use self::element::Element;
 use self::element::Type;
-use subspace::Subspace;
 
 /// Tuple encoding/decoding related errors
 #[derive(Debug, Fail)]
@@ -258,11 +257,11 @@ mod tests {
     #[test]
     fn test_encode_recursive_tuple() {
         assert_eq!(
-            &("one", ("two", 42)).encode_to_vec(),
+            &("one", ("two", 42)).to_vec(),
             &[2, 111, 110, 101, 0, 5, 2, 116, 119, 111, 0, 21, 42, 0]
         );
         assert_eq!(
-            &("one", ("two", 42, ("three", 33))).encode_to_vec(),
+            &("one", ("two", 42, ("three", 33))).to_vec(),
             &[
                 2, 111, 110, 101, 0, 5, 2, 116, 119, 111, 0, 21, 42, 5, 2, 116, 104, 114, 101, 101,
                 0, 21, 33, 0, 0,
@@ -273,21 +272,21 @@ mod tests {
         // from Python impl:
         //  >>> [ord(x) for x in fdb.tuple.pack( (None, (None, None)) )]
         assert_eq!(
-            &(None::<i64>, (None::<i64>, None::<i64>)).encode_to_vec(),
+            &(None::<i64>, (None::<i64>, None::<i64>)).to_vec(),
             &[0, 5, 0, 255, 0, 255, 0]
         )
     }
 
     #[test]
     fn test_decode_recursive_tuple() {
-        let two_decode = <(String, (String, i64))>::decode_full(&[
+        let two_decode = <(String, (String, i64))>::try_from(&[
             2, 111, 110, 101, 0, 5, 2, 116, 119, 111, 0, 21, 42, 0,
         ]).expect("failed two");
 
         // TODO: can we get eq for borrows of the inner types?
         assert_eq!(("one".to_string(), ("two".to_string(), 42)), two_decode);
 
-        let three_decode = <(String, (String, i64, (String, i64)))>::decode_full(&[
+        let three_decode = <(String, (String, i64, (String, i64)))>::try_from(&[
             2, 111, 110, 101, 0, 5, 2, 116, 119, 111, 0, 21, 42, 5, 2, 116, 104, 114, 101, 101, 0,
             21, 33, 0, 0,
         ]).expect("failed three");
@@ -303,7 +302,7 @@ mod tests {
         //
         // from Python impl:
         //  >>> [ord(x) for x in fdb.tuple.pack( (None, (None, None)) )]
-        let option_decode = <(Option<i64>, (Option<i64>, Option<i64>))>::decode_full(&[
+        let option_decode = <(Option<i64>, (Option<i64>, Option<i64>))>::try_from(&[
             0, 5, 0, 255, 0, 255, 0,
         ]).expect("failed option");
 
