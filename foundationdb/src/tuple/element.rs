@@ -541,7 +541,7 @@ mod tests {
         S: Encode + Decode + std::fmt::Debug + PartialEq,
     {
         assert_eq!(val, Decode::decode_full(buf).unwrap());
-        assert_eq!(buf, Encode::encode_to_vec(&val).as_slice());
+        assert_eq!(buf, Encode::to_vec(&val).as_slice());
     }
 
     #[test]

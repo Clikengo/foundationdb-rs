@@ -191,7 +191,7 @@ impl Instr {
 
         let code = match cmd {
             "PUSH" => {
-                let data = tup[1].encode_to_vec();
+                let data = tup[1].to_vec();
                 Push(data)
             }
             "DUP" => Dup,
@@ -280,13 +280,13 @@ impl StackItem {
 
         //TODO: wait
         match self.fut.unwrap().wait() {
-            Ok((_trx, data)) => data.encode_to_vec(),
+            Ok((_trx, data)) => data.to_vec(),
             Err(e) => {
                 let code = format!("{}", e.code());
                 let tup = (b"ERROR".to_vec(), code.into_bytes());
                 debug!("ERROR: {:?}", e);
-                let bytes = tup.encode_to_vec();
-                bytes.encode_to_vec()
+                let bytes = tup.to_vec();
+                bytes.to_vec()
             }
         }
     }
@@ -406,7 +406,7 @@ impl StackMachine {
     where
         S: Encode,
     {
-        let data = s.encode_to_vec();
+        let data = s.to_vec();
         self.push(number, data);
     }
 
@@ -723,7 +723,7 @@ impl StackMachine {
 
                 while !data.is_empty() {
                     let (val, offset): (Element, _) = Decode::decode(data).unwrap();
-                    let bytes = val.encode_to_vec();
+                    let bytes = val.to_vec();
                     self.push_item(number, &bytes);
                     data = &data[offset..];
                 }

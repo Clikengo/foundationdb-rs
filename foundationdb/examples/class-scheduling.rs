@@ -72,7 +72,7 @@ fn all_classes() -> Vec<String> {
 fn init_classes(trx: &Transaction, all_classes: &[String]) {
     let class_subspace = Subspace::from("class");
     for class in all_classes {
-        trx.set(&class_subspace.pack(class), &100_i64.encode_to_vec());
+        trx.set(&class_subspace.pack(class), &100_i64.to_vec());
     }
 }
 
@@ -111,7 +111,7 @@ fn get_available_classes(db: &Database) -> Vec<String> {
 }
 
 fn ditch_trx(trx: &Transaction, student: &str, class: &str) {
-    let attends_key = ("attends", student, class).encode_to_vec();
+    let attends_key = ("attends", student, class).to_vec();
 
     // TODO: should get take an &Encode? current impl does encourage &[u8] reuse...
     if trx.get(&attends_key, true)
@@ -124,7 +124,7 @@ fn ditch_trx(trx: &Transaction, student: &str, class: &str) {
         return;
     }
 
-    let class_key = ("class", class).encode_to_vec();
+    let class_key = ("class", class).to_vec();
     let available_seats: i64 = i64::decode_full(
         trx.get(&class_key, true)
             .wait()
@@ -135,7 +135,7 @@ fn ditch_trx(trx: &Transaction, student: &str, class: &str) {
     ).expect("failed to decode i64") + 1;
 
     //println!("{} ditching class: {}", student, class);
-    trx.set(&class_key, &available_seats.encode_to_vec());
+    trx.set(&class_key, &available_seats.to_vec());
     trx.clear(&attends_key);
 }
 
@@ -148,7 +148,7 @@ fn ditch(db: &Database, student: String, class: String) -> Result<(), failure::E
 }
 
 fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(), failure::Error> {
-    let attends_key = ("attends", student, class).encode_to_vec();
+    let attends_key = ("attends", student, class).to_vec();
     if trx.get(&attends_key, true)
         .wait()
         .expect("get failed")
@@ -160,7 +160,7 @@ fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(), failu
         return Ok(());
     }
 
-    let class_key = ("class", class).encode_to_vec();
+    let class_key = ("class", class).to_vec();
     let available_seats: i64 = i64::decode_full(
         trx.get(&class_key, true)
             .wait()
@@ -185,8 +185,8 @@ fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(), failu
     }
 
     //println!("{} taking class: {}", student, class);
-    trx.set(&class_key, &(available_seats - 1).encode_to_vec());
-    trx.set(&attends_key, &"".encode_to_vec());
+    trx.set(&class_key, &(available_seats - 1).to_vec());
+    trx.set(&attends_key, &"".to_vec());
     Ok(())
 }
 

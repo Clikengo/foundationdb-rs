@@ -27,7 +27,7 @@ pub struct Subspace {
 impl<E: Encode> From<E> for Subspace {
     fn from(e: E) -> Self {
         Self {
-            prefix: e.encode_to_vec(),
+            prefix: e.to_vec(),
         }
     }
 }
@@ -60,7 +60,7 @@ impl Subspace {
     /// Returns the key encoding the specified Tuple with the prefix of this Subspace
     /// prepended.
     pub fn pack<T: Encode>(&self, t: T) -> Vec<u8> {
-        let mut packed = t.encode_to_vec();
+        let mut packed = t.to_vec();
         let mut out = Vec::with_capacity(self.prefix.len() + packed.len());
         out.extend_from_slice(&self.prefix);
         out.append(&mut packed);
@@ -120,7 +120,7 @@ mod tests {
         let tup = (2, 3);
 
         let packed = ss0.pack(&tup);
-        let expected = (1, 2, 3).encode_to_vec();
+        let expected = (1, 2, 3).to_vec();
         assert_eq!(expected, packed);
 
         let tup_unpack: (i64, i64) = ss0.unpack(&packed).unwrap();
@@ -137,12 +137,12 @@ mod tests {
 
         assert!(ss0.is_start_of(&ss0.pack(&tup)));
         assert!(!ss1.is_start_of(&ss0.pack(&tup)));
-        assert!(Subspace::from("start").is_start_of(&"start".encode_to_vec()));
-        assert!(Subspace::from("start").is_start_of(&"start".to_string().encode_to_vec()));
-        assert!(!Subspace::from("start").is_start_of(&"starting".encode_to_vec()));
-        assert!(Subspace::from(("start",)).is_start_of(&"start".encode_to_vec()));
-        assert!(Subspace::from("start").is_start_of(&("start", "end").encode_to_vec()));
-        assert!(Subspace::from(("start", 42)).is_start_of(&("start", 42, "end").encode_to_vec()));
+        assert!(Subspace::from("start").is_start_of(&"start".to_vec()));
+        assert!(Subspace::from("start").is_start_of(&"start".to_string().to_vec()));
+        assert!(!Subspace::from("start").is_start_of(&"starting".to_vec()));
+        assert!(Subspace::from(("start",)).is_start_of(&"start".to_vec()));
+        assert!(Subspace::from("start").is_start_of(&("start", "end").to_vec()));
+        assert!(Subspace::from(("start", 42)).is_start_of(&("start", 42, "end").to_vec()));
     }
 
     #[test]

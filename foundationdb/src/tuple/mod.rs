@@ -67,7 +67,7 @@ pub trait Encode {
     /// Encodes this tuple/elemnt into the associated Write
     fn encode<W: Write>(&self, _w: &mut W) -> std::io::Result<()>;
     /// Encodes this tuple/elemnt into a new Vec
-    fn encode_to_vec(&self) -> Vec<u8> {
+    fn to_vec(&self) -> Vec<u8> {
         let mut v = Vec::new();
         self.encode(&mut v)
             .expect("tuple encoding should never fail");
@@ -218,17 +218,17 @@ mod tests {
 
         assert_eq!(
             &[2, 104, 101, 108, 108, 111, 0, 1, 119, 111, 114, 108, 100, 0],
-            Encode::encode_to_vec(&tup).as_slice()
+            Encode::to_vec(&tup).as_slice()
         );
     }
 
     #[test]
     fn test_eq() {
         assert_eq!(
-            "string".encode_to_vec(),
-            "string".to_string().encode_to_vec()
+            "string".to_vec(),
+            "string".to_string().to_vec()
         );
 
-        assert_eq!("string".encode_to_vec(), ("string",).encode_to_vec());
+        assert_eq!("string".to_vec(), ("string",).to_vec());
     }
 }
