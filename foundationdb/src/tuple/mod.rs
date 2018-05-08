@@ -162,6 +162,7 @@ macro_rules! tuple_impls {
 }
 
 tuple_impls! {
+    1 => (0 T0)
     2 => (0 T0 1 T1)
     3 => (0 T0 1 T1 2 T2)
     4 => (0 T0 1 T1 2 T2 3 T3)
@@ -307,5 +308,54 @@ mod tests {
         ]).expect("failed option");
 
         assert_eq!(&(None::<i64>, (None::<i64>, None::<i64>)), &option_decode)
+    }
+
+    #[test]
+    fn test_single_tuple_encode() {
+        // derived from python impl
+        assert_eq!(&(1,).to_vec(), &1.to_vec());
+
+        // >>> [ord(x) for x in fdb.tuple.pack((1,(1,)))]
+        // [21, 1, 5, 21, 1, 0]
+        assert_eq!(&(1, (1,)).to_vec(), &[21, 1, 5, 21, 1, 0]);
+
+        // >>> [ord(x) for x in fdb.tuple.pack( (1,(1,(1,))) )]
+        // [21, 1, 5, 21, 1, 5, 21, 1, 0, 0]
+        assert_eq!(&(1, (1, (1,))).to_vec(), &[21, 1, 5, 21, 1, 5, 21, 1, 0, 0]);
+
+        // >>> [ord(x) for x in fdb.tuple.pack( (1,(1,),(1,)) )]
+        // [21, 1, 5, 21, 1, 0, 5, 21, 1, 0]
+        assert_eq!(
+            &(1, (1,), (1,)).to_vec(),
+            &[21, 1, 5, 21, 1, 0, 5, 21, 1, 0]
+        );
+    }
+
+    #[test]
+    fn test_single_tuple_decode() {
+        // derived from python impl
+        assert_eq!(1_i64, Decode::try_from(&[21, 1]).expect("1"));
+        assert_eq!((1_i64,), Decode::try_from(&[21, 1]).expect("(1,)"));
+
+        // >>> [ord(x) for x in fdb.tuple.pack((1,(1,)))]
+        // [21, 1, 5, 21, 1, 0]
+        assert_eq!(
+            (1_i64, (1_i64,)),
+            Decode::try_from(&[21, 1, 5, 21, 1, 0]).expect("(1, (1,))")
+        );
+
+        // >>> [ord(x) for x in fdb.tuple.pack( (1,(1,(1,))) )]
+        // [21, 1, 5, 21, 1, 5, 21, 1, 0, 0]
+        assert_eq!(
+            (1_i64, (1_i64, (1_i64,))),
+            Decode::try_from(&[21, 1, 5, 21, 1, 5, 21, 1, 0, 0]).expect("(1, (1, (1,)))")
+        );
+
+        // >>> [ord(x) for x in fdb.tuple.pack( (1,(1,),(1,)) )]
+        // [21, 1, 5, 21, 1, 0, 5, 21, 1, 0]
+        assert_eq!(
+            (1_i64, (1_i64,), (1_i64,)),
+            Decode::try_from(&[21, 1, 5, 21, 1, 0, 5, 21, 1, 0]).expect("(1, (1,), (1,))")
+        );
     }
 }
