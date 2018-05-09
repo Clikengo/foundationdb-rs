@@ -125,7 +125,6 @@ pub mod database;
 pub mod error;
 pub mod fdb_api;
 pub mod future;
-#[allow(missing_docs)]
 pub mod keyselector;
 pub mod network;
 /// Generated configuration types for use with the various `set_option` functions
@@ -139,8 +138,8 @@ pub mod tuple;
 pub use cluster::Cluster;
 pub use database::Database;
 pub use error::Error;
-pub use transaction::Transaction;
 pub use subspace::Subspace;
+pub use transaction::Transaction;
 
 /// Initialize the FoundationDB Client API, this can only be called once per process.
 ///
