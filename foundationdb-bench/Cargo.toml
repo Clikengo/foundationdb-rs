@@ -22,7 +22,7 @@ travis-ci = { repository = "bluejekyll/foundationdb-rs" }
 [dependencies]
 rand = "0.4"
 futures = "0.1"
-foundationdb = { version = "0.1.0", path = "../foundationdb" }
+foundationdb = { version = "*", path = "../foundationdb" }
 stopwatch = "0"
 log = "0.4"
 env_logger = "0.5"
