@@ -70,7 +70,7 @@ fn all_classes() -> Vec<String> {
 }
 
 fn init_classes(trx: &Transaction, all_classes: &[String]) {
-    let class_subspace = Subspace::from(&"class");
+    let class_subspace = Subspace::from("class");
     for class in all_classes {
         trx.set(&class_subspace.pack(class), &100_i64.to_vec());
     }
