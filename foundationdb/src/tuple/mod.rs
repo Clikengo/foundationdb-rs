@@ -45,11 +45,12 @@ impl TupleDepth {
         TupleDepth(0)
     }
 
-    fn increment(&self) -> Self {
+    /// Increment the depth by one, this be called when calling into `Tuple::{encode, decode}` of tuple-like datastructures
+    pub fn increment(&self) -> Self {
         TupleDepth(self.0 + 1)
     }
 
-    /// returns the current depth in any recursive tuple processing
+    /// Returns the current depth in any recursive tuple processing, 0 representing there having been no recursion
     pub fn depth(&self) -> usize {
         self.0
     }
@@ -84,15 +85,24 @@ impl DerefMut for Tuple {
 
 /// For types that are encodable as defined by the tuple definitions on FoundationDB
 pub trait Encode {
-    /// Encodes this tuple/elemnt into the associated Write
-    fn encode<W: Write>(&self, _w: &mut W, tuple_depth: TupleDepth) -> std::io::Result<()>;
+    /// Encodes this tuple/element into the associated Write
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - a Write to put the self as FoundationDB encoded bytes
+    /// * `tuple_depth` - the current depth in recursive tuple-like datastructures, it should be incremented only when encoding a tuple inside another object, see `encode_to` for a method which can initialize the TupleDepth.
+    fn encode<W: Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> std::io::Result<()>;
 
-    /// Encodes this tuple/elemnt into the associated Write
+    /// Encodes this tuple/element into the associated Write
+    ///
+    /// # Arguments
+    ///
+    /// * `w` - a Write to put the self as FoundationDB encoded bytes
     fn encode_to<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
         self.encode(w, TupleDepth::new())
     }
 
-    /// Encodes this tuple/elemnt into a new Vec
+    /// Encodes this tuple/element into a new Vec
     fn to_vec(&self) -> Vec<u8> {
         let mut v = Vec::new();
         self.encode_to(&mut v)
@@ -105,9 +115,21 @@ pub trait Encode {
 pub trait Decode: Sized {
     /// Decodes Self from the byte slice
     ///
+    /// # Arguments
+    ///
+    /// * `buf` - the buffer, starting at 0, from which to read Self, where the encoding is FoundationDB encoded bytes
+    /// * `tuple_depth` - the current depth in recursive tuple-like datastructures
+    ///
+    /// # Return
+    ///
+    /// Self and the offset of the next byte after Self in the byte slice
     fn decode(buf: &[u8], tuple_depth: TupleDepth) -> Result<(Self, usize)>;
 
     /// Decodes Self from the byte slice
+    ///
+    /// # Arguments
+    ///
+    /// * `buf` - the buffer, starting at 0, from which to read Self, where the encoding is FoundationDB encoded bytes
     ///
     /// # Return
     ///
@@ -284,6 +306,8 @@ mod tests {
             ("string", "string".to_string()).to_vec(),
             ("string".to_string(), "string").to_vec()
         );
+
+        assert_eq!("string".to_vec(), ("string",).to_vec());
     }
 
     #[test]
