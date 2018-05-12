@@ -29,6 +29,7 @@ $> sudo installer -pkg FoundationDB-5.1.5.pkg -target /
 ```toml
 [dependencies]
 foundationdb = "*"
+futures = "0.1"
 ```
 
 ## Extern the crate in `bin.rs` or `lib.rs`
