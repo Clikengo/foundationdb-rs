@@ -36,6 +36,7 @@
 //! ```toml
 //! [dependencies]
 //! foundationdb = "*"
+//! futures = "0.1"
 //! ```
 //!
 //! ## Extern the crate in `bin.rs` or `lib.rs`
