@@ -48,9 +48,7 @@ Due to limitations in the C API, the Client and it's associated Network can only
 extern crate futures;
 extern crate foundationdb;
 
-use std::thread;
 use futures::future::*;
-use foundationdb::{self, *};
 
 let network = foundationdb::init().expect("failed to initialize Fdb client");
 
