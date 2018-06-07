@@ -9,9 +9,16 @@ const INCLUDE_PATH: &str = "-I/usr/include/foundationdb/";
 #[cfg(target_os = "macos")]
 const INCLUDE_PATH: &str = "-I/usr/local/include/foundationdb/";
 
+
+#[cfg(target_os = "windows")]
+const INCLUDE_PATH: &str = "-IC:/Program Files/foundationdb/include/foundationdb";
+
 fn main() {
     // Link against fdb_c
     println!("cargo:rustc-link-lib=fdb_c");
+
+    #[cfg(target_os = "windows")]
+    println!("cargo:rustc-link-search=C:/Program Files/foundationdb/lib/foundationdb");
 
     if env::var_os("BINDGEN").is_some() {
         // The bindgen::Builder is the main entry point
