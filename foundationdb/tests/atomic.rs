@@ -79,9 +79,7 @@ fn test_atomic() {
         })
         .and_then(|db| result(db.create_trx()).and_then(|trx| trx.get(KEY, false)))
         .and_then(|res| {
-            let value = res.value()
-                .expect("failed to get value")
-                .expect("value should exists");
+            let value = res.value().expect("value should exists");
 
             // A value should be zero, as same number of atomic add/sub operations are done.
             let v: i64 = byteorder::LE::read_i64(&value);

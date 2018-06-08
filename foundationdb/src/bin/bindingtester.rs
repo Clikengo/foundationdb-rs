@@ -502,7 +502,7 @@ impl StackMachine {
                 let key: Vec<u8> = self.pop_item();
                 let trx0 = trx.clone();
                 let f = trx.get(&key, instr.pop_snapshot()).map(move |res| {
-                    let val = res.value().expect("failed to get value");
+                    let val = res.value();
                     let val = match val {
                         Some(v) => v.to_vec(),
                         None => b"RESULT_NOT_PRESENT".to_vec(),
