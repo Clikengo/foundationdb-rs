@@ -116,6 +116,7 @@ extern crate failure;
 extern crate failure_derive;
 extern crate byteorder;
 extern crate foundationdb_sys;
+#[macro_use]
 extern crate futures;
 #[cfg(feature = "uuid")]
 extern crate uuid;
