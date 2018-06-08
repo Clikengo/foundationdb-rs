@@ -521,7 +521,7 @@ impl StackMachine {
 
                 //TODO: wait
                 let key = trx.get_key(selector, instr.pop_snapshot())
-                    .map(move |res| res.value().expect("failed to get value").to_vec())
+                    .map(move |res| res.value().to_vec())
                     .wait()
                     .unwrap();
 

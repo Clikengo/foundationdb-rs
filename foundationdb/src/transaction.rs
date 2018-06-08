@@ -646,16 +646,11 @@ impl Future for TrxGet {
     type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
-        let res = match self.inner.poll()? {
-            Async::Ready((trx, inner)) => {
-                // check if a future resolves to value type
-                inner.get_value()?;
+        let (trx, inner) = try_ready!(self.inner.poll());
+        // check if a future resolves to value type
+        inner.get_value()?;
 
-                Async::Ready(GetResult { trx, inner })
-            }
-            Async::NotReady => Async::NotReady,
-        };
-        Ok(res)
+        Ok(Async::Ready(GetResult { trx, inner }))
     }
 }
 
@@ -671,8 +666,8 @@ impl GetKeyResult {
     }
 
     /// Returns the values associated with this get
-    pub fn value(&self) -> Result<&[u8]> {
-        self.inner.get_key()
+    pub fn value(&self) -> &[u8] {
+        self.inner.get_key().expect("inner should resolve into key")
     }
 }
 
@@ -685,11 +680,9 @@ impl Future for TrxGetKey {
     type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
-        match self.inner.poll() {
-            Ok(Async::Ready((trx, inner))) => Ok(Async::Ready(GetKeyResult { trx, inner })),
-            Ok(Async::NotReady) => Ok(Async::NotReady),
-            Err(e) => Err(e),
-        }
+        let (trx, inner) = try_ready!(self.inner.poll());
+        inner.get_key()?;
+        Ok(Async::Ready(GetKeyResult { trx, inner }))
     }
 }
 
@@ -716,7 +709,9 @@ impl GetRangeResult {
 
     /// Returns the values associated with this get
     pub fn key_values(&self) -> KeyValues {
-        self.inner.get_keyvalue_array().unwrap()
+        self.inner
+            .get_keyvalue_array()
+            .expect("inner should resolve into keyvalue array")
     }
 
     /// Returns `None` if all results are returned, and returns `Some(_)` if there are more results
@@ -764,18 +759,12 @@ impl Future for TrxGetRange {
     type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
-        match self.inner.poll() {
-            Ok(Async::Ready((trx, inner))) => {
-                // tests if the future resolves to keyvalue array.
-                if let Err(e) = inner.get_keyvalue_array() {
-                    return Err(e);
-                }
-                let opt = self.opt.take().expect("should not poll after ready");
-                Ok(Async::Ready(GetRangeResult { trx, inner, opt }))
-            }
-            Ok(Async::NotReady) => Ok(Async::NotReady),
-            Err(e) => Err(e),
-        }
+        let (trx, inner) = try_ready!(self.inner.poll());
+        // tests if the future resolves to keyvalue array.
+        inner.get_keyvalue_array()?;
+
+        let opt = self.opt.take().expect("should not poll after ready");
+        Ok(Async::Ready(GetRangeResult { trx, inner, opt }))
     }
 }
 
@@ -838,11 +827,8 @@ impl Future for TrxCommit {
     type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
-        match self.inner.poll() {
-            Ok(Async::Ready((trx, _res))) => Ok(Async::Ready(trx)),
-            Ok(Async::NotReady) => Ok(Async::NotReady),
-            Err(e) => Err(e),
-        }
+        let (trx, _res) = try_ready!(self.inner.poll());
+        Ok(Async::Ready(trx))
     }
 }
 
@@ -858,8 +844,10 @@ impl GetAddressResult {
     }
 
     /// Returns the addresses for the key
-    pub fn address(&self) -> Result<Vec<&[u8]>> {
-        self.inner.get_string_array()
+    pub fn address(&self) -> Vec<&[u8]> {
+        self.inner
+            .get_string_array()
+            .expect("inner should resolve into string array")
     }
 }
 
@@ -872,11 +860,9 @@ impl Future for TrxGetAddressesForKey {
     type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
-        match self.inner.poll() {
-            Ok(Async::Ready((trx, inner))) => Ok(Async::Ready(GetAddressResult { trx, inner })),
-            Ok(Async::NotReady) => Ok(Async::NotReady),
-            Err(e) => Err(e),
-        }
+        let (trx, inner) = try_ready!(self.inner.poll());
+        inner.get_string_array()?;
+        Ok(Async::Ready(GetAddressResult { trx, inner }))
     }
 }
 
@@ -891,11 +877,8 @@ impl Future for TrxWatch {
     type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
-        match self.inner.poll() {
-            Ok(Async::Ready(_r)) => Ok(Async::Ready(())),
-            Ok(Async::NotReady) => Ok(Async::NotReady),
-            Err(e) => Err(e),
-        }
+        try_ready!(self.inner.poll());
+        Ok(Async::Ready(()))
     }
 }
 
@@ -922,21 +905,12 @@ impl Future for TrxVersionstamp {
     type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
-        match self.inner.poll() {
-            Ok(Async::Ready(r)) => {
-                // returning future should resolve to key
-                match r.get_key() {
-                    Err(e) => Err(e),
-                    Ok(key) => {
-                        let mut buf: [u8; 10] = Default::default();
-                        buf.copy_from_slice(key);
-                        Ok(Async::Ready(Versionstamp(buf)))
-                    }
-                }
-            }
-            Ok(Async::NotReady) => Ok(Async::NotReady),
-            Err(e) => Err(e),
-        }
+        let r = try_ready!(self.inner.poll());
+        // returning future should resolve to key
+        let key = r.get_key()?;
+        let mut buf: [u8; 10] = Default::default();
+        buf.copy_from_slice(key);
+        Ok(Async::Ready(Versionstamp(buf)))
     }
 }
 
@@ -950,14 +924,9 @@ impl Future for TrxReadVersion {
     type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
-        match self.inner.poll() {
-            Ok(Async::Ready((_trx, r))) => match r.get_version() {
-                Err(e) => Err(e),
-                Ok(version) => Ok(Async::Ready(version)),
-            },
-            Ok(Async::NotReady) => Ok(Async::NotReady),
-            Err(e) => Err(e),
-        }
+        let (_trx, r) = try_ready!(self.inner.poll());
+        let version = r.get_version()?;
+        Ok(Async::Ready(version))
     }
 }
 
@@ -1010,16 +979,10 @@ impl Future for TrxErrFuture {
     type Item = Error;
     type Error = Error;
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
-        match self.inner.poll() {
-            Ok(Async::Ready(_res)) => {
-                //
-                let mut e = self.err.take().expect("should not poll after ready");
-                e.set_should_retry(true);
-                Ok(Async::Ready(e))
-            }
-            Ok(Async::NotReady) => Ok(Async::NotReady),
-            Err(e) => Err(e),
-        }
+        try_ready!(self.inner.poll());
+        let mut e = self.err.take().expect("should not poll after ready");
+        e.set_should_retry(true);
+        Ok(Async::Ready(e))
     }
 }
 
