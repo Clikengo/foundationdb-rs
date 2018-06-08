@@ -630,8 +630,10 @@ impl GetResult {
     }
 
     /// Returns the values associated with this get
-    pub fn value(&self) -> Result<Option<&[u8]>> {
-        self.inner.get_value()
+    pub fn value(&self) -> Option<&[u8]> {
+        self.inner
+            .get_value()
+            .expect("inner should resolve into value")
     }
 }
 
@@ -644,11 +646,16 @@ impl Future for TrxGet {
     type Error = Error;
 
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
-        match self.inner.poll() {
-            Ok(Async::Ready((trx, inner))) => Ok(Async::Ready(GetResult { trx, inner })),
-            Ok(Async::NotReady) => Ok(Async::NotReady),
-            Err(e) => Err(e),
-        }
+        let res = match self.inner.poll()? {
+            Async::Ready((trx, inner)) => {
+                // check if a future resolves to value type
+                inner.get_value()?;
+
+                Async::Ready(GetResult { trx, inner })
+            }
+            Async::NotReady => Async::NotReady,
+        };
+        Ok(res)
     }
 }
 

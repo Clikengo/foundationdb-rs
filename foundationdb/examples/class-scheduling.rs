@@ -117,7 +117,6 @@ fn ditch_trx(trx: &Transaction, student: &str, class: &str) {
         .wait()
         .expect("get failed")
         .value()
-        .expect("value failed")
         .is_none()
     {
         return;
@@ -129,7 +128,6 @@ fn ditch_trx(trx: &Transaction, student: &str, class: &str) {
             .wait()
             .expect("get failed")
             .value()
-            .expect("value failed")
             .expect("class seats were not initialized"),
     ).expect("failed to decode i64") + 1;
 
@@ -152,7 +150,6 @@ fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(), failu
         .wait()
         .expect("get failed")
         .value()
-        .expect("value failed")
         .is_some()
     {
         //println!("{} already taking class: {}", student, class);
@@ -165,7 +162,6 @@ fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(), failu
             .wait()
             .expect("get failed")
             .value()
-            .expect("value failed")
             .expect("class seats were not initialized"),
     ).expect("failed to decode i64");
 

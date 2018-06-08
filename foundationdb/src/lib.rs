@@ -92,7 +92,6 @@
 //! let result = trx.get(b"hello", false).wait().expect("failed to read world from hello");
 //!
 //! let value: &[u8] = result.value()
-//!     .expect("failed to get value from result") // unwrap the error
 //!     .unwrap();   // unwrap the option
 //!
 //! // should print "hello world"
