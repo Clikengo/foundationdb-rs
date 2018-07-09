@@ -2,3 +2,5 @@
 **/*.rs.bk
 *.swp
 Cargo.lock
+
+.vscode
