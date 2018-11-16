@@ -9,7 +9,8 @@ case $(uname) in
     brew install mono
   ;;
   Linux)
-    sudo apt install mono-devel
+    sudo apt update
+    sudo apt install mono-devel -y
   ;;
   *) echo "only macOS or Ubuntu is supported"
 esac
