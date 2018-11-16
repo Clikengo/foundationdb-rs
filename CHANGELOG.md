@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## 0.3.0
+
+### Changed
+
+- `GetKeyResult` and `GetAddressResult` return value no longer unwrap to Result #94 (@yjh0502)
+
+### Added
+
+- Win64 support #92 (@Speedy37)
+
 ## 0.2.0
 
 ### Added
