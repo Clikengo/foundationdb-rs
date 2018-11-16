@@ -20,7 +20,7 @@ install:
   - ps: $env:Path = "C:\Program Files\foundationdb\bin;$env:USERPROFILE\.cargo\bin;$env:Path"
 
 build_script:
-  - cargo test -p foundationdb-sys --all-features
+  - cargo test -p foundationdb-sys
   - cargo test -p foundationdb-gen --all-features
   - cargo test -p foundationdb --all-features
   - cargo test -p foundationdb-bench --all-features

@@ -22,6 +22,9 @@ travis-ci = { repository = "bluejekyll/foundationdb-rs" }
 [features]
 default = ["uuid"]
 
+[build-dependencies]
+foundationdb-gen = { version = "0.1.0", path = "../foundationdb-gen" }
+
 [dependencies]
 failure = "0.1"
 failure_derive = "0.1"
