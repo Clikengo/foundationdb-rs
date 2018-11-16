@@ -53,7 +53,7 @@ before_install:
   - if [[ "$CLIPPY" == "true" ]]; then cargo install clippy --force ; fi
 
 script:
-  - cargo test -p foundationdb-sys --all-features
+  - cargo test -p foundationdb-sys
   - cargo test -p foundationdb-gen --all-features
   - cargo test -p foundationdb --all-features
   - cargo test -p foundationdb-bench --all-features
