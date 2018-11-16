@@ -2,8 +2,8 @@
 
 set -x
 
-VERSION=5.1.7
-VERSION2=5.1.7-1
+VERSION=5.2.5
+VERSION2=${VERSION}-1
 BASE_URL=https://www.foundationdb.org/downloads/${VERSION}
 
 dpkg --version &> /dev/null
