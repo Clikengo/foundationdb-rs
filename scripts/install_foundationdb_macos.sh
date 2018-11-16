@@ -2,6 +2,6 @@
 
 set -x
 
-curl -O https://www.foundationdb.org/downloads/5.2.5/macOS/installers/FoundationDB-5.2.5.pkg
+curl -O https://www.foundationdb.org/downloads/6.0.15/macOS/installers/FoundationDB-6.0.15.pkg
 
-sudo installer -pkg FoundationDB-5.2.5.pkg -target /
+sudo installer -pkg FoundationDB-6.0.15.pkg -target /

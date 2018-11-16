@@ -2,7 +2,7 @@
 
 set -x
 
-VERSION=5.2.5
+VERSION=6.0.15
 VERSION2=${VERSION}-1
 BASE_URL=https://www.foundationdb.org/downloads/${VERSION}
 
