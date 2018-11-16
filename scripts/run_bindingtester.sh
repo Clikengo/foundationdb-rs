@@ -28,9 +28,9 @@ esac
   cd ${fdb_builddir:?}
 
   ## Get foundationdb source
-  git clone --depth 1 https://github.com/apple/foundationdb.git -b release-5.2
+  git clone --depth 1 https://github.com/apple/foundationdb.git -b release-6.0
   cd foundationdb
-  git checkout release-5.2
+  git checkout release-6.0
 
   ## need the python api bindings
   make fdb_python
