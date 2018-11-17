@@ -1,6 +1,6 @@
 [package]
 name = "foundationdb"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Benjamin Fry <benjaminfry@me.com>"]
 
 description = """
@@ -28,7 +28,7 @@ foundationdb-gen = { version = "0.1.0", path = "../foundationdb-gen" }
 [dependencies]
 failure = "0.1"
 failure_derive = "0.1"
-foundationdb-sys = { version = "0.1.0", path = "../foundationdb-sys" }
+foundationdb-sys = { version = "0.2.0", path = "../foundationdb-sys" }
 futures = "0.1"
 lazy_static = "1.0"
 byteorder = "1.2"
