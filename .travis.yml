@@ -19,6 +19,11 @@ matrix:
       env: NAME=macos
            RUST_BACKTRACE=full
 
+    - os: windows
+      rust: stable
+      env: NAME=windows
+           RUST_BACKTRACE=full
+
     - rust: nightly
       env: RUST_BACKTRACE=full
 
@@ -50,6 +55,7 @@ matrix:
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then scripts/install_foundationdb_linux.sh ; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then scripts/install_foundationdb_macos.sh ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then scripts/install_foundationdb_win64.sh ; export PATH="${PATH}:/c/Program Files/foundationdb/bin" ; fi
   - if [[ "$CLIPPY" == "true" ]]; then cargo install clippy --force ; fi
 
 script:
