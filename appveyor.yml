@@ -21,7 +21,8 @@ install:
 
 build_script:
   - cargo test -p foundationdb-sys
-  - cargo test -p foundationdb-gen --all-features
-  - cargo test -p foundationdb --all-features
-  - cargo test -p foundationdb-bench --all-features
-  - cargo run -p foundationdb --example class-scheduling --all-features 
+  - cargo test -p foundationdb-gen
+  - cargo test -p foundationdb
+  - cd foundationdb && cargo test --no-default-features --features fdb-6_0
+  - cargo test -p foundationdb-bench
+  - cargo run -p foundationdb --example class-scheduling

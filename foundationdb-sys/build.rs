@@ -30,12 +30,20 @@ fn main() {
     // to the driver and then '#define FDB_API_VERSION FDB_TRICKY_VERSION', but
     // bindgen isn't smart enough to resolve that from the arguments. Instead, write
     // out a src/wrapper.h file with the chosen version instead.
+    let api_version;
+
     #[cfg(feature = "fdb-5_1")]
-    let api_version = 510;
+    {
+        api_version = 510;
+    }
     #[cfg(feature = "fdb-5_2")]
-    let api_version = 520;
+    {
+        api_version = 520;
+    }
     #[cfg(feature = "fdb-6_0")]
-    let api_version = 600;
+    {
+        api_version = 600;
+    }
 
     // Sigh, bindgen only takes a String for its header path, but that's UTF-8 while
     // PathBuf is OS-native...
