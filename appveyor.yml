@@ -20,9 +20,9 @@ install:
   - ps: $env:Path = "C:\Program Files\foundationdb\bin;$env:USERPROFILE\.cargo\bin;$env:Path"
 
 build_script:
-  - cargo test -p foundationdb-sys
-  - cargo test -p foundationdb-gen
-  - cargo test -p foundationdb
-  - cd foundationdb && cargo test --no-default-features --features fdb-6_0
-  - cargo test -p foundationdb-bench
-  - cargo run -p foundationdb --example class-scheduling
+  - cargo test --manifest-path foundationdb-sys/Cargo.toml
+  - cargo test --manifest-path foundationdb-gen/Cargo.toml
+  - cargo test --manifest-path foundationdb/Cargo.toml
+  - cargo test --manifest-path foundationdb/Cargo.toml --no-default-features --features fdb-6_0
+  - cargo test --manifest-path foundationdb-bench/Cargo.toml
+  - cargo run --manifest-path foundationdb/Cargo.toml --example class-scheduling

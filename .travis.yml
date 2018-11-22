@@ -59,11 +59,11 @@ before_install:
   - if [[ "$CLIPPY" == "true" ]]; then cargo install clippy --force ; fi
 
 script:
-  - cargo test -p foundationdb-sys
-  - cargo test -p foundationdb-gen
-  - cargo test -p foundationdb
-  - cd foundationdb && cargo test --no-default-features --features fdb-6_0
-  - cargo test -p foundationdb-bench
-  - cargo run -p foundationdb --example class-scheduling
+  - cargo test --manifest-path foundationdb-sys/Cargo.toml
+  - cargo test --manifest-path foundationdb-gen/Cargo.toml
+  - cargo test --manifest-path foundationdb/Cargo.toml
+  - cargo test --manifest-path foundationdb/Cargo.toml --no-default-features --features fdb-6_0
+  - cargo test --manifest-path foundationdb-bench/Cargo.toml
+  - cargo run --manifest-path foundationdb/Cargo.toml --example class-scheduling
 
 # after_success: cargo kcov here...
