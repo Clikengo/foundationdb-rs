@@ -13,6 +13,9 @@ mod element;
 use std::ops::{Deref, DerefMut};
 use std::{self, io::Write, string::FromUtf8Error};
 
+#[cfg(feature = "uuid")]
+use uuid;
+
 pub use self::element::Element;
 use self::element::Type;
 
@@ -34,6 +37,10 @@ pub enum Error {
     /// Utf8 Conversion error of tuple data
     #[fail(display = "UTF8 conversion error")]
     FromUtf8Error(FromUtf8Error),
+    /// Uuid Conversion error of tuple data
+    #[cfg(feature = "uuid")]
+    #[fail(display = "UUID conversion error")]
+    FromUuidError(uuid::BytesError),
 }
 
 /// Tracks the depth of a Tuple decoding chain
@@ -259,6 +266,13 @@ impl From<FromUtf8Error> for Error {
     }
 }
 
+#[cfg(feature = "uuid")]
+impl From<uuid::BytesError> for Error {
+    fn from(error: uuid::BytesError) -> Self {
+        Error::FromUuidError(error)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -358,9 +372,9 @@ mod tests {
         //
         // from Python impl:
         //  >>> [ord(x) for x in fdb.tuple.pack( (None, (None, None)) )]
-        let option_decode = <(Option<i64>, (Option<i64>, Option<i64>))>::try_from(&[
-            0, 5, 0, 255, 0, 255, 0,
-        ]).expect("failed option");
+        let option_decode =
+            <(Option<i64>, (Option<i64>, Option<i64>))>::try_from(&[0, 5, 0, 255, 0, 255, 0])
+                .expect("failed option");
 
         assert_eq!(&(None::<i64>, (None::<i64>, None::<i64>)), &option_decode)
     }
