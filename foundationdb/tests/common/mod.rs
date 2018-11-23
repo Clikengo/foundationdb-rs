@@ -8,9 +8,14 @@ use foundationdb::*;
 /// string as a value.
 #[allow(unused)]
 pub fn random_str(len: usize) -> String {
+    use self::rand::distributions::Alphanumeric;
     use self::rand::Rng;
+
     let mut rng = rand::thread_rng();
-    rng.gen_ascii_chars().take(len).collect::<String>()
+    ::std::iter::repeat(())
+        .take(len)
+        .map(|()| rng.sample(Alphanumeric))
+        .collect::<String>()
 }
 
 #[allow(unused)]
