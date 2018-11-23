@@ -3,6 +3,21 @@ name = "foundationdb-gen"
 version = "0.1.0"
 authors = ["Jihyun Yu <yjh0502@gmail.com>"]
 
+description = """
+Binding generation helper for FoundationDB.
+"""
+
+documentation = "https://docs.rs/foundationdb"
+repository = "https://github.com/bluejekyll/foundationdb-rs"
+license = "MIT/Apache-2.0"
+
+readme = "README.md"
+keywords = ["foundationdb", "kv"]
+categories = ["database"]
+
+[badges]
+travis-ci = { repository = "bluejekyll/foundationdb-rs" }
+
 [dependencies]
 failure = "0.1"
 Inflector = "0.11"
