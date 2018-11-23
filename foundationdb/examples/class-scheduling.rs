@@ -17,7 +17,7 @@ extern crate rand;
 use std::borrow::Cow;
 use std::thread;
 
-use self::rand::{Rng, ThreadRng};
+use self::rand::{rngs::ThreadRng, seq::SliceRandom};
 use futures::future::{self, Future};
 
 use foundationdb as fdb;
@@ -104,8 +104,7 @@ fn get_available_classes(db: &Database) -> Vec<String> {
             }
 
             future::ok(available_classes)
-        })
-        .wait()
+        }).wait()
         .expect("failed to get classes")
 }
 
@@ -113,7 +112,8 @@ fn ditch_trx(trx: &Transaction, student: &str, class: &str) {
     let attends_key = ("attends", student, class).to_vec();
 
     // TODO: should get take an &Encode? current impl does encourage &[u8] reuse...
-    if trx.get(&attends_key, true)
+    if trx
+        .get(&attends_key, true)
         .wait()
         .expect("get failed")
         .value()
@@ -129,7 +129,8 @@ fn ditch_trx(trx: &Transaction, student: &str, class: &str) {
             .expect("get failed")
             .value()
             .expect("class seats were not initialized"),
-    ).expect("failed to decode i64") + 1;
+    ).expect("failed to decode i64")
+        + 1;
 
     //println!("{} ditching class: {}", student, class);
     trx.set(&class_key, &available_seats.to_vec());
@@ -141,12 +142,13 @@ fn ditch(db: &Database, student: String, class: String) -> Result<(), failure::E
         ditch_trx(&trx, &student, &class);
         future::result(Ok::<(), failure::Error>(()))
     }).wait()
-        .map_err(|e| format_err!("error in signup: {}", e))
+    .map_err(|e| format_err!("error in signup: {}", e))
 }
 
 fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(), failure::Error> {
     let attends_key = ("attends", student, class).to_vec();
-    if trx.get(&attends_key, true)
+    if trx
+        .get(&attends_key, true)
         .wait()
         .expect("get failed")
         .value()
@@ -170,11 +172,13 @@ fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(), failu
     }
 
     let attends_range = RangeOptionBuilder::from(("attends", student)).build();
-    if trx.get_range(attends_range, 1_024)
+    if trx
+        .get_range(attends_range, 1_024)
         .wait()
         .expect("get_range failed")
         .key_values()
-        .len() >= 5
+        .len()
+        >= 5
     {
         bail!("Too many classes");
     }
@@ -201,7 +205,7 @@ fn switch_classes(
         ditch_trx(&trx, &student_id, &old_class);
         future::result(signup_trx(&trx, &student_id, &new_class))
     }).wait()
-        .map_err(|e| format_err!("error in switch: {}", e))
+    .map_err(|e| format_err!("error in switch: {}", e))
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -221,18 +225,18 @@ fn perform_op(
 ) -> Result<(), failure::Error> {
     match mood {
         Mood::Add => {
-            let class = rng.choose(all_classes).unwrap();
+            let class = all_classes.choose(rng).unwrap();
             signup(&db, student_id.to_string(), class.to_string())?;
             my_classes.push(class.to_string());
         }
         Mood::Ditch => {
-            let class = rng.choose(all_classes).unwrap();
+            let class = all_classes.choose(rng).unwrap();
             ditch(&db, student_id.to_string(), class.to_string())?;
             my_classes.retain(|s| s != class);
         }
         Mood::Switch => {
-            let old_class = rng.choose(my_classes).unwrap().to_string();
-            let new_class = rng.choose(all_classes).unwrap();
+            let old_class = my_classes.choose(rng).unwrap().to_string();
+            let new_class = all_classes.choose(rng).unwrap();
             switch_classes(
                 &db,
                 student_id.to_string(),
@@ -268,7 +272,7 @@ fn simulate_students(student_id: usize, num_ops: usize) {
                     moods.push(Mood::Add);
                 }
 
-                let mood = rng.choose(&moods).map(|mood| *mood).unwrap();
+                let mood = moods.choose(&mut rng).map(|mood| *mood).unwrap();
 
                 // on errors we recheck for available classes
                 if perform_op(
@@ -286,8 +290,7 @@ fn simulate_students(student_id: usize, num_ops: usize) {
             }
 
             future::ok(())
-        })
-        .wait()
+        }).wait()
         .expect("got error in simulation");
 }
 
@@ -310,7 +313,8 @@ fn run_sim(db: &Database, students: usize, ops_per_student: usize) {
         let student_id = format!("s{}", id);
         let attends_range = RangeOptionBuilder::from(("attends", &student_id)).build();
 
-        for key_value in db.create_trx()
+        for key_value in db
+            .create_trx()
             .unwrap()
             .get_range(attends_range, 1_024)
             .wait()
@@ -349,8 +353,7 @@ fn main() {
             run_sim(&db, 10, 10);
 
             future::ok(())
-        })
-        .wait()
+        }).wait()
         .expect("failed to create cluster");
 
     // shutdown
