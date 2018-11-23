@@ -5,14 +5,13 @@ extern crate stopwatch;
 #[macro_use]
 extern crate log;
 extern crate env_logger;
-#[macro_use]
 extern crate structopt;
 
 use std::sync::atomic::*;
 use std::sync::Arc;
 
 use futures::future::*;
-use rand::SeedableRng;
+use rand::rngs::mock::StepRng;
 use stopwatch::Stopwatch;
 use structopt::StructOpt;
 
@@ -44,14 +43,13 @@ struct BenchRunner {
     counter: Counter,
     key_buf: Vec<u8>,
     val_buf: Vec<u8>,
-
-    rng: rand::XorShiftRng,
+    rng: StepRng,
     trx: Option<Transaction>,
     trx_batch_size: usize,
 }
 
 impl BenchRunner {
-    fn new(db: Database, rng: rand::XorShiftRng, counter: Counter, opt: &Opt) -> Self {
+    fn new(db: Database, rng: StepRng, counter: Counter, opt: &Opt) -> Self {
         let mut key_buf = Vec::with_capacity(opt.key_len);
         key_buf.resize(opt.key_len, 0u8);
 
@@ -84,8 +82,8 @@ impl BenchRunner {
         let trx = self.trx.take().unwrap();
 
         for _ in 0..self.trx_batch_size {
-            self.rng.fill_bytes(&mut self.key_buf);
-            self.rng.fill_bytes(&mut self.val_buf);
+            self.rng.fill(&mut self.key_buf as &mut [u8]);
+            self.rng.fill(&mut self.val_buf as &mut [u8]);
             self.key_buf[0] = 0x01;
             trx.set(&self.key_buf, &self.val_buf);
         }
@@ -159,9 +157,7 @@ impl Bench {
             .map(|n| {
                 // With deterministic Rng, benchmark with same parameters will overwrite same set
                 // of keys again, which makes benchmark result stable.
-                let seed = [n as u32, 0, 0, 1];
-                let mut rng = rand::XorShiftRng::new_unseeded();
-                rng.reseed(seed);
+                let rng = StepRng::new(n as u64, 1);
                 BenchRunner::new(self.db.clone(), rng, counter.clone(), &self.opt).run()
             }).collect::<Vec<_>>();
 
