@@ -11,6 +11,7 @@ use std::sync::atomic::*;
 use std::sync::Arc;
 
 use futures::future::*;
+use rand::prelude::*;
 use rand::rngs::mock::StepRng;
 use stopwatch::Stopwatch;
 use structopt::StructOpt;
@@ -77,13 +78,11 @@ impl BenchRunner {
 
     //TODO: impl future
     fn step(mut self) -> Box<Future<Item = Loop<(), Self>, Error = Error>> {
-        use rand::Rng;
-
         let trx = self.trx.take().unwrap();
 
         for _ in 0..self.trx_batch_size {
-            self.rng.fill(&mut self.key_buf as &mut [u8]);
-            self.rng.fill(&mut self.val_buf as &mut [u8]);
+            self.rng.fill_bytes(&mut self.key_buf);
+            self.rng.fill_bytes(&mut self.val_buf);
             self.key_buf[0] = 0x01;
             trx.set(&self.key_buf, &self.val_buf);
         }
