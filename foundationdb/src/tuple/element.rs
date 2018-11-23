@@ -224,7 +224,7 @@ impl Decode for Uuid {
         let mut uuid = [0u8; 16];
         uuid.copy_from_slice(&buf[1..17]);
 
-        Ok((Uuid::from_uuid_bytes(uuid), 17))
+        Ok((Uuid::from_slice(&uuid)?, 17))
     }
 }
 
@@ -632,24 +632,8 @@ mod tests {
                 Element::I64(42),
             ])),
             &[
-                NESTED,
-                /*hello*/ 2,
-                104,
-                101,
-                108,
-                108,
-                111,
-                0,
-                /*world*/ 2,
-                119,
-                111,
-                114,
-                108,
-                100,
-                0,
-                /*42*/ 21,
-                42,
-                /*end nested*/
+                NESTED, /*hello*/ 2, 104, 101, 108, 108, 111, 0, /*world*/ 2, 119, 111,
+                114, 108, 100, 0, /*42*/ 21, 42, /*end nested*/
                 NIL,
             ],
         );
