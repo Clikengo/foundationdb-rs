@@ -151,13 +151,14 @@ mod tests {
 
         let network = Arc::new(network);
         let runner = Arc::clone(&network);
-        thread::spawn(move || {
+        let net_thread = thread::spawn(move || {
             runner.run().expect("failed to run");
         });
 
         println!("stop!");
         network.wait();
         network.stop().expect("failed to stop");
+        net_thread.join().expect("failed to join net thread");
         println!("stopped!");
 
         // this should fail:
