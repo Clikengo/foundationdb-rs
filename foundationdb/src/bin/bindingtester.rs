@@ -582,7 +582,7 @@ impl StackMachine {
                     .snapshot(instr.pop_snapshot())
                     .build();
 
-                let mut out = Vec::new();
+                let out = Vec::new();
                 let trx0 = trx.clone();
                 let f = trx.get_ranges(opt)
                     .map_err(|(_, e)| e)
