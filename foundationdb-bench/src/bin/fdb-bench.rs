@@ -16,8 +16,8 @@ use rand::rngs::mock::StepRng;
 use stopwatch::Stopwatch;
 use structopt::StructOpt;
 
-use fdb::error::*;
-use fdb::*;
+use crate::fdb::error::*;
+use crate::fdb::*;
 
 #[derive(Clone)]
 struct Counter {

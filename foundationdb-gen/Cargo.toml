@@ -2,6 +2,7 @@
 name = "foundationdb-gen"
 version = "0.1.0"
 authors = ["Jihyun Yu <yjh0502@gmail.com>"]
+edition = "2018"
 
 description = """
 Binding generation helper for FoundationDB.

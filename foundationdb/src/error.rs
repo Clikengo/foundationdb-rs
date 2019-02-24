@@ -15,8 +15,8 @@ use std::fmt::{self, Display};
 use failure::{Backtrace, Context, Fail};
 
 use foundationdb_sys as fdb_sys;
-use options;
-use tuple;
+use crate::options;
+use crate::tuple;
 
 pub(crate) fn eval(error_code: fdb_sys::fdb_error_t) -> Result<()> {
     let rust_code = error_code as i32;

@@ -17,10 +17,10 @@ use foundationdb_sys as fdb;
 use futures::future::*;
 use futures::Future;
 
-use cluster::*;
-use error::{self, Error as FdbError, Result};
-use options;
-use transaction::*;
+use crate::cluster::*;
+use crate::error::{self, Error as FdbError, Result};
+use crate::options;
+use crate::transaction::*;
 
 /// Represents a FoundationDB database — a mutable, lexicographically ordered mapping from binary keys to binary values.
 ///

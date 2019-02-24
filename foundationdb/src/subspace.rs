@@ -6,7 +6,7 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
-use tuple::{Decode, Encode, Error, Result};
+use crate::tuple::{Decode, Encode, Error, Result};
 
 /// Represents a well-defined region of keyspace in a FoundationDB database
 ///
@@ -100,7 +100,7 @@ impl Subspace {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tuple::Tuple;
+    use crate::tuple::Tuple;
 
     #[test]
     fn sub() {

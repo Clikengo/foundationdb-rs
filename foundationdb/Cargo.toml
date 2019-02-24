@@ -2,6 +2,7 @@
 name = "foundationdb"
 version = "0.3.0"
 authors = ["Benjamin Fry <benjaminfry@me.com>"]
+edition = "2018"
 
 description = """
 High level client bindings for FoundationDB.

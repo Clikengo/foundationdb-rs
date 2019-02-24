@@ -3,7 +3,7 @@ use std::{self, io::Write};
 use uuid::Uuid;
 
 use byteorder::{self, ByteOrder};
-use tuple::{Decode, Encode, Error, Result, Tuple, TupleDepth};
+use crate::tuple::{Decode, Encode, Error, Result, Tuple, TupleDepth};
 
 /// Various tuple types
 pub(super) const NIL: u8 = 0x00;
@@ -577,7 +577,7 @@ impl Decode for Element {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tuple::Tuple;
+    use crate::tuple::Tuple;
 
     fn test_round_trip<S>(val: S, buf: &[u8])
     where
@@ -650,7 +650,7 @@ mod tests {
 
     #[test]
     fn test_decode_nested() {
-        use tuple::Decode;
+        use crate::tuple::Decode;
 
         assert!(Tuple::try_from(&[NESTED]).is_err());
         assert!(Tuple::try_from(&[NESTED, NIL]).is_ok());

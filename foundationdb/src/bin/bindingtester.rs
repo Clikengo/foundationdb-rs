@@ -6,14 +6,14 @@ extern crate log;
 
 use std::collections::HashMap;
 
-use fdb::error::Error;
-use fdb::keyselector::KeySelector;
-use fdb::tuple::*;
-use fdb::*;
+use crate::fdb::error::Error;
+use crate::fdb::keyselector::KeySelector;
+use crate::fdb::tuple::*;
+use crate::fdb::*;
 use futures::future::*;
 use futures::prelude::*;
 
-use fdb::options::{MutationType, StreamingMode};
+use crate::fdb::options::{MutationType, StreamingMode};
 fn mutation_from_str(s: &str) -> MutationType {
     match s {
         "ADD" => MutationType::Add,
@@ -174,7 +174,7 @@ fn has_opt<'a>(cmd: &'a str, opt: &'static str) -> (&'a str, bool) {
 
 impl Instr {
     fn from(data: &[u8]) -> Self {
-        use InstrCode::*;
+        use crate::InstrCode::*;
 
         let tup: Tuple = Decode::try_from(data).unwrap();
         let cmd = match tup[0] {
@@ -431,7 +431,7 @@ impl StackMachine {
     }
 
     fn run_step(&mut self, number: usize, mut instr: Instr) {
-        use InstrCode::*;
+        use crate::InstrCode::*;
 
         let is_db = instr.pop_database();
         let mut mutation = false;

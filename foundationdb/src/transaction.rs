@@ -15,13 +15,13 @@ use futures::{Async, Future, Stream};
 use std;
 use std::sync::Arc;
 
-use database::*;
-use error::{self, *};
-use future::*;
-use keyselector::*;
-use options;
-use subspace::Subspace;
-use tuple::Encode;
+use crate::database::*;
+use crate::error::{self, *};
+use crate::future::*;
+use crate::keyselector::*;
+use crate::options;
+use crate::subspace::Subspace;
+use crate::tuple::Encode;
 
 /// In FoundationDB, a transaction is a mutable snapshot of a database.
 ///

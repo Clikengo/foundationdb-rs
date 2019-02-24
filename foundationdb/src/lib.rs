@@ -136,11 +136,11 @@ pub mod transaction;
 pub mod tuple;
 
 //move to prelude?
-pub use cluster::Cluster;
-pub use database::Database;
-pub use error::Error;
-pub use subspace::Subspace;
-pub use transaction::Transaction;
+pub use crate::cluster::Cluster;
+pub use crate::database::Database;
+pub use crate::error::Error;
+pub use crate::subspace::Subspace;
+pub use crate::transaction::Transaction;
 
 /// Initialize the FoundationDB Client API, this can only be called once per process.
 ///

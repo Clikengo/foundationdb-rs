@@ -11,13 +11,13 @@
 //! https://apple.github.io/foundationdb/api-c.html#cluster
 
 use foundationdb_sys as fdb;
-use future::*;
+use crate::future::*;
 use futures::{Async, Future};
 use std;
 use std::sync::Arc;
 
-use database::*;
-use error::*;
+use crate::database::*;
+use crate::error::*;
 
 /// An opaque type that represents a Cluster in the FoundationDB C API.
 #[derive(Clone)]
