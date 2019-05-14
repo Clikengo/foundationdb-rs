@@ -23,7 +23,7 @@ const VERSIONSTAMP: u8 = 0x33;
 
 pub(super) const ESCAPE: u8 = 0xff;
 
-const SIZE_LIMITS: &[i64] = &[
+const SIZE_LIMITS: &[u64] = &[
     0,
     (1 << (1 * 8)) - 1,
     (1 << (2 * 8)) - 1,
@@ -32,7 +32,7 @@ const SIZE_LIMITS: &[i64] = &[
     (1 << (5 * 8)) - 1,
     (1 << (6 * 8)) - 1,
     (1 << (7 * 8)) - 1,
-    -1,
+    u64::max_value(),
 ];
 
 /// A single tuple element
@@ -118,7 +118,7 @@ fn adjust_float_bytes(b: &mut [u8], encode: bool) {
     }
 }
 
-fn bisect_left(val: i64) -> usize {
+fn bisect_left(val: u64) -> usize {
     SIZE_LIMITS.iter().position(|v| val <= *v).unwrap_or(8)
 }
 
@@ -405,17 +405,16 @@ impl Decode for f64 {
 impl Encode for i64 {
     fn encode<W: Write>(&self, w: &mut W, _tuple_depth: TupleDepth) -> std::io::Result<()> {
         let mut code = INTZERO;
-        let n;
+        let abs = self.wrapping_abs() as u64;
+        let n = bisect_left(abs);
         let mut buf: [u8; 8] = Default::default();
 
         if *self > 0 {
-            n = bisect_left(*self);
             code += n as u8;
-            byteorder::BE::write_i64(&mut buf, *self);
+            byteorder::BE::write_u64(&mut buf, abs);
         } else {
-            n = bisect_left(-*self);
             code -= n as u8;
-            byteorder::BE::write_i64(&mut buf, SIZE_LIMITS[n] + *self);
+            byteorder::BE::write_u64(&mut buf, SIZE_LIMITS[n] - abs);
         }
 
         w.write_all(&[code])?;
@@ -433,31 +432,35 @@ impl Decode for i64 {
             return Err(Error::InvalidType { value: header });
         }
 
-        // if it's 0
+        // zero
         if INTZERO.expect(header).is_ok() {
             return Ok((0, 1));
         }
 
         let mut data: [u8; 8] = Default::default();
         if header > INTZERO {
+            // positive number
             let n = usize::from(header - INTZERO);
             if n + 1 > buf.len() {
                 return Err(Error::InvalidData);
             }
 
             (&mut data[(8 - n)..8]).copy_from_slice(&buf[1..(n + 1)]);
-            let val = byteorder::BE::read_i64(&data);
-            Ok((val, n + 1))
+            let val = byteorder::BE::read_u64(&data);
+            Ok((val as i64, n + 1))
         } else {
+            // negative number
             let n = usize::from(INTZERO - header);
             if n + 1 > buf.len() {
                 return Err(Error::InvalidData);
             }
 
             (&mut data[(8 - n)..8]).copy_from_slice(&buf[1..(n + 1)]);
-            let shift = (1 << (n * 8)) - 1;
-            let val = byteorder::BE::read_i64(&data);
-            Ok((val - shift, n + 1))
+            let shift = SIZE_LIMITS[n];
+
+            let val = byteorder::BE::read_u64(&data);
+            let val = ((shift - val) as i64).wrapping_neg();
+            Ok((val, n + 1))
         }
     }
 }
@@ -646,6 +649,34 @@ mod tests {
                 Element::Tuple(Tuple(vec![Element::Bytes(vec![0]), Element::Empty])),
             ])),
             &[5, 1, 0, 255, 0, 0, 255, 5, 1, 0, 255, 0, 0, 255, 0, 0],
+        );
+    }
+
+    #[test]
+    fn test_large_neg() {
+        test_round_trip(
+            -8617230260136600747,
+            &[0x0c, 0x88, 0x69, 0x72, 0xbc, 0x04, 0xcf, 0x9b, 0x54],
+        );
+    }
+
+    #[test]
+    fn test_boundary() {
+        test_round_trip(i64::min_value() + 1, &[0x0c, 0x80, 0, 0, 0, 0, 0, 0, 0]);
+
+        test_round_trip(
+            i64::min_value(),
+            &[0x0c, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff],
+        );
+
+        test_round_trip(
+            i64::max_value(),
+            &[0x1c, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff],
+        );
+
+        test_round_trip(
+            i64::max_value() - 1,
+            &[0x1c, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe],
         );
     }
 
