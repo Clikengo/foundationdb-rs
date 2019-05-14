@@ -23,7 +23,7 @@ const VERSIONSTAMP: u8 = 0x33;
 
 pub(super) const ESCAPE: u8 = 0xff;
 
-const SIZE_LIMITS: &[i128] = &[
+const SIZE_LIMITS: &[i64] = &[
     0,
     (1 << (1 * 8)) - 1,
     (1 << (2 * 8)) - 1,
@@ -32,7 +32,7 @@ const SIZE_LIMITS: &[i128] = &[
     (1 << (5 * 8)) - 1,
     (1 << (6 * 8)) - 1,
     (1 << (7 * 8)) - 1,
-    (1 << (8 * 8)) - 1,
+    -1,
 ];
 
 /// A single tuple element
@@ -119,7 +119,7 @@ fn adjust_float_bytes(b: &mut [u8], encode: bool) {
 }
 
 fn bisect_left(val: i64) -> usize {
-    SIZE_LIMITS.iter().position(|v| val <= (*v as i64)).unwrap_or(8)
+    SIZE_LIMITS.iter().position(|v| val <= *v).unwrap_or(8)
 }
 
 impl Type for u8 {
@@ -415,7 +415,7 @@ impl Encode for i64 {
         } else {
             n = bisect_left(-*self);
             code -= n as u8;
-            byteorder::BE::write_i64(&mut buf, (SIZE_LIMITS[n] as i64) + *self);
+            byteorder::BE::write_i64(&mut buf, SIZE_LIMITS[n] + *self);
         }
 
         w.write_all(&[code])?;
