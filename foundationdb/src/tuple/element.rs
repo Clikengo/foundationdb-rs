@@ -447,7 +447,12 @@ impl Decode for i64 {
 
             (&mut data[(8 - n)..8]).copy_from_slice(&buf[1..(n + 1)]);
             let val = byteorder::BE::read_u64(&data);
-            Ok((val as i64, n + 1))
+            let max = i64::max_value() as u64;
+            if val <= max {
+                Ok((val as i64, n + 1))
+            } else {
+                Err(Error::InvalidData)
+            }
         } else {
             // negative number
             let n = usize::from(INTZERO - header);
@@ -459,8 +464,16 @@ impl Decode for i64 {
             let shift = SIZE_LIMITS[n];
 
             let val = byteorder::BE::read_u64(&data);
-            let val = ((shift - val) as i64).wrapping_neg();
-            Ok((val, n + 1))
+            let val = shift - val;
+            let max = i64::max_value() as u64 + 1;
+            if val < max {
+                Ok((-(val as i64), n + 1))
+            } else if val == max {
+                // val == i64::max_value()+1, (encoded value is i64::min_value())
+                Ok((i64::min_value(), n + 1))
+            } else {
+                Err(Error::InvalidData)
+            }
         }
     }
 }
@@ -678,6 +691,17 @@ mod tests {
             i64::max_value() - 1,
             &[0x1c, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe],
         );
+    }
+
+    #[test]
+    fn test_i64_out_of_bound() {
+        // fdb.tuple.pack(((1<<63),))
+        let v = i64::try_from(&[0x1c, 0x80, 0, 0, 0, 0, 0, 0, 0]);
+        assert!(v.is_err());
+
+        // fdb.tuple.pack((-(1<<63)-1,))
+        let v = i64::try_from(&[0x0c, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe]);
+        assert!(v.is_err());
     }
 
     #[test]
