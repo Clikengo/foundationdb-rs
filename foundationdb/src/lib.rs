@@ -118,20 +118,27 @@ extern crate byteorder;
 extern crate foundationdb_sys;
 #[macro_use]
 extern crate futures;
+extern crate core;
 #[cfg(feature = "uuid")]
 extern crate uuid;
+#[macro_use]
+extern crate lazy_static;
+extern crate rand;
 
 pub mod cluster;
 pub mod database;
 pub mod error;
 pub mod fdb_api;
 pub mod future;
+pub mod hca;
 pub mod keyselector;
 pub mod network;
 /// Generated configuration types for use with the various `set_option` functions
 #[allow(missing_docs)]
 pub mod options;
-mod subspace;
+/// TODO: @phemberger
+#[allow(missing_docs)]
+pub mod subspace;
 pub mod transaction;
 pub mod tuple;
 
