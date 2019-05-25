@@ -58,16 +58,17 @@ impl HighContentionAllocator {
 
             let kvs: Vec<i64> = transaction.get_ranges(range_option)
                 .map_err(|(_, e)| e)
-                .filter_map(|range_result| {
-                    for kv in range_result.key_values().as_ref() {
+                .fold(Vec::new(), move |mut out, range_result| {
+                    let kvs = range_result.key_values();
+
+                    for kv in kvs.as_ref() {
                         if let Element::I64(counter) = self.counters.unpack(kv.key()).expect("unable to unpack counter key") {
-                            return Some(counter);
+                            out.push(counter);
                         }
                     }
 
-                    return None;
+                    Ok::<_, Error>(out)
                 })
-                .collect()
                 .wait()?;
 
             let mut start: i64 = 0;
@@ -128,15 +129,17 @@ impl HighContentionAllocator {
 
                 let kvs: Vec<i64> = transaction.get_ranges(range_option)
                     .map_err(|(_, e)| e)
-                    .filter_map(|range_result| {
-                        for kv in range_result.key_values().as_ref() {
+                    .fold(Vec::new(), move |mut out, range_result| {
+                        let kvs = range_result.key_values();
+
+                        for kv in kvs.as_ref() {
                             if let Element::I64(counter) = self.counters.unpack(kv.key()).expect("unable to unpack counter key") {
-                                return Some(counter);
+                                out.push(counter);
                             }
                         }
-                        return None;
+
+                        Ok::<_, Error>(out)
                     })
-                    .collect()
                     .wait()?;
 
                 let candidate_value_trx = transaction.get(candidate_subspace, false);
