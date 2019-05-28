@@ -21,11 +21,12 @@ travis-ci = { repository = "bluejekyll/foundationdb-rs" }
 # codecov = { repository = "bluejekyll/foundationdb-rs", branch = "master", service = "github" }
 
 [features]
-default = [ "fdb-6_0" ]
+default = [ "fdb-6_1" ]
 
 fdb-5_1 = [ ]
 fdb-5_2 = [ ]
 fdb-6_0 = [ ]
+fdb-6_1 = [ ]
 
 [dependencies]
 

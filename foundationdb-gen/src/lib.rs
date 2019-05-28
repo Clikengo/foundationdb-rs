@@ -62,7 +62,7 @@ impl FdbScope {
         for option in self.options.iter() {
             let rs_name = match option.name.as_ref() {
                 "AppendIfFit" => "AppendIfFits",
-                s => s
+                s => s,
             };
 
             s += &format!("{}::{}", self.name, rs_name);
@@ -94,6 +94,7 @@ impl FdbScope {
             ("THREAD", "THREADS"),
             ("KEY", "KEYS"),
             ("FIT", "FITS"),
+            ("PROXY", "PROXIES"),
         ];
 
         for &(ref from, ref to) in tab.iter() {
@@ -352,7 +353,8 @@ const OPTIONS_DATA: &[u8] = include_bytes!("/usr/include/foundationdb/fdb.option
 const OPTIONS_DATA: &[u8] = include_bytes!("/usr/local/include/foundationdb/fdb.options");
 
 #[cfg(target_os = "windows")]
-const OPTIONS_DATA: &[u8] = include_bytes!("C:/Program Files/foundationdb/include/foundationdb/fdb.options");
+const OPTIONS_DATA: &[u8] =
+    include_bytes!("C:/Program Files/foundationdb/include/foundationdb/fdb.options");
 
 pub fn emit() -> Result<String> {
     let mut reader = OPTIONS_DATA.as_ref();
