@@ -6,8 +6,23 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
-//! Docs!
+//! The directory layer offers subspace indirection, where logical application subspaces are mapped to short, auto-generated key prefixes. This prefix assignment is done by the High Contention Allocator, which allows many clients to allocate short directory prefixes efficiently.
 //!
+//! The allocation process works over candidate value windows. It uses two subspaces to operate, the "counters" subspace and "recents" subspace (derived from the subspace used to create the HCA).
+//!
+//!     "counters" contains a single key : "counters : window_start", whose value is the # of allocations in the current window. "window_start" is an integer that marks the lower bound of values that can be assigned from the current window.
+//!     "recents" can contain many keys : "recents : <candidate>", where each "candidate" is an integer that has been assigned to some client
+//!
+//! Assignment has two stages that are executed in a loop until they both succeed.
+//!
+//!     1. Find the current window. The client scans "counters : *" to get the current "window_start" and how many allocations have been made in the current window.
+//!         If the window is more than half-full (using pre-defined window sizes), the window is advanced: "counters : *" and "recents : *" are both cleared, and a new "counters : window_start + window_size" key is created with a value of 0. (1) is retried
+//!         If the window still has space, it moves to (2).
+//!
+//!     2. Find a candidate value inside that window. The client picks a candidate number between "[window_start, window_start + window_size)" and tries to set the key "recents : <candidate>".
+//!         If the write succeeds, the candidate is returned as the allocated value. Success!
+//!         If the write fails because the window has been advanced, it repeats (1).
+//!         If the write fails because the value was already set, it repeats (2).
 
 use std::sync::Mutex;
 
@@ -23,32 +38,29 @@ use subspace::Subspace;
 use transaction::{RangeOptionBuilder, Transaction};
 use tuple::Element;
 
-lazy_static! {
-    static ref LOCK: Mutex<i32> = Mutex::new(0);
-}
-
 const ONE_BYTES: &[u8] = &[0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
 
-/// High Contention Allocator
-///
-#[derive(Debug, Clone)]
+/// Represents a High Contention Allocator for a given subspace
+#[derive(Debug)]
 pub struct HighContentionAllocator {
     counters: Subspace,
     recent: Subspace,
+    allocation_mutex: Mutex<()>,
 }
 
 impl HighContentionAllocator {
-    /// New HCA
+    /// Constructs an allocator that will use the input subspace for assigning values.
+    /// The given subspace should not be used by anything other than the allocator
     pub fn new(subspace: Subspace) -> HighContentionAllocator {
         HighContentionAllocator {
             counters: subspace.subspace(0),
             recent: subspace.subspace(1),
+            allocation_mutex: Mutex::new(()),
         }
     }
 
     /// Returns a byte string that
-    ///   1) has never and will never be returned by another call to this
-    ///      method on the same subspace
+    ///   1) has never and will never be returned by another call to this method on the same subspace
     ///   2) is nearly as short as possible given the above
     pub fn allocate(&self, transaction: &mut Transaction) -> Result<i64, Error> {
         let (begin, end) = self.counters.range();
@@ -88,7 +100,7 @@ impl HighContentionAllocator {
             let mut window_advanced = false;
 
             loop {
-                let mutex_guard = LOCK.lock().unwrap();
+                let mutex_guard = self.allocation_mutex.lock().unwrap();
 
                 if window_advanced {
                     transaction
@@ -135,7 +147,7 @@ impl HighContentionAllocator {
                 let recent_subspace_for_candidate = self.recent.subspace(candidate);
                 let candidate_subspace = recent_subspace_for_candidate.bytes();
 
-                let mutex_guard = LOCK.lock().unwrap();
+                let mutex_guard = self.allocation_mutex.lock().unwrap();
 
                 let counters_begin = KeySelector::first_greater_or_equal(&begin);
                 let counters_end = KeySelector::first_greater_than(&end);
