@@ -119,11 +119,10 @@ extern crate foundationdb_sys;
 #[macro_use]
 extern crate futures;
 extern crate core;
-#[cfg(feature = "uuid")]
-extern crate uuid;
-#[macro_use]
 extern crate lazy_static;
 extern crate rand;
+#[cfg(feature = "uuid")]
+extern crate uuid;
 
 pub mod cluster;
 pub mod database;
@@ -136,8 +135,6 @@ pub mod network;
 /// Generated configuration types for use with the various `set_option` functions
 #[allow(missing_docs)]
 pub mod options;
-/// TODO: @phemberger
-#[allow(missing_docs)]
 pub mod subspace;
 pub mod transaction;
 pub mod tuple;
