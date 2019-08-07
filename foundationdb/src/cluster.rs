@@ -11,13 +11,13 @@
 //! https://apple.github.io/foundationdb/api-c.html#cluster
 
 use foundationdb_sys as fdb;
-use future::*;
+use crate::future::*;
 use futures::{Async, Future};
 use std;
 use std::sync::Arc;
 
-use database::*;
-use error::*;
+use crate::database::*;
+use crate::error::*;
 
 /// An opaque type that represents a Cluster in the FoundationDB C API.
 #[derive(Clone)]
@@ -46,7 +46,7 @@ impl Cluster {
     /// Returns an `FdbFuture` which will be set to an `Database` object.
     ///
     /// TODO: impl Future
-    pub fn create_database(&self) -> Box<Future<Item = Database, Error = Error>> {
+    pub fn create_database(&self) -> Box<dyn Future<Item = Database, Error = Error>> {
         let f = unsafe {
             let f_db = fdb::fdb_cluster_create_database(self.inner.inner, b"DB" as *const _, 2);
             let cluster = self.clone();

@@ -389,7 +389,7 @@ pub fn emit() -> Result<String> {
 
     let mut result = format!(
         "{}\n{}\n{}\n\n",
-        "use std;", "use error;", "use foundationdb_sys as fdb;"
+        "use std;", "use crate::error;", "use foundationdb_sys as fdb;"
     );
 
     for scope in scopes.iter() {

@@ -21,7 +21,7 @@ use foundationdb_sys as fdb;
 use futures;
 use futures::Async;
 
-use error::{self, Error, Result};
+use crate::error::{self, Error, Result};
 
 /// An opaque type that represents a Future in the FoundationDB C API.
 pub(crate) struct FdbFuture {

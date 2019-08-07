@@ -16,10 +16,10 @@ use std::thread;
 
 use failure;
 
-use error::{self, Result};
-use fdb_api::FdbApi;
+use crate::error::{self, Result};
+use crate::fdb_api::FdbApi;
 use foundationdb_sys as fdb_sys;
-use options::NetworkOption;
+use crate::options::NetworkOption;
 
 // The Fdb states that setting the Client version should happen only once
 //   and is not thread-safe, thus the choice of a lazy static enforcing a single
@@ -135,7 +135,7 @@ mod tests {
     use std::sync::Arc;
     use std::thread;
 
-    use fdb_api::*;
+    use crate::fdb_api::*;
 
     use super::*;
 

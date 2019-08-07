@@ -8,7 +8,7 @@
 
 //! Implements the FDB Subspace Layer
 
-use tuple::{Decode, Encode, Error, Result};
+use crate::tuple::{Decode, Encode, Error, Result};
 
 /// Represents a well-defined region of keyspace in a FoundationDB database
 ///
@@ -101,7 +101,7 @@ impl Subspace {
 
 #[cfg(test)]
 mod tests {
-    use tuple::Tuple;
+    use crate::tuple::Tuple;
 
     use super::*;
 

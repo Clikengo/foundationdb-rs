@@ -6,14 +6,14 @@ extern crate log;
 
 use std::collections::HashMap;
 
-use fdb::error::Error;
-use fdb::keyselector::KeySelector;
-use fdb::tuple::*;
-use fdb::*;
+use crate::fdb::error::Error;
+use crate::fdb::keyselector::KeySelector;
+use crate::fdb::tuple::*;
+use crate::fdb::*;
 use futures::future::*;
 use futures::prelude::*;
 
-use fdb::options::{MutationType, StreamingMode};
+use crate::fdb::options::{MutationType, StreamingMode};
 fn mutation_from_str(s: &str) -> MutationType {
     match s {
         "ADD" => MutationType::Add,
@@ -174,7 +174,7 @@ fn has_opt<'a>(cmd: &'a str, opt: &'static str) -> (&'a str, bool) {
 
 impl Instr {
     fn from(data: &[u8]) -> Self {
-        use InstrCode::*;
+        use crate::InstrCode::*;
 
         let tup: Tuple = Decode::try_from(data).unwrap();
         let cmd = match tup[0] {
@@ -251,7 +251,7 @@ impl Instr {
     }
 }
 
-type StackFuture = Box<Future<Item = (Transaction, Vec<u8>), Error = Error>>;
+type StackFuture = Box<dyn Future<Item = (Transaction, Vec<u8>), Error = Error>>;
 struct StackItem {
     number: usize,
     // TODO: enum
@@ -350,7 +350,7 @@ impl StackMachine {
         }
     }
 
-    fn fetch_instr(&self) -> Box<Future<Item = Vec<Instr>, Error = Error>> {
+    fn fetch_instr(&self) -> Box<dyn Future<Item = Vec<Instr>, Error = Error>> {
         let db = self.db.clone();
 
         let prefix = self.prefix.clone();
@@ -431,7 +431,7 @@ impl StackMachine {
     }
 
     fn run_step(&mut self, number: usize, mut instr: Instr) {
-        use InstrCode::*;
+        use crate::InstrCode::*;
 
         let is_db = instr.pop_database();
         let mut mutation = false;
@@ -582,7 +582,7 @@ impl StackMachine {
                     .snapshot(instr.pop_snapshot())
                     .build();
 
-                let mut out = Vec::new();
+                let out = Vec::new();
                 let trx0 = trx.clone();
                 let f = trx.get_ranges(opt)
                     .map_err(|(_, e)| e)

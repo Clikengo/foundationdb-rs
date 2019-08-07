@@ -31,12 +31,12 @@ use futures::future::Future;
 use futures::stream::Stream;
 use rand::Rng;
 
-use error::Error;
-use keyselector::KeySelector;
-use options::{ConflictRangeType, MutationType, TransactionOption};
-use subspace::Subspace;
-use transaction::{RangeOptionBuilder, Transaction};
-use tuple::Element;
+use crate::error::Error;
+use crate::keyselector::KeySelector;
+use crate::options::{ConflictRangeType, MutationType, TransactionOption};
+use crate::subspace::Subspace;
+use crate::transaction::{RangeOptionBuilder, Transaction};
+use crate::tuple::Element;
 
 const ONE_BYTES: &[u8] = &[0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
 
