@@ -62,7 +62,8 @@ impl FdbScope {
         for option in self.options.iter() {
             let rs_name = match option.name.as_ref() {
                 "AppendIfFit" => "AppendIfFits",
-                s => s
+                "UseProvisionalProxy" => "UseProvisionalProxies",
+                s => s,
             };
 
             s += &format!("{}::{}", self.name, rs_name);
@@ -74,7 +75,7 @@ impl FdbScope {
             }
 
             let mut enum_name = screamingsnakecase::to_screaming_snake_case(&option.name);
-            if self.name != "MutationType" || option.name == "AppendIfFit" {
+            if self.name != "MutationType" || option.name == "AppendIfFit" || option.name == "UseProvisionalProxy" {
                 enum_name = Self::fix_enum_name(&enum_name);
             }
 
@@ -94,6 +95,7 @@ impl FdbScope {
             ("THREAD", "THREADS"),
             ("KEY", "KEYS"),
             ("FIT", "FITS"),
+            ("PROXY", "PROXIES"),
         ];
 
         for &(ref from, ref to) in tab.iter() {
@@ -281,6 +283,8 @@ impl From<Vec<OwnedAttribute>> for FdbOption {
                     opt.name = classcase::to_class_case(&v);
                     if opt.name == "AppendIfFit" {
                         opt.name = String::from("AppendIfFits");
+                    } else if opt.name == "UseProvisionalProxy" {
+                        opt.name = String::from("UseProvisionalProxies");
                     };
                 }
                 "code" => {
