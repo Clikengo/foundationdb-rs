@@ -27,7 +27,7 @@ use std::task::{Context, Poll, Waker};
 /// An opaque type that represents a Future in the FoundationDB C API.
 pub(crate) struct FdbFuture {
     f: Option<*mut fdb::FDBFuture>,
-    task: Option<Box<Waker>>,
+    cb_active: bool,
 }
 
 impl FdbFuture {
@@ -35,7 +35,7 @@ impl FdbFuture {
     pub(crate) unsafe fn new(f: *mut fdb::FDBFuture) -> Self {
         Self {
             f: Some(f),
-            task: None,
+            cb_active: false,
         }
     }
 }
@@ -56,11 +56,11 @@ impl futures::Future for FdbFuture {
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let f = self.f.expect("cannot poll after resolve");
 
-        if self.task.is_none() {
+        if !self.cb_active {
             let b = Box::new(cx.waker().clone());
-            let ptr = &*b as *const _;
-            let ptr = ptr as *mut _;
-            self.task = Some(b);
+            let b = Box::into_raw(b);
+            let ptr = b as *mut std::ffi::c_void;
+            self.cb_active = true;
             unsafe {
                 fdb::fdb_future_set_callback(f, Some(fdb_future_callback), ptr);
             }
@@ -87,9 +87,8 @@ extern "C" fn fdb_future_callback(
     _f: *mut fdb::FDBFuture,
     callback_parameter: *mut ::std::os::raw::c_void,
 ) {
-    let task: *const Waker = callback_parameter as *const _;
-    let task: &Waker = unsafe { &*task };
-    task.wake_by_ref();
+    let b = unsafe { Box::from_raw(callback_parameter as *mut Waker) };
+    b.wake();
 }
 
 /// Represents the output of fdb_future_get_keyvalue_array().
