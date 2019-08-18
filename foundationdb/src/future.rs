@@ -19,14 +19,15 @@ use std::ops::Deref;
 
 use foundationdb_sys as fdb;
 use futures;
-use futures::Async;
 
-use crate::error::{self, Error, Result};
+use crate::error::{self, Result};
+use std::pin::Pin;
+use std::task::{Context, Poll, Waker};
 
 /// An opaque type that represents a Future in the FoundationDB C API.
 pub(crate) struct FdbFuture {
     f: Option<*mut fdb::FDBFuture>,
-    task: Option<Box<futures::task::Task>>,
+    task: Option<Box<Waker>>,
 }
 
 impl FdbFuture {
@@ -50,34 +51,33 @@ impl Drop for FdbFuture {
 }
 
 impl futures::Future for FdbFuture {
-    type Item = FdbFutureResult;
-    type Error = Error;
+    type Output = Result<FdbFutureResult>;
 
-    fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let f = self.f.expect("cannot poll after resolve");
 
         if self.task.is_none() {
-            let task = futures::task::current();
-            let task = Box::new(task);
-            let task_ptr = task.as_ref() as *const _;
+            let b = Box::new(cx.waker().clone());
+            let ptr = &*b as *const _;
+            let ptr = ptr as *mut _;
+            self.task = Some(b);
             unsafe {
-                fdb::fdb_future_set_callback(f, Some(fdb_future_callback), task_ptr as *mut _);
+                fdb::fdb_future_set_callback(f, Some(fdb_future_callback), ptr);
             }
-            self.task = Some(task);
 
-            return Ok(Async::NotReady);
+            return Poll::Pending;
         }
 
         let ready = unsafe { fdb::fdb_future_is_ready(f) };
         if ready == 0 {
-            return Ok(Async::NotReady);
+            return Poll::Pending;
         }
 
         unsafe { error::eval(fdb::fdb_future_get_error(f))? };
 
         // The result is taking ownership of fdb::FDBFuture
         let g = FdbFutureResult::new(self.f.take().unwrap());
-        Ok(Async::Ready(g))
+        Poll::Ready(Ok(g))
     }
 }
 
@@ -87,9 +87,9 @@ extern "C" fn fdb_future_callback(
     _f: *mut fdb::FDBFuture,
     callback_parameter: *mut ::std::os::raw::c_void,
 ) {
-    let task: *const futures::task::Task = callback_parameter as *const _;
-    let task: &futures::task::Task = unsafe { &*task };
-    task.notify();
+    let task: *const Waker = callback_parameter as *const _;
+    let task: &Waker = unsafe { &*task };
+    task.wake_by_ref();
 }
 
 /// Represents the output of fdb_future_get_keyvalue_array().
@@ -150,18 +150,6 @@ impl Drop for FdbFutureResult {
 impl FdbFutureResult {
     pub(crate) fn new(f: *mut fdb::FDBFuture) -> Self {
         Self { f }
-    }
-
-    pub(crate) unsafe fn get_cluster(&self) -> Result<*mut fdb::FDBCluster> {
-        let mut v: *mut fdb::FDBCluster = std::ptr::null_mut();
-        error::eval(fdb::fdb_future_get_cluster(self.f, &mut v as *mut _))?;
-        Ok(v)
-    }
-
-    pub(crate) unsafe fn get_database(&self) -> Result<*mut fdb::FDBDatabase> {
-        let mut v: *mut fdb::FDBDatabase = std::ptr::null_mut();
-        error::eval(fdb::fdb_future_get_database(self.f, &mut v as *mut _))?;
-        Ok(v)
     }
 
     #[allow(unused)]

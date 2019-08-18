@@ -32,21 +32,9 @@ fn main() {
     // out a src/wrapper.h file with the chosen version instead.
     let api_version;
 
-    #[cfg(feature = "fdb-5_1")]
-    {
-        api_version = 510;
-    }
-    #[cfg(feature = "fdb-5_2")]
-    {
-        api_version = 520;
-    }
-    #[cfg(feature = "fdb-6_0")]
-    {
-        api_version = 600;
-    }
     #[cfg(feature = "fdb-6_1")]
     {
-        api_version = 600;
+        api_version = 610;
     }
 
     // Sigh, bindgen only takes a String for its header path, but that's UTF-8 while

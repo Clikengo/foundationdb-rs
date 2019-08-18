@@ -27,8 +27,7 @@
 use std::sync::Mutex;
 
 use byteorder::ByteOrder;
-use futures::future::Future;
-use futures::stream::Stream;
+use futures::{StreamExt,TryStreamExt};
 use rand::Rng;
 
 use crate::error::Error;
@@ -37,6 +36,7 @@ use crate::options::{ConflictRangeType, MutationType, TransactionOption};
 use crate::subspace::Subspace;
 use crate::transaction::{RangeOptionBuilder, Transaction};
 use crate::tuple::Element;
+use futures::future::ready;
 
 const ONE_BYTES: &[u8] = &[0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
 
@@ -62,7 +62,7 @@ impl HighContentionAllocator {
     /// Returns a byte string that
     ///   1) has never and will never be returned by another call to this method on the same subspace
     ///   2) is nearly as short as possible given the above
-    pub fn allocate(&self, transaction: &mut Transaction) -> Result<i64, Error> {
+    pub async fn allocate(&self, transaction: Transaction) -> Result<i64, Error> {
         let (begin, end) = self.counters.range();
 
         loop {
@@ -77,18 +77,22 @@ impl HighContentionAllocator {
             let kvs: Vec<i64> = transaction
                 .get_ranges(range_option)
                 .map_err(|(_, e)| e)
-                .fold(Vec::new(), move |mut out, range_result| {
+                .fold(Ok(Vec::new()), move |out, range_result| {
+                    let mut out = out.unwrap();
+                    let range_result = range_result.unwrap();
+
                     let kvs = range_result.key_values();
 
                     for kv in kvs.as_ref() {
-                        if let Element::I64(counter) = self.counters.unpack(kv.key())? {
+                        // fixme: unwrap
+                        if let Element::I64(counter) = self.counters.unpack(kv.key()).unwrap() {
                             out.push(counter);
                         }
                     }
 
-                    Ok::<_, Error>(out)
+                    ready(Ok::<_, Error>(out))
                 })
-                .wait()?;
+                .await?;
 
             let mut start: i64 = 0;
             let mut window: i64;
@@ -121,7 +125,7 @@ impl HighContentionAllocator {
 
                 let subspace_start_trx = transaction
                     .get(counters_subspace_with_start.bytes(), true)
-                    .wait()?;
+                    .await?;
                 let count = byteorder::LittleEndian::read_i64(subspace_start_trx.value().unwrap());
 
                 drop(mutex_guard);
@@ -160,18 +164,22 @@ impl HighContentionAllocator {
                 let kvs: Vec<i64> = transaction
                     .get_ranges(range_option)
                     .map_err(|(_, e)| e)
-                    .fold(Vec::new(), move |mut out, range_result| {
+                    .fold(Ok(Vec::new()), move |out, range_result| {
+                        let mut out = out.unwrap();
+                        let range_result = range_result.unwrap();
+
                         let kvs = range_result.key_values();
 
                         for kv in kvs.as_ref() {
-                            if let Element::I64(counter) = self.counters.unpack(kv.key())? {
+                            // fixme: unwrap
+                            if let Element::I64(counter) = self.counters.unpack(kv.key()).unwrap() {
                                 out.push(counter);
                             }
                         }
 
-                        Ok::<_, Error>(out)
+                        ready(Ok::<_, Error>(out))
                     })
-                    .wait()?;
+                    .await?;
 
                 let candidate_value_trx = transaction.get(candidate_subspace, false);
 
@@ -188,7 +196,7 @@ impl HighContentionAllocator {
                     }
                 }
 
-                let candidate_value = candidate_value_trx.wait()?;
+                let candidate_value = candidate_value_trx.await?;
 
                 match candidate_value.value() {
                     Some(_) => (),

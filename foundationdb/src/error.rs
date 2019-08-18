@@ -164,7 +164,8 @@ impl Error {
         self.should_retry = should_retry;
     }
 
-    pub(crate) fn should_retry(&self) -> bool {
+    /// true if fdb_transaction_on_error says this error can be retried
+    pub fn should_retry(&self) -> bool {
         self.should_retry
     }
 }

@@ -11,7 +11,7 @@
 //! https://apple.github.io/foundationdb/api-c.html#transaction
 
 use foundationdb_sys as fdb;
-use futures::{Async, Future, Stream};
+use futures::{ready, Future, FutureExt, Stream};
 use std;
 use std::sync::Arc;
 
@@ -22,6 +22,8 @@ use crate::keyselector::*;
 use crate::options;
 use crate::subspace::Subspace;
 use crate::tuple::Encode;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 /// In FoundationDB, a transaction is a mutable snapshot of a database.
 ///
@@ -559,8 +561,8 @@ impl Transaction {
     ///
     /// # Warning
     ///
-    /// The API is exposed mainly for `bindingtester`, and it is not recommended to call the API
-    /// directly from application. Use `Database::transact` instead.
+    /// The API is exposed mainly for `bindingtester`. You do not need to call it manually,
+    /// as future results will automatically call it when they receive an error.
     #[doc(hidden)]
     pub fn on_error(&self, error: Error) -> TrxErrFuture {
         TrxErrFuture::new(self.clone(), error)
@@ -642,15 +644,14 @@ pub struct TrxGet {
     inner: TrxFuture,
 }
 impl Future for TrxGet {
-    type Item = GetResult;
-    type Error = Error;
+    type Output = Result<GetResult>;
 
-    fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
-        let (trx, inner) = try_ready!(self.inner.poll());
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let (trx, inner) = ready!(self.inner.poll_unpin(cx))?;
         // check if a future resolves to value type
         inner.get_value()?;
 
-        Ok(Async::Ready(GetResult { trx, inner }))
+        Poll::Ready(Ok(GetResult { trx, inner }))
     }
 }
 
@@ -676,13 +677,12 @@ pub struct TrxGetKey {
     inner: TrxFuture,
 }
 impl Future for TrxGetKey {
-    type Item = GetKeyResult;
-    type Error = Error;
+    type Output = Result<GetKeyResult>;
 
-    fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
-        let (trx, inner) = try_ready!(self.inner.poll());
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let (trx, inner) = ready!(self.inner.poll_unpin(cx))?;
         inner.get_key()?;
-        Ok(Async::Ready(GetKeyResult { trx, inner }))
+        Poll::Ready(Ok(GetKeyResult { trx, inner }))
     }
 }
 
@@ -755,16 +755,15 @@ pub struct TrxGetRange {
 }
 
 impl Future for TrxGetRange {
-    type Item = GetRangeResult;
-    type Error = Error;
+    type Output = Result<GetRangeResult>;
 
-    fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
-        let (trx, inner) = try_ready!(self.inner.poll());
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let (trx, inner) = ready!(self.inner.poll_unpin(cx))?;
         // tests if the future resolves to keyvalue array.
         inner.get_keyvalue_array()?;
 
         let opt = self.opt.take().expect("should not poll after ready");
-        Ok(Async::Ready(GetRangeResult { trx, inner, opt }))
+        Poll::Ready(Ok(GetRangeResult { trx, inner, opt }))
     }
 }
 
@@ -791,27 +790,30 @@ impl RangeStream {
 }
 
 impl<'a> Stream for RangeStream {
-    type Item = GetRangeResult;
-    type Error = (RangeOption, Error);
+    type Item = std::result::Result<GetRangeResult, (RangeOption, Error)>;
 
-    fn poll(&mut self) -> std::result::Result<Async<Option<Self::Item>>, Self::Error> {
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         if self.inner.is_none() {
-            return Ok(Async::Ready(None));
+            return Poll::Ready(None);
         }
 
         let mut inner = self.inner.take().unwrap();
-        match inner.poll() {
-            Ok(Async::NotReady) => {
+        match inner.poll_unpin(cx) {
+            Poll::Pending => {
                 self.inner = Some(inner);
-                Ok(Async::NotReady)
+                Poll::Pending
             }
-            Ok(Async::Ready(res)) => {
-                self.advance(&res);
-                Ok(Async::Ready(Some(res)))
-            }
-            Err(e) => {
-                // `inner.opt == None` after it resolves, so `inner.opt.unwrap()` should not fail.
-                Err((inner.opt.unwrap(), e))
+            Poll::Ready(res) => {
+                match res {
+                    Ok(res) => {
+                        self.advance(&res);
+                        Poll::Ready(Some(Ok(res)))
+                    }
+                    Err(e) => {
+                        // `inner.opt == None` after it resolves, so `inner.opt.unwrap()` should not fail.
+                        Poll::Ready(Some(Err((inner.opt.unwrap(), e))))
+                    }
+                }
             }
         }
     }
@@ -823,12 +825,11 @@ pub struct TrxCommit {
 }
 
 impl Future for TrxCommit {
-    type Item = Transaction;
-    type Error = Error;
+    type Output = Result<Transaction>;
 
-    fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
-        let (trx, _res) = try_ready!(self.inner.poll());
-        Ok(Async::Ready(trx))
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let (trx, _res) = ready!(self.inner.poll_unpin(cx))?;
+        Poll::Ready(Ok(trx))
     }
 }
 
@@ -856,13 +857,12 @@ pub struct TrxGetAddressesForKey {
     inner: TrxFuture,
 }
 impl Future for TrxGetAddressesForKey {
-    type Item = GetAddressResult;
-    type Error = Error;
+    type Output = Result<GetAddressResult>;
 
-    fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
-        let (trx, inner) = try_ready!(self.inner.poll());
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let (trx, inner) = ready!(self.inner.poll_unpin(cx))?;
         inner.get_string_array()?;
-        Ok(Async::Ready(GetAddressResult { trx, inner }))
+        Poll::Ready(Ok(GetAddressResult { trx, inner }))
     }
 }
 
@@ -873,12 +873,11 @@ pub struct TrxWatch {
     inner: NonTrxFuture,
 }
 impl Future for TrxWatch {
-    type Item = ();
-    type Error = Error;
+    type Output = Result<()>;
 
-    fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
-        try_ready!(self.inner.poll());
-        Ok(Async::Ready(()))
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        ready!(self.inner.poll_unpin(cx))?;
+        Poll::Ready(Ok(()))
     }
 }
 
@@ -901,16 +900,15 @@ pub struct TrxVersionstamp {
     inner: NonTrxFuture,
 }
 impl Future for TrxVersionstamp {
-    type Item = Versionstamp;
-    type Error = Error;
+    type Output = Result<Versionstamp>;
 
-    fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
-        let r = try_ready!(self.inner.poll());
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let r = ready!(self.inner.poll_unpin(cx))?;
         // returning future should resolve to key
         let key = r.get_key()?;
         let mut buf: [u8; 10] = Default::default();
         buf.copy_from_slice(key);
-        Ok(Async::Ready(Versionstamp(buf)))
+        Poll::Ready(Ok(Versionstamp(buf)))
     }
 }
 
@@ -920,13 +918,12 @@ pub struct TrxReadVersion {
 }
 
 impl Future for TrxReadVersion {
-    type Item = i64;
-    type Error = Error;
+    type Output = Result<i64>;
 
-    fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
-        let (_trx, r) = try_ready!(self.inner.poll());
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let (_trx, r) = ready!(self.inner.poll_unpin(cx))?;
         let version = r.get_version()?;
-        Ok(Async::Ready(version))
+        Poll::Ready(Ok(version))
     }
 }
 
@@ -948,22 +945,22 @@ impl NonTrxFuture {
 }
 
 impl Future for NonTrxFuture {
-    type Item = FdbFutureResult;
-    type Error = Error;
+    type Output = Result<FdbFutureResult>;
 
-    fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
-        self.inner.poll()
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        self.inner.poll_unpin(cx)
     }
 }
 
-/// Abstraction over `fdb_transaction_on_err`.
+/// Abstraction over `fdb_transaction_on_error`.
+/// After the backoff period, resolves to an Error - should_retry will be set
+/// to true if the error can be retried.
 pub struct TrxErrFuture {
-    // A future from `fdb_transaction_on_err`. It resolves to `Ok(_)` after backoff interval if
-    // undering transaction should be retried, and resolved to `Err(e)` if the error should be
-    // reported to the user without retry.
     inner: NonTrxFuture,
+    // stores the original error, which is returned if retryable
     err: Option<Error>,
 }
+
 impl TrxErrFuture {
     fn new(trx: Transaction, err: Error) -> Self {
         let inner = unsafe { fdb::fdb_transaction_on_error(trx.inner.inner, err.code()) };
@@ -976,13 +973,20 @@ impl TrxErrFuture {
 }
 
 impl Future for TrxErrFuture {
-    type Item = Error;
-    type Error = Error;
-    fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
-        try_ready!(self.inner.poll());
-        let mut e = self.err.take().expect("should not poll after ready");
-        e.set_should_retry(true);
-        Ok(Async::Ready(e))
+    type Output = Error;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        // if on_error resolves to the error again, should_retry will be false
+        match ready!(self.inner.poll_unpin(cx)) {
+            Ok(_) => {
+                // did not resolve to an error, mark the original error as retryable and
+                // return it
+                let mut e = self.err.take().expect("should not poll after ready");
+                e.set_should_retry(true);
+                Poll::Ready(e)
+            }
+            Err(e) => Poll::Ready(e),
+        }
     }
 }
 
@@ -1007,34 +1011,29 @@ impl TrxFuture {
 }
 
 impl Future for TrxFuture {
-    type Item = (Transaction, FdbFutureResult);
-    type Error = Error;
+    type Output = Result<(Transaction, FdbFutureResult)>;
 
-    fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         if self.f_err.is_none() {
-            match self.inner.poll() {
-                Ok(Async::Ready(res)) => {
-                    return Ok(Async::Ready((
+            return match self.inner.poll_unpin(cx) {
+                Poll::Ready(res) => match res {
+                    Ok(res) => Poll::Ready(Ok((
                         self.trx.take().expect("should not poll after ready"),
                         res,
-                    )))
-                }
-                Ok(Async::NotReady) => return Ok(Async::NotReady),
-                Err(e) => {
-                    // The transaction will be dropped on `TrxErrFuture::new`. The `trx` is a last
-                    // reference for the transaction, undering transaction will be destroyed at
-                    // this point.
-                    let trx = self.trx.take().expect("should not poll after error");
-                    self.f_err = Some(TrxErrFuture::new(trx, e));
-                    return self.poll();
-                }
-            }
+                    ))),
+                    Err(e) => {
+                        let trx = self.trx.take().expect("should not poll after error");
+                        self.f_err = Some(TrxErrFuture::new(trx, e));
+                        return self.poll_unpin(cx);
+                    }
+                },
+                Poll::Pending => Poll::Pending,
+            };
         }
 
-        match self.f_err.as_mut().unwrap().poll() {
-            Ok(Async::Ready(e)) => Err(e),
-            Ok(Async::NotReady) => Ok(Async::NotReady),
-            Err(e) => Err(e),
+        match self.f_err.as_mut().unwrap().poll_unpin(cx) {
+            Poll::Ready(e) => Poll::Ready(Err(e)),
+            Poll::Pending => Poll::Pending,
         }
     }
 }

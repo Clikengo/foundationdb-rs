@@ -24,9 +24,6 @@ travis-ci = { repository = "bluejekyll/foundationdb-rs" }
 [features]
 default = [ "fdb-6_1" ]
 
-fdb-5_1 = [ ]
-fdb-5_2 = [ ]
-fdb-6_0 = [ ]
 fdb-6_1 = [ ]
 
 [dependencies]

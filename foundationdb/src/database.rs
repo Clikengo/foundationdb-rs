@@ -14,10 +14,9 @@ use std;
 use std::sync::Arc;
 
 use foundationdb_sys as fdb;
-use futures::future::*;
 use futures::Future;
+use failure::Fail;
 
-use crate::cluster::*;
 use crate::error::{self, Error as FdbError, Result};
 use crate::options;
 use crate::transaction::*;
@@ -27,15 +26,19 @@ use crate::transaction::*;
 /// Modifications to a database are performed via transactions.
 #[derive(Clone)]
 pub struct Database {
-    // Order of fields should not be changed, because Rust drops field top-to-bottom (rfc1857), and
-    // database should be dropped before cluster.
     inner: Arc<DatabaseInner>,
-    cluster: Cluster,
 }
 impl Database {
-    pub(crate) fn new(cluster: Cluster, db: *mut fdb::FDBDatabase) -> Self {
-        let inner = Arc::new(DatabaseInner::new(db));
-        Self { cluster, inner }
+    /// open a new database connection to the cluster
+    pub fn new(path: &str) -> Result<Self> {
+        let path_str = std::ffi::CString::new(path).unwrap();
+
+        unsafe {
+            let mut db: *mut fdb::FDBDatabase = std::ptr::null_mut();
+            let err = fdb::fdb_create_database(path_str.as_ptr(), &mut db);
+            error::eval(err)?;
+            Ok(Database { inner: Arc::new(DatabaseInner { inner: db }) })
+        }
     }
 
     /// Called to set an option an on `Database`.
@@ -65,53 +68,51 @@ impl Database {
     /// It might retry indefinitely if the transaction is highly contentious. It is recommended to
     /// set `TransactionOption::RetryLimit` or `TransactionOption::SetTimeout` on the transaction
     /// if the task need to be guaranteed to finish.
-    pub fn transact<F, Fut, Item, Error>(
-        &self,
-        f: F,
-    ) -> Box<dyn Future<Item = Fut::Item, Error = Error>>
-    where
-        F: FnMut(Transaction) -> Fut + 'static,
-        Fut: IntoFuture<Item = Item, Error = Error> + 'static,
-        Item: 'static,
-        Error: From<FdbError> + 'static,
+    pub async fn transact<F, Fut, Output>(&self, func: F) -> std::result::Result<Output, failure::Error>
+        where
+            F: Fn(Transaction) -> Fut,
+            Fut: Future<Output = std::result::Result<Output, failure::Error>>,
     {
-        let db = self.clone();
+        let trx = self.create_trx().unwrap();
 
-        let f = result(db.create_trx())
-            .map_err(Error::from)
-            .and_then(|trx| {
-                loop_fn((trx, f), |(trx, mut f)| {
-                    let trx0 = trx.clone();
-                    f(trx.clone()).into_future().and_then(move |res| {
-                        // try to commit the transaction
-                        trx0.commit().map(|_| res).then(|res| match res {
-                            Ok(v) => {
-                                // committed
-                                Ok(Loop::Break(v))
-                            }
-                            Err(e) => {
-                                if e.should_retry() {
-                                    Ok(Loop::Continue((trx, f)))
-                                } else {
-                                    Err(Error::from(e))
-                                }
-                            }
-                        })
-                    })
-                })
-            });
+        loop {
+            let res = func(trx.clone()).await;
 
-        Box::new(f)
+            // did the closure return an error?
+            if let Err(e) = res {
+                let res = e.downcast::<FdbError>();
+                if let Ok(e) = res {
+                    if e.should_retry() {
+                        //debug!("retrying error in transaction body: {}", e);
+                        continue;
+                    } else {
+                        return Err(e.context("non-retryable error in transaction body").into());
+                    }
+                }
+
+                // non-fdb error, abort
+                trx.cancel();
+                return Err(res.unwrap_err());
+            } else {
+                // commit
+                match trx.clone().commit().await {
+                    // and return the value from the closure on success
+                    Ok(_) => return res,
+                    Err(e) => {
+                        if e.should_retry() {
+                            //debug!("retrying error in transaction commit: {}", e);
+                        } else {
+                            return Err(e.context("non-retryable error in transaction commit").into())                                        }
+                    }
+                }
+            }
+        }
     }
+
 }
 
 struct DatabaseInner {
     inner: *mut fdb::FDBDatabase,
-}
-impl DatabaseInner {
-    fn new(inner: *mut fdb::FDBDatabase) -> Self {
-        Self { inner }
-    }
 }
 impl Drop for DatabaseInner {
     fn drop(&mut self) {

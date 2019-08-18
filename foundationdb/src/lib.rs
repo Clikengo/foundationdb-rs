@@ -49,65 +49,11 @@
 //!
 //! Due to limitations in the C API, the Client and it's associated Network can only be initialized and run once per the life of a process. Generally the `foundationdb::init` function will be enough to initialize the Client. See `foundationdb::default_api` and `foundationdb::builder` for more configuration options of the Fdb Client.
 //!
-//! ## Example
-//!
-//! ```rust
-//! extern crate futures;
-//! extern crate foundationdb;
-//!
-//! # fn main() {
-//!
-//! use std::thread;
-//! use futures::future::*;
-//! use foundationdb::{self, *};
-//!
-//! let network = foundationdb::init().expect("failed to initialize Fdb client");
-//!
-//! let handle = std::thread::spawn(move || {
-//!     let error = network.run();
-//!
-//!     if let Err(error) = error {
-//!         panic!("fdb_run_network: {}", error);
-//!     }
-//! });
-//!
-//! // wait for the network thread to be started
-//! network.wait();
-//!
-//! // work with Fdb
-//! let db = Cluster::new(foundationdb::default_config_path())
-//!     .and_then(|cluster| cluster.create_database())
-//!     .wait().expect("failed to create Cluster");
-//!
-//! // set a value
-//! let trx = db.create_trx().expect("failed to create transaction");
-//!
-//! trx.set(b"hello", b"world"); // errors will be returned in the future result
-//! trx.commit()
-//!     .wait()
-//!     .expect("failed to set hello to world");
-//!
-//! // read a value
-//! let trx = db.create_trx().expect("failed to create transaction");
-//! let result = trx.get(b"hello", false).wait().expect("failed to read world from hello");
-//!
-//! let value: &[u8] = result.value()
-//!     .unwrap();   // unwrap the option
-//!
-//! // should print "hello world"
-//! println!("hello {}", String::from_utf8_lossy(value));
-//!
-//! // cleanly shutdown the client
-//! network.stop().expect("failed to stop Fdb client");
-//! handle.join();
-//!
-//! # }
-//! ```
-//!
 //! ## API stability
 //!
 //! *WARNING* Until the 1.0 release of this library, the API may be in constant flux.
 
+#![feature(async_await)]
 #![deny(missing_docs)]
 
 #[macro_use]
@@ -115,16 +61,14 @@ extern crate failure;
 #[macro_use]
 extern crate failure_derive;
 extern crate byteorder;
-extern crate foundationdb_sys;
-#[macro_use]
-extern crate futures;
 extern crate core;
+extern crate foundationdb_sys;
+extern crate futures;
 extern crate lazy_static;
 extern crate rand;
 #[cfg(feature = "uuid")]
 extern crate uuid;
 
-pub mod cluster;
 pub mod database;
 pub mod error;
 pub mod fdb_api;
@@ -140,7 +84,6 @@ pub mod transaction;
 pub mod tuple;
 
 //move to prelude?
-pub use crate::cluster::Cluster;
 pub use crate::database::Database;
 pub use crate::error::Error;
 pub use crate::subspace::Subspace;
