@@ -1,3 +1,5 @@
+#![feature(async_await)]
+
 extern crate foundationdb as fdb;
 extern crate futures;
 extern crate rand;
@@ -11,6 +13,7 @@ use std::sync::atomic::*;
 use std::sync::Arc;
 
 use futures::future::*;
+use futures::executor::block_on;
 use rand::prelude::*;
 use rand::rngs::mock::StepRng;
 use stopwatch::Stopwatch;
@@ -45,7 +48,6 @@ struct BenchRunner {
     key_buf: Vec<u8>,
     val_buf: Vec<u8>,
     rng: StepRng,
-    trx: Option<Transaction>,
     trx_batch_size: usize,
 }
 
@@ -57,8 +59,6 @@ impl BenchRunner {
         let mut val_buf = Vec::with_capacity(opt.val_len);
         val_buf.resize(opt.val_len, 0u8);
 
-        let trx = db.create_trx().expect("failed to create trx");
-
         Self {
             db,
             counter,
@@ -66,38 +66,35 @@ impl BenchRunner {
             val_buf,
 
             rng,
-            trx: Some(trx),
             trx_batch_size: opt.trx_batch_size,
         }
     }
 
     //TODO: impl future
-    fn run(self) -> Box<dyn Future<Item = (), Error = Error>> {
-        Box::new(loop_fn(self, Self::step))
-    }
+    async fn run(mut self) -> Result<()> {
+        let trx = self.db.create_trx().expect("failed to create trx");
 
-    //TODO: impl future
-    fn step(mut self) -> Box<dyn Future<Item = Loop<(), Self>, Error = Error>> {
-        let trx = self.trx.take().unwrap();
+        loop {
+            let trx = trx.clone();
+            for _ in 0..self.trx_batch_size {
+                self.rng.fill_bytes(&mut self.key_buf);
+                self.rng.fill_bytes(&mut self.val_buf);
+                self.key_buf[0] = 0x01;
+                trx.set(&self.key_buf, &self.val_buf);
+            }
 
-        for _ in 0..self.trx_batch_size {
-            self.rng.fill_bytes(&mut self.key_buf);
-            self.rng.fill_bytes(&mut self.val_buf);
-            self.key_buf[0] = 0x01;
-            trx.set(&self.key_buf, &self.val_buf);
-        }
-
-        let f = trx.commit().map(move |trx| {
-            trx.reset();
-            self.trx = Some(trx);
+            let trx2 = trx.clone();
+            trx.commit().await?;
+            trx2.reset();
 
             if self.counter.decr(self.trx_batch_size) {
-                Loop::Continue(self)
+                continue;
             } else {
-                Loop::Break(())
+                break;
             }
-        });
-        Box::new(f)
+        }
+
+        Ok(())
     }
 }
 
@@ -124,7 +121,7 @@ impl Bench {
             let range = start..end;
             let counter = counter.clone();
             let b = self.clone();
-            let handle = std::thread::spawn(move || b.run_range(range, counter).wait());
+            let handle = std::thread::spawn(move || block_on(b.run_range(range, counter)));
             handles.push(handle);
 
             start = end;
@@ -146,11 +143,11 @@ impl Bench {
         );
     }
 
-    fn run_range(
+    async fn run_range(
         &self,
         r: std::ops::Range<usize>,
         counter: Counter,
-    ) -> Box<dyn Future<Item = (), Error = Error>> {
+    ) -> Result<()> {
         let runners = r
             .into_iter()
             .map(|n| {
@@ -158,10 +155,14 @@ impl Bench {
                 // of keys again, which makes benchmark result stable.
                 let rng = StepRng::new(n as u64, 1);
                 BenchRunner::new(self.db.clone(), rng, counter.clone(), &self.opt).run()
-            }).collect::<Vec<_>>();
+            })
+            .collect::<Vec<_>>();
 
-        let f = join_all(runners).map(|_| ());
-        Box::new(f)
+        for r in join_all(runners).await {
+            r.expect("didn't expect error in transaction");
+        }
+
+        Ok(())
     }
 }
 
@@ -204,15 +205,7 @@ fn main() {
 
     network.wait();
 
-    let cluster_path = fdb::default_config_path();
-    let cluster = Cluster::new(cluster_path)
-        .wait()
-        .expect("failed to create cluster");
-
-    let db = cluster
-        .create_database()
-        .wait()
-        .expect("failed to get database");
+    let db = Database::new(foundationdb::default_config_path()).expect("db connect failed");
 
     let bench = Bench { db, opt };
     bench.run();
