@@ -12,6 +12,7 @@ extern crate lazy_static;
 
 use foundationdb::error::Error;
 use foundationdb::*;
+use futures::executor::block_on;
 use futures::future::*;
 use futures::prelude::*;
 
@@ -24,38 +25,40 @@ fn test_get_range() {
     common::setup_static();
     const N: usize = 10000;
 
-    let fut = Cluster::new(foundationdb::default_config_path())
-        .and_then(|cluster| cluster.create_database())
-        .and_then(|db| result(db.create_trx()))
-        .and_then(|trx| {
-            let key_begin = "test-range-";
-            let key_end = "test-range.";
+    let db = Database::new(foundationdb::default_config_path()).unwrap();
+    let fut = ready(db.create_trx()).and_then(|trx| {
+        let key_begin = "test-range-";
+        let key_end = "test-range.";
 
-            trx.clear_range(key_begin.as_bytes(), key_end.as_bytes());
+        trx.clear_range(key_begin.as_bytes(), key_end.as_bytes());
 
-            for _ in 0..N {
-                let key = format!("{}-{}", key_begin, common::random_str(10));
-                let value = common::random_str(10);
-                trx.set(key.as_bytes(), value.as_bytes());
-            }
+        for _ in 0..N {
+            let key = format!("{}-{}", key_begin, common::random_str(10));
+            let value = common::random_str(10);
+            trx.set(key.as_bytes(), value.as_bytes());
+        }
 
-            let begin = KeySelector::first_greater_or_equal(key_begin.as_bytes());
-            let end = KeySelector::first_greater_than(key_end.as_bytes());
-            let opt = transaction::RangeOptionBuilder::new(begin, end).build();
+        let begin = KeySelector::first_greater_or_equal(key_begin.as_bytes());
+        let end = KeySelector::first_greater_than(key_end.as_bytes());
+        let opt = transaction::RangeOptionBuilder::new(begin, end).build();
 
-            trx.get_ranges(opt)
-                .map_err(|(_opt, e)| e)
-                .fold(0, |count, item| {
-                    let kvs = item.key_values();
-                    Ok::<_, Error>(count + kvs.as_ref().len())
-                })
-                .map(|count| {
-                    if count != N {
-                        panic!("count expected={}, found={}", N, count);
-                    }
-                    eprintln!("count: {:?}", count);
-                })
-        });
+        trx.get_ranges(opt)
+            .map_err(|(_opt, e)| e)
+            .fold(Ok(0), |count, item| {
+                let item = item.unwrap();
+                let kvs = item.key_values();
+                ready(Ok::<_, Error>(count.unwrap() + kvs.as_ref().len()))
+            })
+            .map(|count| {
+                let count = count.unwrap();
+                if count != N {
+                    panic!("count expected={}, found={}", N, count);
+                }
+                eprintln!("count: {:?}", count);
 
-    fut.wait().expect("failed to run")
+                Ok(())
+            })
+    });
+
+    block_on(fut).expect("failed to run");
 }

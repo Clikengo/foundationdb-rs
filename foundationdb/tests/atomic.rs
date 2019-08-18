@@ -11,21 +11,19 @@ extern crate futures;
 #[macro_use]
 extern crate lazy_static;
 
+use crate::error::Result;
 use byteorder::ByteOrder;
 use foundationdb::*;
+use futures::executor::block_on;
 use futures::future::*;
+use std::pin::Pin;
 
 mod common;
 
-//TODO: impl Future
-fn atomic_add(
-    db: Database,
-    key: &[u8],
-    value: i64,
-) -> Box<dyn Future<Item = (), Error = error::Error>> {
+fn atomic_add(db: Database, key: &[u8], value: i64) -> Pin<Box<dyn Future<Output = Result<()>>>> {
     let trx = match db.create_trx() {
         Ok(trx) => trx,
-        Err(e) => return Box::new(err(e)),
+        Err(e) => return Box::pin(err(e)),
     };
 
     let val = {
@@ -35,8 +33,8 @@ fn atomic_add(
     };
     trx.atomic_op(key, &val, options::MutationType::Add);
 
-    let fut = trx.commit().map(|_trx| ());
-    Box::new(fut)
+    let fut = trx.commit().map(|_trx| Ok(()));
+    Box::pin(fut)
 }
 
 #[test]
@@ -44,18 +42,15 @@ fn test_atomic() {
     common::setup_static();
     const KEY: &[u8] = b"test-atomic";
 
-    let fut = Cluster::new(foundationdb::default_config_path())
-        .and_then(|cluster| cluster.create_database())
-        .and_then(|db| {
-            // clear key before run example
-            result(db.create_trx())
-                .and_then(|trx| {
-                    trx.clear(KEY);
-                    trx.commit()
-                })
-                .map(|trx| trx.database())
+    let db = Database::new(foundationdb::default_config_path()).unwrap();
+    let r: Result<()> = Ok(());
+    let fut = ready(r)
+        .and_then(|_| {
+            let trx = db.create_trx().unwrap();
+            trx.clear(KEY);
+            trx.commit()
         })
-        .and_then(|db| {
+        .and_then(|_| {
             let n = 1000usize;
 
             // Run `n` add(1) operations in parallel
@@ -75,9 +70,9 @@ fn test_atomic() {
             let fut_sub = join_all(fut_sub_list);
 
             // Wait for all atomic operations
-            fut_add.join(fut_sub).map(move |_| db)
+            join(fut_add, fut_sub).map(|_| Ok(()))
         })
-        .and_then(|db| result(db.create_trx()).and_then(|trx| trx.get(KEY, false)))
+        .and_then(|_| ready(db.create_trx()).and_then(|trx| trx.get(KEY, false)))
         .and_then(|res| {
             let value = res.value().expect("value should exists");
 
@@ -87,8 +82,8 @@ fn test_atomic() {
                 panic!("expected 0, found {}", v);
             }
 
-            Ok(())
+            ok(())
         });
 
-    fut.wait().expect("failed to run");
+    block_on(fut).expect("failed to run");
 }

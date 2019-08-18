@@ -5,6 +5,8 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
+#![feature(async_await)]
+
 extern crate foundationdb;
 extern crate futures;
 #[macro_use]
@@ -18,6 +20,7 @@ use futures::future::*;
 use foundationdb::error::Error;
 use foundationdb::hca::HighContentionAllocator;
 use foundationdb::*;
+use futures::executor::block_on;
 
 mod common;
 
@@ -27,35 +30,35 @@ fn test_hca_many_sequential_allocations() {
     const N: usize = 6000;
     const KEY: &[u8] = b"test-hca-allocate";
 
-    let fut = Cluster::new(foundationdb::default_config_path())
-        .and_then(|cluster| cluster.create_database())
-        .and_then(|db: Database| {
-            let cleared_range = db
-                .transact(move |tx| {
-                    tx.clear_subspace_range(Subspace::from_bytes(KEY));
-                    futures::future::result(Ok::<(), failure::Error>(()))
-                })
-                .wait();
+    let db = Database::new(foundationdb::default_config_path()).unwrap();
 
-            cleared_range.expect("unable to clear hca test range");
+    let fut = async move {
+        let cleared_range = db
+            .transact(move |tx| {
+                tx.clear_subspace_range(Subspace::from_bytes(KEY));
+                futures::future::ready(Ok::<(), failure::Error>(()))
+            })
+            .await;
 
-            let hca = HighContentionAllocator::new(Subspace::from_bytes(KEY));
+        cleared_range.expect("unable to clear hca test range");
 
-            let mut all_ints = Vec::new();
+        let hca = HighContentionAllocator::new(Subspace::from_bytes(KEY));
 
-            for _ in 0..N {
-                let mut tx: Transaction = db.create_trx()?;
+        let mut all_ints = Vec::new();
 
-                let next_int: i64 = hca.allocate(&mut tx)?;
-                all_ints.push(next_int);
+        for _ in 0..N {
+            let tx: Transaction = db.create_trx()?;
 
-                tx.commit().wait()?;
-            }
+            let next_int: i64 = hca.allocate(tx.clone()).await?;
+            all_ints.push(next_int);
 
-            Ok::<_, Error>(all_ints)
-        });
+            tx.commit().await?;
+        }
 
-    let all_ints: Vec<i64> = fut.wait().expect("failed to run");
+        Ok::<_, Error>(all_ints)
+    };
+
+    let all_ints: Vec<i64> = block_on(fut).expect("failed to run");
     check_hca_result_uniqueness(&all_ints);
 
     eprintln!("ran test {:?}", all_ints);
@@ -67,15 +70,14 @@ fn test_hca_concurrent_allocations() {
     const N: usize = 1000;
     const KEY: &[u8] = b"test-hca-allocate-concurrent";
 
-    let fut = Cluster::new(foundationdb::default_config_path())
-        .and_then(|cluster| cluster.create_database())
-        .and_then(|db: Database| {
+    let db = Database::new(foundationdb::default_config_path()).unwrap();
+
+    let fut = async move {
             let cleared_range = db
                 .transact(move |tx| {
                     tx.clear_subspace_range(Subspace::from_bytes(KEY));
-                    futures::future::result(Ok::<(), failure::Error>(()))
-                })
-                .wait();
+                    futures::future::ready(Ok::<(), failure::Error>(()))
+                }).await;
 
             cleared_range.expect("unable to clear hca test range");
 
@@ -83,22 +85,23 @@ fn test_hca_concurrent_allocations() {
             let mut all_ints: Vec<i64> = Vec::new();
 
             for _ in 0..N {
-                let f = db.transact(move |mut tx| {
-                    HighContentionAllocator::new(Subspace::from_bytes(KEY)).allocate(&mut tx)
+                let f = db.transact(move |tx| async move {
+                    let ha = HighContentionAllocator::new(Subspace::from_bytes(KEY));
+                    ha.allocate(tx).map_err(|e| e.into()).await
                 });
 
                 futures.push(f);
             }
 
             for allocation in futures {
-                let i = allocation.wait().expect("unable to get allocation");
+                let i = allocation.await.expect("unable to get allocation");
                 all_ints.push(i);
             }
 
             Ok::<_, Error>(all_ints)
-        });
+    };
 
-    let all_ints: Vec<i64> = fut.wait().expect("failed to run");
+    let all_ints: Vec<i64> = block_on(fut).expect("failed to run");
     check_hca_result_uniqueness(&all_ints);
 
     eprintln!("ran test {:?}", all_ints);

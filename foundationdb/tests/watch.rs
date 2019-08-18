@@ -12,6 +12,7 @@ extern crate lazy_static;
 
 use foundationdb::*;
 use futures::future::*;
+use futures::executor::block_on;
 
 mod common;
 
@@ -20,25 +21,27 @@ fn test_watch() {
     common::setup_static();
     const KEY: &'static [u8] = b"test-watch";
 
-    let fut = Cluster::new(foundationdb::default_config_path())
-        .and_then(|cluster| cluster.create_database())
-        .and_then(|db| {
-            let watch = result(db.create_trx()).and_then(|trx| {
+    let db = Database::new(foundationdb::default_config_path()).unwrap();
+    let fut = ok(())
+        .and_then(|_| {
+            let watch = ready(db.create_trx()).and_then(|trx| {
                 eprintln!("setting watch");
                 let watch = trx.watch(KEY);
                 trx.commit().map(|_| {
                     eprintln!("watch committed");
-                    watch
+                    Ok(watch)
                 })
             });
 
-            let write = result(db.create_trx()).and_then(|trx| {
+            let write = ready(db.create_trx()).and_then(|trx| {
                 eprintln!("writing value");
 
                 let value = common::random_str(10);
                 trx.set(KEY, value.as_bytes());
                 trx.commit().map(|_| {
                     eprintln!("write committed");
+
+                    Ok(())
                 })
             });
 
@@ -53,11 +56,13 @@ fn test_watch() {
                     .map(|_| {
                         // 4. watch fired as expected
                         eprintln!("watch fired");
+
+                        Ok(())
                     })
             })
         });
 
-    fut.wait().expect("failed to run")
+    block_on(fut).expect("failed to run")
 }
 
 #[test]
@@ -65,21 +70,22 @@ fn test_watch_without_commit() {
     common::setup_static();
     const KEY: &'static [u8] = b"test-watch-2";
 
-    let fut = Cluster::new(foundationdb::default_config_path())
-        .and_then(|cluster| cluster.create_database())
-        .and_then(|db| result(db.create_trx()))
+    let db = Database::new(foundationdb::default_config_path()).unwrap();
+    let fut = ok(())
+        .and_then(|_| ready(db.create_trx()))
         .and_then(|trx| {
             eprintln!("setting watch");
 
             // trx will be dropped without `commit`, so a watch will be canceled
             trx.watch(KEY)
         })
-        .or_else(|e| {
+        .then(|e| {
+            let e = e.unwrap_err();
             // should return error_code=1025, `Operation aborted because the transaction was
             // canceled`
             eprintln!("error as expected: {:?}", e);
-            Ok::<(), error::Error>(())
+            ready(Ok::<(), error::Error>(()))
         });
 
-    fut.wait().expect("failed to run")
+    block_on(fut).expect("failed to run")
 }
