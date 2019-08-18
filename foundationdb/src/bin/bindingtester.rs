@@ -1,3 +1,14 @@
+// Copyright 2019 foundationdb-rs developers, https://github.com/bluejekyll/foundationdb-rs/graphs/contributors
+//
+// Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
+// http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
+// http://opensource.org/licenses/MIT>, at your option. This file may not be
+// copied, modified, or distributed except according to those terms.
+//
+// See scripts/run_bindingtester.sh for how to use this.
+
+#![feature(async_await)]
+
 extern crate foundationdb as fdb;
 extern crate foundationdb_sys as fdb_sys;
 extern crate futures;
@@ -6,12 +17,14 @@ extern crate log;
 
 use std::collections::HashMap;
 
-use crate::fdb::error::Error;
+use crate::fdb::error::{Error,Result};
 use crate::fdb::keyselector::KeySelector;
 use crate::fdb::tuple::*;
 use crate::fdb::*;
 use futures::future::*;
 use futures::prelude::*;
+use futures::executor::block_on;
+use std::pin::Pin;
 
 use crate::fdb::options::{MutationType, StreamingMode};
 fn mutation_from_str(s: &str) -> MutationType {
@@ -251,7 +264,7 @@ impl Instr {
     }
 }
 
-type StackFuture = Box<dyn Future<Item = (Transaction, Vec<u8>), Error = Error>>;
+type StackFuture = Pin<Box<dyn Future<Output = Result<(Transaction, Vec<u8>)>>>>;
 struct StackItem {
     number: usize,
     // TODO: enum
@@ -273,20 +286,19 @@ impl Clone for StackItem {
 }
 
 impl StackItem {
-    fn data(self) -> Vec<u8> {
+    async fn data(self) -> Vec<u8> {
         if let Some(data) = self.data {
-            return data;
-        }
-
-        //TODO: wait
-        match self.fut.unwrap().wait() {
-            Ok((_trx, data)) => data.to_vec(),
-            Err(e) => {
-                let code = format!("{}", e.code());
-                let tup = (b"ERROR".to_vec(), code.into_bytes());
-                debug!("ERROR: {:?}", e);
-                let bytes = tup.to_vec();
-                bytes.to_vec()
+            data
+        } else {
+            match self.fut.unwrap().await {
+                Ok((_trx, data)) => data.to_vec(),
+                Err(e) => {
+                    let code = format!("{}", e.code());
+                    let tup = (b"ERROR".to_vec(), code.into_bytes());
+                    debug!("ERROR: {:?}", e);
+                    let bytes = tup.to_vec();
+                    bytes.to_vec()
+                }
             }
         }
     }
@@ -350,38 +362,40 @@ impl StackMachine {
         }
     }
 
-    fn fetch_instr(&self) -> Box<dyn Future<Item = Vec<Instr>, Error = Error>> {
-        let db = self.db.clone();
+    async fn fetch_instr(&self) -> std::result::Result<Vec<Instr>, failure::Error> {
+        self.db.transact(move |trx| {
+            let prefix = self.prefix.clone();
+            async move {
+                let opt = transaction::RangeOptionBuilder::from(&prefix).build();
+                let instrs = Vec::new();
+                trx.get_ranges(opt)
+                    .map_err(|(_opt, e)| e)
+                    .fold(Ok(instrs), |instrs, res| {
+                        let mut instrs = instrs.unwrap();
+                        let res = res.unwrap();
 
-        let prefix = self.prefix.clone();
-        let f = db.transact(move |trx| {
-            let opt = transaction::RangeOptionBuilder::from(&prefix).build();
-            let instrs = Vec::new();
-            let f = trx.get_ranges(opt)
-                .map_err(|(_opt, e)| e)
-                .fold(instrs, |mut instrs, res| {
-                    let kvs = res.key_values();
+                        let kvs = res.key_values();
 
-                    for kv in kvs.as_ref() {
-                        let instr = Instr::from(kv.value());
-                        instrs.push(instr);
-                    }
-                    Ok::<_, Error>(instrs)
-                });
-            f
-        });
-        Box::new(f)
+                        for kv in kvs.as_ref() {
+                            let instr = Instr::from(kv.value());
+                            instrs.push(instr);
+                        }
+                        ready(Ok::<_, failure::Error>(instrs))
+                    })
+                    .await
+            }
+        }).await
     }
 
     fn pop(&mut self) -> StackItem {
         self.stack.pop().expect("stack empty")
     }
 
-    fn pop_item<S>(&mut self) -> S
+    async fn pop_item<S>(&mut self) -> S
     where
         S: Decode,
     {
-        let data = self.pop().data();
+        let data = self.pop().data().await;
         match Decode::try_from(&data) {
             Ok(v) => v,
             Err(e) => {
@@ -390,14 +404,14 @@ impl StackMachine {
         }
     }
 
-    fn pop_data(&mut self) -> Vec<u8> {
-        self.pop().data()
+    async fn pop_data(&mut self) -> Vec<u8> {
+        self.pop().data().await
     }
 
-    fn pop_selector(&mut self) -> KeySelector {
-        let key: Vec<u8> = self.pop_item();
-        let or_equal: i64 = self.pop_item();
-        let offset: i64 = self.pop_item();
+    async fn pop_selector(&mut self) -> KeySelector {
+        let key: Vec<u8> = self.pop_item().await;
+        let or_equal: i64 = self.pop_item().await;
+        let offset: i64 = self.pop_item().await;
 
         KeySelector::new(key, or_equal != 0, offset as usize)
     }
@@ -420,17 +434,17 @@ impl StackMachine {
 
     fn push_fut<F>(&mut self, number: usize, fut: F)
     where
-        F: Future<Item = (Transaction, Vec<u8>), Error = Error> + 'static,
+        F: Future<Output = Result<(Transaction, Vec<u8>)>> + 'static,
     {
         let item = StackItem {
             number,
             data: None,
-            fut: Some(Box::new(fut)),
+            fut: Some(Box::pin(fut)),
         };
         self.stack.push(item);
     }
 
-    fn run_step(&mut self, number: usize, mut instr: Instr) {
+    async fn run_step(&mut self, number: usize, mut instr: Instr) {
         use crate::InstrCode::*;
 
         let is_db = instr.pop_database();
@@ -453,7 +467,7 @@ impl StackMachine {
             }
             EmptyStack => self.stack.clear(),
             Swap => {
-                let idx: i64 = self.pop_item();
+                let idx: i64 = self.pop_item().await;
                 {
                     let len = self.stack.len();
                     let idx1 = len - 1;
@@ -469,14 +483,14 @@ impl StackMachine {
                 self.pop();
             }
             Sub => {
-                let a: i64 = self.pop_item();
-                let b: i64 = self.pop_item();
+                let a: i64 = self.pop_item().await;
+                let b: i64 = self.pop_item().await;
 
                 self.push_item(number, &(a - b));
             }
             Concat => {
-                let mut a: Vec<u8> = self.pop_item();
-                let mut b: Vec<u8> = self.pop_item();
+                let mut a: Vec<u8> = self.pop_item().await;
+                let mut b: Vec<u8> = self.pop_item().await;
                 a.append(&mut b);
                 self.push_item(number, &a);
             }
@@ -488,20 +502,27 @@ impl StackMachine {
                 self.transactions.insert(name, trx);
             }
             UseTransacton => {
-                let name: Vec<u8> = self.pop_item();
+                let name: Vec<u8> = self.pop_item().await;
                 self.cur_transaction = name;
             }
             OnError => {
-                let code: i64 = self.pop_item();
+                let code: i64 = self.pop_item().await;
                 let trx0 = trx.clone();
                 let f = trx.on_error(Error::from(code as i32))
-                    .map(move |_| (trx0, b"RESULT_NOT_PRESENT".to_vec()));
+                    .then(|e| {
+                        if e.should_retry() {
+                            ok((trx0, b"RESULT_NOT_PRESENT".to_vec()))
+                        } else {
+                            err(e)
+                        }
+                    });
                 self.push_fut(number, f);
             }
             Get => {
-                let key: Vec<u8> = self.pop_item();
+                let key: Vec<u8> = self.pop_item().await;
                 let trx0 = trx.clone();
                 let f = trx.get(&key, instr.pop_snapshot()).map(move |res| {
+                    let res = res.unwrap();
                     let val = res.value();
                     let val = match val {
                         Some(v) => v.to_vec(),
@@ -509,21 +530,23 @@ impl StackMachine {
                     };
 
                     debug!("get  : key={:?}, value={:?}", key, val);
-                    (trx0, val)
+                    Ok((trx0, val))
                 });
 
                 self.push_fut(number, f);
             }
 
             GetKey => {
-                let selector = self.pop_selector();
-                let mut prefix: Vec<u8> = self.pop_item();
+                let selector = self.pop_selector().await;
+                let mut prefix: Vec<u8> = self.pop_item().await;
 
                 //TODO: wait
                 let key = trx.get_key(selector, instr.pop_snapshot())
-                    .map(move |res| res.value().to_vec())
-                    .wait()
-                    .unwrap();
+                    .map(move |res| {
+                        let res = res.unwrap();
+                        res.value().to_vec()
+                    })
+                    .await;
 
                 if key.starts_with(&prefix) {
                     self.push_item(number, &key);
@@ -539,7 +562,7 @@ impl StackMachine {
                 let selector = instr.pop_selector();
 
                 let (begin, end) = if instr.pop_starts_with() {
-                    let begin: Vec<u8> = self.pop_item();
+                    let begin: Vec<u8> = self.pop_item().await;
                     let mut end = begin.clone();
                     strinc(&mut end);
                     (
@@ -547,21 +570,21 @@ impl StackMachine {
                         KeySelector::first_greater_or_equal(&end),
                     )
                 } else if selector {
-                    let begin = self.pop_selector();
-                    let end = self.pop_selector();
+                    let begin = self.pop_selector().await;
+                    let end = self.pop_selector().await;
                     (begin, end)
                 } else {
-                    let begin: Vec<u8> = self.pop_item();
-                    let end: Vec<u8> = self.pop_item();
+                    let begin: Vec<u8> = self.pop_item().await;
+                    let end: Vec<u8> = self.pop_item().await;
                     (
                         KeySelector::first_greater_or_equal(&begin),
                         KeySelector::first_greater_or_equal(&end),
                     )
                 };
 
-                let limit: i64 = self.pop_item();
-                let reverse: i64 = self.pop_item();
-                let streaming_mode: i64 = self.pop_item();
+                let limit: i64 = self.pop_item().await;
+                let reverse: i64 = self.pop_item().await;
+                let streaming_mode: i64 = self.pop_item().await;
                 let mode = streaming_from_value(streaming_mode as i32);
 
                 debug!(
@@ -570,7 +593,7 @@ impl StackMachine {
                 );
 
                 let prefix: Option<Vec<u8>> = if selector {
-                    Some(self.pop_item())
+                    Some(self.pop_item().await)
                 } else {
                     None
                 };
@@ -584,9 +607,16 @@ impl StackMachine {
 
                 let out = Vec::new();
                 let trx0 = trx.clone();
+
                 let f = trx.get_ranges(opt)
                     .map_err(|(_, e)| e)
-                    .fold(out, move |mut out, res| {
+                    .fold(Ok((trx0.clone(), out)), move |state, res| {
+                        let (_trx, mut out) = state.unwrap();
+                        if let Err(e) = res {
+                            return err(e);
+                        }
+                        let res = res.unwrap();
+
                         let kvs = res.key_values();
 
                         debug!("range: len={:?}", kvs.as_ref().len());
@@ -606,22 +636,23 @@ impl StackMachine {
                                 .encode_to(&mut out)
                                 .expect("failed to encode");
                         }
-                        Ok::<_, Error>(out)
-                    })
-                    .map(|out| (trx0, out));
+                        ok((trx0.clone(), out))
+                    });
+
+
 
                 //TODO: wait
                 self.push_fut(number, f);
 
                 let item = self.pop();
                 let number = item.number;
-                self.push(number, item.data());
+                self.push(number, item.data().await);
             }
 
             GetReadVersion => {
                 //TODO: wait
                 let version = trx.get_read_version()
-                    .wait()
+                    .await
                     .expect("failed to get read version");
 
                 //TODO
@@ -635,13 +666,13 @@ impl StackMachine {
                 let trx0 = trx.clone();
                 let f = trx.clone()
                     .get_versionstamp()
-                    .map(move |v| (trx0, v.versionstamp().to_vec()));
+                    .map_ok(move |v| (trx0, v.versionstamp().to_vec()));
                 self.push_fut(number, f);
             }
 
             Set => {
-                let key: Vec<u8> = self.pop_item();
-                let value: Vec<u8> = self.pop_item();
+                let key: Vec<u8> = self.pop_item().await;
+                let value: Vec<u8> = self.pop_item().await;
 
                 debug!("set  : key={:?}, value={:?}", key, value);
                 trx.set(&key, &value);
@@ -653,7 +684,7 @@ impl StackMachine {
             }
 
             Clear => {
-                let key: Vec<u8> = self.pop_item();
+                let key: Vec<u8> = self.pop_item().await;
                 trx.clear(&key);
 
                 debug!("clear: key={:?}", key);
@@ -661,13 +692,13 @@ impl StackMachine {
             }
 
             ClearRange => {
-                let begin: Vec<u8> = self.pop_item();
+                let begin: Vec<u8> = self.pop_item().await;
                 let end = if instr.pop_starts_with() {
                     let mut end = begin.clone();
                     strinc(&mut end);
                     end
                 } else {
-                    let end: Vec<u8> = self.pop_item();
+                    let end: Vec<u8> = self.pop_item().await;
                     end
                 };
                 trx.clear_range(&begin, &end);
@@ -675,9 +706,9 @@ impl StackMachine {
             }
 
             AtomicOp => {
-                let optype: String = self.pop_item();
-                let key: Vec<u8> = self.pop_item();
-                let value: Vec<u8> = self.pop_item();
+                let optype: String = self.pop_item().await;
+                let key: Vec<u8> = self.pop_item().await;
+                let value: Vec<u8> = self.pop_item().await;
 
                 let op = mutation_from_str(&optype);
                 trx.atomic_op(&key, &value, op);
@@ -689,9 +720,10 @@ impl StackMachine {
             }
 
             Commit => {
+                let trx0 = trx.clone();
                 let f = trx.clone()
                     .commit()
-                    .map(|trx| (trx, b"RESULT_NOT_PRESENT".to_vec()));
+                    .and_then(|_| ok((trx0, b"RESULT_NOT_PRESENT".to_vec())));
                 self.push_fut(number, f);
             }
 
@@ -706,22 +738,22 @@ impl StackMachine {
                 //TODO
                 let item = self.pop();
                 let number = item.number;
-                self.push(number, item.data());
+                self.push(number, item.data().await);
             }
 
             TuplePack => {
-                let n: i64 = self.pop_item();
+                let n: i64 = self.pop_item().await;
 
                 let mut buf = Vec::new();
                 for _ in 0..n {
-                    let mut data = self.pop_data();
+                    let mut data = self.pop_data().await;
                     buf.append(&mut data);
                 }
                 self.push_item(number, &buf);
             }
 
             TupleUnpack => {
-                let data: Vec<u8> = self.pop_item();
+                let data: Vec<u8> = self.pop_item().await;
                 let mut data = data.as_slice();
 
                 while !data.is_empty() {
@@ -733,11 +765,11 @@ impl StackMachine {
             }
 
             TupleRange => {
-                let n: i64 = self.pop_item();
+                let n: i64 = self.pop_item().await;
 
                 let mut tup = Vec::new();
                 for _ in 0..n {
-                    let mut data = self.pop_data();
+                    let mut data = self.pop_data().await;
                     tup.append(&mut data);
                 }
 
@@ -765,7 +797,7 @@ impl StackMachine {
 
         if is_db && mutation {
             //TODO
-            trx.commit().wait().expect("failed to commit");
+            trx.commit().await.expect("failed to commit");
             self.push_item(number, &b"RESULT_NOT_PRESENT".to_vec());
         }
 
@@ -774,14 +806,14 @@ impl StackMachine {
         }
     }
 
-    fn run(&mut self) {
+    async fn run(&mut self) {
         let instrs = self.fetch_instr()
-            .wait()
+            .await
             .expect("failed to read instructions");
 
         for (i, instr) in instrs.into_iter().enumerate() {
             debug!("{}/{}, {:?}", i, self.stack.len(), instr);
-            self.run_step(i, instr);
+            self.run_step(i, instr).await;
 
             /*
             if i == 135 {
@@ -793,6 +825,10 @@ impl StackMachine {
 }
 
 fn main() {
+    //env_logger::builder()
+    //    .default_format_timestamp(false)
+    //    .init();
+
     let args = std::env::args().collect::<Vec<_>>();
     let prefix = &args[1];
 
@@ -821,18 +857,12 @@ fn main() {
 
     network.wait();
 
-    let cluster = Cluster::new(cluster_path)
-        .wait()
-        .expect("failed to create cluster");
-
-    let db = cluster
-        .create_database()
-        .wait()
+    let db = Database::new(cluster_path)
         .expect("failed to get database");
 
     let mut sm = StackMachine::new(db, prefix.to_owned());
 
-    sm.run();
+    block_on(sm.run());
 
     network.stop().expect("failed to stop network");
     handle.join().expect("failed to join fdb thread");
