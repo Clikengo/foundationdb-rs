@@ -6,6 +6,8 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
+#![feature(async_await)]
+
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
@@ -14,16 +16,18 @@ extern crate foundationdb;
 extern crate futures;
 extern crate rand;
 
+use futures::executor::block_on;
+
 use std::borrow::Cow;
 use std::thread;
 
 use self::rand::{rngs::ThreadRng, seq::SliceRandom};
-use futures::future::{self, Future};
+use futures::future::{self, TryFutureExt};
 
 use foundationdb as fdb;
 use foundationdb::transaction::RangeOptionBuilder;
 use foundationdb::tuple::{Decode, Encode};
-use foundationdb::{Cluster, Database, Subspace, Transaction};
+use foundationdb::{Database, Subspace, Transaction};
 
 // Data model:
 // ("attends", student, class) = ""
@@ -76,16 +80,17 @@ fn init_classes(trx: &Transaction, all_classes: &[String]) {
     }
 }
 
-fn init(db: &Database, all_classes: &[String]) {
-    let trx = db.create_trx().expect("could not create transaction");
-    trx.clear_subspace_range("attends");
-    trx.clear_subspace_range("class");
-    init_classes(&trx, all_classes);
+async fn init(db: &Database, all_classes: &[String]) {
+    db.transact(|trx| async move {
+        trx.clear_subspace_range("attends");
+        trx.clear_subspace_range("class");
+        init_classes(&trx, all_classes);
 
-    trx.commit().wait().expect("failed to initialize data");
+        Ok(())
+    }).await.unwrap();
 }
 
-fn get_available_classes(db: &Database) -> Vec<String> {
+async fn get_available_classes(db: &Database) -> Vec<String> {
     let trx = db.create_trx().expect("could not create transaction");
 
     let range = RangeOptionBuilder::from("class");
@@ -104,17 +109,17 @@ fn get_available_classes(db: &Database) -> Vec<String> {
             }
 
             future::ok(available_classes)
-        }).wait()
+        }).await
         .expect("failed to get classes")
 }
 
-fn ditch_trx(trx: &Transaction, student: &str, class: &str) {
+async fn ditch_trx(trx: &Transaction, student: &str, class: &str) {
     let attends_key = ("attends", student, class).to_vec();
 
     // TODO: should get take an &Encode? current impl does encourage &[u8] reuse...
     if trx
         .get(&attends_key, true)
-        .wait()
+        .await
         .expect("get failed")
         .value()
         .is_none()
@@ -125,7 +130,7 @@ fn ditch_trx(trx: &Transaction, student: &str, class: &str) {
     let class_key = ("class", class).to_vec();
     let available_seats: i64 = i64::try_from(
         trx.get(&class_key, true)
-            .wait()
+            .await
             .expect("get failed")
             .value()
             .expect("class seats were not initialized"),
@@ -137,19 +142,25 @@ fn ditch_trx(trx: &Transaction, student: &str, class: &str) {
     trx.clear(&attends_key);
 }
 
-fn ditch(db: &Database, student: String, class: String) -> Result<(), failure::Error> {
-    db.transact(move |trx| {
-        ditch_trx(&trx, &student, &class);
-        future::result(Ok::<(), failure::Error>(()))
-    }).wait()
+async fn ditch(db: &Database, student: String, class: String) -> Result<(), failure::Error> {
+    db.transact(|trx| {
+        let student = student.clone();
+        let class = class.clone();
+
+        async move {
+            ditch_trx(&trx, &student, &class).await;
+
+            Ok(())
+        }
+    }).await
     .map_err(|e| format_err!("error in signup: {}", e))
 }
 
-fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(), failure::Error> {
+async fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(), failure::Error> {
     let attends_key = ("attends", student, class).to_vec();
     if trx
         .get(&attends_key, true)
-        .wait()
+        .await
         .expect("get failed")
         .value()
         .is_some()
@@ -161,7 +172,7 @@ fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(), failu
     let class_key = ("class", class).to_vec();
     let available_seats: i64 = i64::try_from(
         trx.get(&class_key, true)
-            .wait()
+            .await
             .expect("get failed")
             .value()
             .expect("class seats were not initialized"),
@@ -174,7 +185,7 @@ fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(), failu
     let attends_range = RangeOptionBuilder::from(("attends", student)).build();
     if trx
         .get_range(attends_range, 1_024)
-        .wait()
+        .await
         .expect("get_range failed")
         .key_values()
         .len()
@@ -189,22 +200,35 @@ fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(), failu
     Ok(())
 }
 
-fn signup(db: &Database, student: String, class: String) -> Result<(), failure::Error> {
-    db.transact(move |trx| future::result(signup_trx(&trx, &student, &class)))
-        .wait()
+async fn signup(db: &Database, student: String, class: String) -> Result<(), failure::Error> {
+    db.transact(|trx| {
+        let student = student.clone();
+        let class = class.clone();
+        async move {
+            signup_trx(&trx, &student, &class).await
+        }
+    }).await
         .map_err(|e| format_err!("error in signup: {}", e))
 }
 
-fn switch_classes(
+async fn switch_classes(
     db: &Database,
     student_id: String,
     old_class: String,
     new_class: String,
 ) -> Result<(), failure::Error> {
-    db.transact(move |trx| {
-        ditch_trx(&trx, &student_id, &old_class);
-        future::result(signup_trx(&trx, &student_id, &new_class))
-    }).wait()
+    db.transact(|trx| {
+        let student_id = student_id.clone();
+        let old_class = old_class.clone();
+        let new_class = new_class.clone();
+
+        async move {
+            ditch_trx(&trx, &student_id, &old_class).await;
+            signup_trx(&trx, &student_id, &new_class).await.unwrap();
+
+            Ok(())
+        }
+    }).await
     .map_err(|e| format_err!("error in switch: {}", e))
 }
 
@@ -215,7 +239,7 @@ enum Mood {
     Switch,
 }
 
-fn perform_op(
+async fn perform_op(
     db: &Database,
     rng: &mut ThreadRng,
     mood: Mood,
@@ -226,12 +250,12 @@ fn perform_op(
     match mood {
         Mood::Add => {
             let class = all_classes.choose(rng).unwrap();
-            signup(&db, student_id.to_string(), class.to_string())?;
+            signup(&db, student_id.to_string(), class.to_string()).await?;
             my_classes.push(class.to_string());
         }
         Mood::Ditch => {
             let class = all_classes.choose(rng).unwrap();
-            ditch(&db, student_id.to_string(), class.to_string())?;
+            ditch(&db, student_id.to_string(), class.to_string()).await?;
             my_classes.retain(|s| s != class);
         }
         Mood::Switch => {
@@ -242,7 +266,7 @@ fn perform_op(
                 student_id.to_string(),
                 old_class.to_string(),
                 new_class.to_string(),
-            )?;
+            ).await?;
             my_classes.retain(|s| s != &old_class);
             my_classes.push(new_class.to_string());
         }
@@ -251,50 +275,49 @@ fn perform_op(
 }
 
 fn simulate_students(student_id: usize, num_ops: usize) {
-    Cluster::new(foundationdb::default_config_path())
-        .and_then(|cluster| cluster.create_database())
-        .and_then(|db| {
-            let student_id = format!("s{}", student_id);
-            let mut rng = rand::thread_rng();
+    let db = Database::new(foundationdb::default_config_path()).unwrap();
 
-            let mut available_classes = Cow::Borrowed(&*ALL_CLASSES);
-            let mut my_classes = Vec::<String>::new();
+    block_on(async {
+        let student_id = format!("s{}", student_id);
+        let mut rng = rand::thread_rng();
 
-            for _ in 0..num_ops {
-                let mut moods = Vec::<Mood>::new();
+        let mut available_classes = Cow::Borrowed(&*ALL_CLASSES);
+        let mut my_classes = Vec::<String>::new();
 
-                if my_classes.len() > 0 {
-                    moods.push(Mood::Ditch);
-                    moods.push(Mood::Switch);
-                }
+        for _ in 0..num_ops {
+            let mut moods = Vec::<Mood>::new();
 
-                if my_classes.len() < 5 {
-                    moods.push(Mood::Add);
-                }
-
-                let mood = moods.choose(&mut rng).map(|mood| *mood).unwrap();
-
-                // on errors we recheck for available classes
-                if perform_op(
-                    &db,
-                    &mut rng,
-                    mood,
-                    &student_id,
-                    &available_classes,
-                    &mut my_classes,
-                ).is_err()
-                {
-                    println!("getting available classes");
-                    available_classes = Cow::Owned(get_available_classes(&db));
-                }
+            if my_classes.len() > 0 {
+                moods.push(Mood::Ditch);
+                moods.push(Mood::Switch);
             }
 
-            future::ok(())
-        }).wait()
-        .expect("got error in simulation");
+            if my_classes.len() < 5 {
+                moods.push(Mood::Add);
+            }
+
+            let mood = moods.choose(&mut rng).map(|mood| *mood).unwrap();
+
+            // on errors we recheck for available classes
+            if perform_op(
+                &db,
+                &mut rng,
+                mood,
+                &student_id,
+                &available_classes,
+                &mut my_classes,
+            ).await.is_err()
+            {
+                println!("getting available classes");
+                available_classes = Cow::Owned(get_available_classes(&db).await);
+            }
+        }
+
+        Ok::<(), failure::Error>(())
+    }).expect("got error in simulation");
 }
 
-fn run_sim(db: &Database, students: usize, ops_per_student: usize) {
+async fn run_sim(db: &Database, students: usize, ops_per_student: usize) {
     let mut threads: Vec<(usize, thread::JoinHandle<()>)> = Vec::with_capacity(students);
     for i in 0..students {
         // TODO: ClusterInner has a mutable pointer reference, if thread-safe, mark that trait as Sync, then we can clone DB here...
@@ -317,7 +340,7 @@ fn run_sim(db: &Database, students: usize, ops_per_student: usize) {
             .create_trx()
             .unwrap()
             .get_range(attends_range, 1_024)
-            .wait()
+            .await
             .expect("get_range failed")
             .key_values()
             .into_iter()
@@ -345,16 +368,16 @@ fn main() {
     network.wait();
 
     // run scheduling
-    Cluster::new(foundationdb::default_config_path())
-        .and_then(|cluster| cluster.create_database())
-        .and_then(|db| {
-            init(&db, &*ALL_CLASSES);
-            println!("Initialized");
-            run_sim(&db, 10, 10);
+    let db = Database::new(foundationdb::default_config_path()).unwrap();
 
-            future::ok(())
-        }).wait()
-        .expect("failed to create cluster");
+    block_on(async {
+        init(&db, &*ALL_CLASSES).await;
+
+        println!("Initialized");
+        run_sim(&db, 10, 10).await;
+
+        Ok::<(), failure::Error>(())
+    }).expect("failed to run");
 
     // shutdown
     network.stop().expect("failed to stop network");
