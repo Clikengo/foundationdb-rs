@@ -1,5 +1,3 @@
-#![feature(async_await)]
-
 extern crate foundationdb as fdb;
 extern crate futures;
 extern crate rand;

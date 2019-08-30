@@ -7,8 +7,6 @@
 //
 // See scripts/run_bindingtester.sh for how to use this.
 
-#![feature(async_await)]
-
 extern crate foundationdb as fdb;
 extern crate foundationdb_sys as fdb_sys;
 extern crate futures;

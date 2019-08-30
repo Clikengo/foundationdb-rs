@@ -53,7 +53,6 @@
 //!
 //! *WARNING* Until the 1.0 release of this library, the API may be in constant flux.
 
-#![feature(async_await)]
 #![deny(missing_docs)]
 
 #[macro_use]
