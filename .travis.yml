@@ -40,7 +40,7 @@ matrix:
            RUSTFMT=true
       script:
         - rustup component add rustfmt-preview
-        - cargo fmt --all -- --write-mode=diff
+        - cargo fmt --all -- --check
 
     ## bindingtester
     - rust: stable
