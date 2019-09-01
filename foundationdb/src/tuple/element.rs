@@ -2,8 +2,8 @@ use std::{self, io::Write};
 #[cfg(feature = "uuid")]
 use uuid::Uuid;
 
-use byteorder::{self, ByteOrder};
 use crate::tuple::{Decode, Encode, Error, Result, Tuple, TupleDepth};
+use byteorder::{self, ByteOrder};
 
 /// Various tuple types
 pub(super) const NIL: u8 = 0x00;

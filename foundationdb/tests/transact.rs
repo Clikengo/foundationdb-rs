@@ -31,7 +31,8 @@ fn test_transact_error() {
             #[allow(unreachable_code)]
             Ok(())
         }
-    })).is_err());
+    }))
+    .is_err());
 }
 
 #[test]
@@ -46,7 +47,8 @@ fn test_transact_success() {
 
             Ok(())
         }
-    })).is_ok());
+    }))
+    .is_ok());
 }
 
 // Makes the key dirty. It will abort transactions which performs non-snapshot read on the `key`.
@@ -69,30 +71,29 @@ fn test_transact_conflict() {
 
     let db = Database::new(foundationdb::default_config_path()).unwrap();
 
-    let fut = db
-        .transact(move |trx| {
-            let try_count0 = try_count0.clone();
-            async move {
-                // increment try counter
-                try_count0.fetch_add(1, Ordering::SeqCst);
+    let fut = db.transact(move |trx| {
+        let try_count0 = try_count0.clone();
+        async move {
+            // increment try counter
+            try_count0.fetch_add(1, Ordering::SeqCst);
 
-                trx.set_option(options::TransactionOption::RetryLimit(RETRY_COUNT as u32))
-                    .expect("failed to set retry limit");
+            trx.set_option(options::TransactionOption::RetryLimit(RETRY_COUNT as u32))
+                .expect("failed to set retry limit");
 
-                let db = trx.database();
+            let db = trx.database();
 
-                // update conflict range
-                let res = trx.get(KEY, false).await?;
+            // update conflict range
+            let res = trx.get(KEY, false).await?;
 
-                // make current transaction invalid by making conflict
-                make_dirty(&db, KEY).await;
+            // make current transaction invalid by making conflict
+            make_dirty(&db, KEY).await;
 
-                let trx = res.transaction();
-                trx.set(KEY, common::random_str(10).as_bytes());
+            let trx = res.transaction();
+            trx.set(KEY, common::random_str(10).as_bytes());
 
-                Ok(())
-            }
-        });
+            Ok(())
+        }
+    });
 
     block_on(fut).expect_err("commit should have failed");
 

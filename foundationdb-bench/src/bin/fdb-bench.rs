@@ -10,8 +10,8 @@ extern crate structopt;
 use std::sync::atomic::*;
 use std::sync::Arc;
 
-use futures::future::*;
 use futures::executor::block_on;
+use futures::future::*;
 use rand::prelude::*;
 use rand::rngs::mock::StepRng;
 use stopwatch::Stopwatch;
@@ -141,11 +141,7 @@ impl Bench {
         );
     }
 
-    async fn run_range(
-        &self,
-        r: std::ops::Range<usize>,
-        counter: Counter,
-    ) -> Result<()> {
+    async fn run_range(&self, r: std::ops::Range<usize>, counter: Counter) -> Result<()> {
         let runners = r
             .into_iter()
             .map(|n| {

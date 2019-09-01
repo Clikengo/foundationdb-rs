@@ -79,13 +79,17 @@ fn init_classes(trx: &Transaction, all_classes: &[String]) {
 }
 
 async fn init(db: &Database, all_classes: &[String]) {
-    db.transact(|trx| async move {
-        trx.clear_subspace_range("attends");
-        trx.clear_subspace_range("class");
-        init_classes(&trx, all_classes);
+    db.transact(|trx| {
+        async move {
+            trx.clear_subspace_range("attends");
+            trx.clear_subspace_range("class");
+            init_classes(&trx, all_classes);
 
-        Ok(())
-    }).await.unwrap();
+            Ok(())
+        }
+    })
+    .await
+    .unwrap();
 }
 
 async fn get_available_classes(db: &Database) -> Vec<String> {
@@ -107,7 +111,8 @@ async fn get_available_classes(db: &Database) -> Vec<String> {
             }
 
             future::ok(available_classes)
-        }).await
+        })
+        .await
         .expect("failed to get classes")
 }
 
@@ -132,7 +137,8 @@ async fn ditch_trx(trx: &Transaction, student: &str, class: &str) {
             .expect("get failed")
             .value()
             .expect("class seats were not initialized"),
-    ).expect("failed to decode i64")
+    )
+    .expect("failed to decode i64")
         + 1;
 
     //println!("{} ditching class: {}", student, class);
@@ -150,7 +156,8 @@ async fn ditch(db: &Database, student: String, class: String) -> Result<(), fail
 
             Ok(())
         }
-    }).await
+    })
+    .await
     .map_err(|e| format_err!("error in signup: {}", e))
 }
 
@@ -174,7 +181,8 @@ async fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(),
             .expect("get failed")
             .value()
             .expect("class seats were not initialized"),
-    ).expect("failed to decode i64");
+    )
+    .expect("failed to decode i64");
 
     if available_seats <= 0 {
         bail!("No remaining seats");
@@ -202,11 +210,10 @@ async fn signup(db: &Database, student: String, class: String) -> Result<(), fai
     db.transact(|trx| {
         let student = student.clone();
         let class = class.clone();
-        async move {
-            signup_trx(&trx, &student, &class).await
-        }
-    }).await
-        .map_err(|e| format_err!("error in signup: {}", e))
+        async move { signup_trx(&trx, &student, &class).await }
+    })
+    .await
+    .map_err(|e| format_err!("error in signup: {}", e))
 }
 
 async fn switch_classes(
@@ -226,7 +233,8 @@ async fn switch_classes(
 
             Ok(())
         }
-    }).await
+    })
+    .await
     .map_err(|e| format_err!("error in switch: {}", e))
 }
 
@@ -264,7 +272,8 @@ async fn perform_op(
                 student_id.to_string(),
                 old_class.to_string(),
                 new_class.to_string(),
-            ).await?;
+            )
+            .await?;
             my_classes.retain(|s| s != &old_class);
             my_classes.push(new_class.to_string());
         }
@@ -304,7 +313,9 @@ fn simulate_students(student_id: usize, num_ops: usize) {
                 &student_id,
                 &available_classes,
                 &mut my_classes,
-            ).await.is_err()
+            )
+            .await
+            .is_err()
             {
                 println!("getting available classes");
                 available_classes = Cow::Owned(get_available_classes(&db).await);
@@ -312,7 +323,8 @@ fn simulate_students(student_id: usize, num_ops: usize) {
         }
 
         Ok::<(), failure::Error>(())
-    }).expect("got error in simulation");
+    })
+    .expect("got error in simulation");
 }
 
 async fn run_sim(db: &Database, students: usize, ops_per_student: usize) {
@@ -375,7 +387,8 @@ fn main() {
         run_sim(&db, 10, 10).await;
 
         Ok::<(), failure::Error>(())
-    }).expect("failed to run");
+    })
+    .expect("failed to run");
 
     // shutdown
     network.stop().expect("failed to stop network");

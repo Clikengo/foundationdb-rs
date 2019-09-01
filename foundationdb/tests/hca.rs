@@ -71,32 +71,35 @@ fn test_hca_concurrent_allocations() {
     let db = Database::new(foundationdb::default_config_path()).unwrap();
 
     let fut = async move {
-            let cleared_range = db
-                .transact(move |tx| {
-                    tx.clear_subspace_range(Subspace::from_bytes(KEY));
-                    futures::future::ready(Ok::<(), failure::Error>(()))
-                }).await;
+        let cleared_range = db
+            .transact(move |tx| {
+                tx.clear_subspace_range(Subspace::from_bytes(KEY));
+                futures::future::ready(Ok::<(), failure::Error>(()))
+            })
+            .await;
 
-            cleared_range.expect("unable to clear hca test range");
+        cleared_range.expect("unable to clear hca test range");
 
-            let mut futures = Vec::new();
-            let mut all_ints: Vec<i64> = Vec::new();
+        let mut futures = Vec::new();
+        let mut all_ints: Vec<i64> = Vec::new();
 
-            for _ in 0..N {
-                let f = db.transact(move |tx| async move {
+        for _ in 0..N {
+            let f = db.transact(move |tx| {
+                async move {
                     let ha = HighContentionAllocator::new(Subspace::from_bytes(KEY));
                     ha.allocate(tx).map_err(|e| e.into()).await
-                });
+                }
+            });
 
-                futures.push(f);
-            }
+            futures.push(f);
+        }
 
-            for allocation in futures {
-                let i = allocation.await.expect("unable to get allocation");
-                all_ints.push(i);
-            }
+        for allocation in futures {
+            let i = allocation.await.expect("unable to get allocation");
+            all_ints.push(i);
+        }
 
-            Ok::<_, Error>(all_ints)
+        Ok::<_, Error>(all_ints)
     };
 
     let all_ints: Vec<i64> = block_on(fut).expect("failed to run");

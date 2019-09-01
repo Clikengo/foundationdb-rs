@@ -27,7 +27,7 @@
 use std::sync::Mutex;
 
 use byteorder::ByteOrder;
-use futures::{StreamExt,TryStreamExt};
+use futures::{StreamExt, TryStreamExt};
 use rand::Rng;
 
 use crate::error::Error;

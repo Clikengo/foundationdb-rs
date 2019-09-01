@@ -11,8 +11,8 @@
 //! https://apple.github.io/foundationdb/api-c.html#api-versioning
 
 use crate::error::{self, Result};
-use foundationdb_sys as fdb_sys;
 use crate::network::NetworkBuilder;
+use foundationdb_sys as fdb_sys;
 
 /// Returns the max api version of the underlying Fdb C API Client
 pub fn get_max_api_version() -> i32 {

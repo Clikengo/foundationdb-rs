@@ -13,9 +13,9 @@
 use std;
 use std::sync::Arc;
 
+use failure::Fail;
 use foundationdb_sys as fdb;
 use futures::Future;
-use failure::Fail;
 
 use crate::error::{self, Error as FdbError, Result};
 use crate::options;
@@ -37,7 +37,9 @@ impl Database {
             let mut db: *mut fdb::FDBDatabase = std::ptr::null_mut();
             let err = fdb::fdb_create_database(path_str.as_ptr(), &mut db);
             error::eval(err)?;
-            Ok(Database { inner: Arc::new(DatabaseInner { inner: db }) })
+            Ok(Database {
+                inner: Arc::new(DatabaseInner { inner: db }),
+            })
         }
     }
 
@@ -68,10 +70,13 @@ impl Database {
     /// It might retry indefinitely if the transaction is highly contentious. It is recommended to
     /// set `TransactionOption::RetryLimit` or `TransactionOption::SetTimeout` on the transaction
     /// if the task need to be guaranteed to finish.
-    pub async fn transact<F, Fut, Output>(&self, func: F) -> std::result::Result<Output, failure::Error>
-        where
-            F: Fn(Transaction) -> Fut,
-            Fut: Future<Output = std::result::Result<Output, failure::Error>>,
+    pub async fn transact<F, Fut, Output>(
+        &self,
+        func: F,
+    ) -> std::result::Result<Output, failure::Error>
+    where
+        F: Fn(Transaction) -> Fut,
+        Fut: Future<Output = std::result::Result<Output, failure::Error>>,
     {
         let trx = self.create_trx().unwrap();
 
@@ -102,13 +107,15 @@ impl Database {
                         if e.should_retry() {
                             //debug!("retrying error in transaction commit: {}", e);
                         } else {
-                            return Err(e.context("non-retryable error in transaction commit").into())                                        }
+                            return Err(e
+                                .context("non-retryable error in transaction commit")
+                                .into());
+                        }
                     }
                 }
             }
         }
     }
-
 }
 
 struct DatabaseInner {

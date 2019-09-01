@@ -18,8 +18,8 @@ use failure;
 
 use crate::error::{self, Result};
 use crate::fdb_api::FdbApi;
-use foundationdb_sys as fdb_sys;
 use crate::options::NetworkOption;
+use foundationdb_sys as fdb_sys;
 
 // The Fdb states that setting the Client version should happen only once
 //   and is not thread-safe, thus the choice of a lazy static enforcing a single

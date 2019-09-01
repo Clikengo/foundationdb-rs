@@ -15,13 +15,13 @@ extern crate log;
 
 use std::collections::HashMap;
 
-use crate::fdb::error::{Error,Result};
+use crate::fdb::error::{Error, Result};
 use crate::fdb::keyselector::KeySelector;
 use crate::fdb::tuple::*;
 use crate::fdb::*;
+use futures::executor::block_on;
 use futures::future::*;
 use futures::prelude::*;
-use futures::executor::block_on;
 use std::pin::Pin;
 
 use crate::fdb::options::{MutationType, StreamingMode};
@@ -361,28 +361,30 @@ impl StackMachine {
     }
 
     async fn fetch_instr(&self) -> std::result::Result<Vec<Instr>, failure::Error> {
-        self.db.transact(move |trx| {
-            let prefix = self.prefix.clone();
-            async move {
-                let opt = transaction::RangeOptionBuilder::from(&prefix).build();
-                let instrs = Vec::new();
-                trx.get_ranges(opt)
-                    .map_err(|(_opt, e)| e)
-                    .fold(Ok(instrs), |instrs, res| {
-                        let mut instrs = instrs.unwrap();
-                        let res = res.unwrap();
+        self.db
+            .transact(move |trx| {
+                let prefix = self.prefix.clone();
+                async move {
+                    let opt = transaction::RangeOptionBuilder::from(&prefix).build();
+                    let instrs = Vec::new();
+                    trx.get_ranges(opt)
+                        .map_err(|(_opt, e)| e)
+                        .fold(Ok(instrs), |instrs, res| {
+                            let mut instrs = instrs.unwrap();
+                            let res = res.unwrap();
 
-                        let kvs = res.key_values();
+                            let kvs = res.key_values();
 
-                        for kv in kvs.as_ref() {
-                            let instr = Instr::from(kv.value());
-                            instrs.push(instr);
-                        }
-                        ready(Ok::<_, failure::Error>(instrs))
-                    })
-                    .await
-            }
-        }).await
+                            for kv in kvs.as_ref() {
+                                let instr = Instr::from(kv.value());
+                                instrs.push(instr);
+                            }
+                            ready(Ok::<_, failure::Error>(instrs))
+                        })
+                        .await
+                }
+            })
+            .await
     }
 
     fn pop(&mut self) -> StackItem {
@@ -506,14 +508,13 @@ impl StackMachine {
             OnError => {
                 let code: i64 = self.pop_item().await;
                 let trx0 = trx.clone();
-                let f = trx.on_error(Error::from(code as i32))
-                    .then(|e| {
-                        if e.should_retry() {
-                            ok((trx0, b"RESULT_NOT_PRESENT".to_vec()))
-                        } else {
-                            err(e)
-                        }
-                    });
+                let f = trx.on_error(Error::from(code as i32)).then(|e| {
+                    if e.should_retry() {
+                        ok((trx0, b"RESULT_NOT_PRESENT".to_vec()))
+                    } else {
+                        err(e)
+                    }
+                });
                 self.push_fut(number, f);
             }
             Get => {
@@ -539,7 +540,8 @@ impl StackMachine {
                 let mut prefix: Vec<u8> = self.pop_item().await;
 
                 //TODO: wait
-                let key = trx.get_key(selector, instr.pop_snapshot())
+                let key = trx
+                    .get_key(selector, instr.pop_snapshot())
                     .map(move |res| {
                         let res = res.unwrap();
                         res.value().to_vec()
@@ -606,9 +608,9 @@ impl StackMachine {
                 let out = Vec::new();
                 let trx0 = trx.clone();
 
-                let f = trx.get_ranges(opt)
-                    .map_err(|(_, e)| e)
-                    .fold(Ok((trx0.clone(), out)), move |state, res| {
+                let f = trx.get_ranges(opt).map_err(|(_, e)| e).fold(
+                    Ok((trx0.clone(), out)),
+                    move |state, res| {
                         let (_trx, mut out) = state.unwrap();
                         if let Err(e) = res {
                             return err(e);
@@ -635,9 +637,8 @@ impl StackMachine {
                                 .expect("failed to encode");
                         }
                         ok((trx0.clone(), out))
-                    });
-
-
+                    },
+                );
 
                 //TODO: wait
                 self.push_fut(number, f);
@@ -649,7 +650,8 @@ impl StackMachine {
 
             GetReadVersion => {
                 //TODO: wait
-                let version = trx.get_read_version()
+                let version = trx
+                    .get_read_version()
                     .await
                     .expect("failed to get read version");
 
@@ -662,7 +664,8 @@ impl StackMachine {
 
             GetVersionstamp => {
                 let trx0 = trx.clone();
-                let f = trx.clone()
+                let f = trx
+                    .clone()
                     .get_versionstamp()
                     .map_ok(move |v| (trx0, v.versionstamp().to_vec()));
                 self.push_fut(number, f);
@@ -719,14 +722,16 @@ impl StackMachine {
 
             Commit => {
                 let trx0 = trx.clone();
-                let f = trx.clone()
+                let f = trx
+                    .clone()
                     .commit()
                     .and_then(|_| ok((trx0, b"RESULT_NOT_PRESENT".to_vec())));
                 self.push_fut(number, f);
             }
 
             GetCommittedVersion => {
-                let last_version = trx.committed_version()
+                let last_version = trx
+                    .committed_version()
                     .expect("failed to get committed version");
                 self.last_version = last_version;
                 self.push_item(number, &b"GOT_COMMITTED_VERSION".to_vec());
@@ -805,7 +810,8 @@ impl StackMachine {
     }
 
     async fn run(&mut self) {
-        let instrs = self.fetch_instr()
+        let instrs = self
+            .fetch_instr()
             .await
             .expect("failed to read instructions");
 
@@ -855,8 +861,7 @@ fn main() {
 
     network.wait();
 
-    let db = Database::new(cluster_path)
-        .expect("failed to get database");
+    let db = Database::new(cluster_path).expect("failed to get database");
 
     let mut sm = StackMachine::new(db, prefix.to_owned());
 

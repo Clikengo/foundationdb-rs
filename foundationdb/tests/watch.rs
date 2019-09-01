@@ -11,8 +11,8 @@ extern crate futures;
 extern crate lazy_static;
 
 use foundationdb::*;
-use futures::future::*;
 use futures::executor::block_on;
+use futures::future::*;
 
 mod common;
 
@@ -22,45 +22,44 @@ fn test_watch() {
     const KEY: &'static [u8] = b"test-watch";
 
     let db = Database::new(foundationdb::default_config_path()).unwrap();
-    let fut = ok(())
-        .and_then(|_| {
-            let watch = ready(db.create_trx()).and_then(|trx| {
-                eprintln!("setting watch");
-                let watch = trx.watch(KEY);
-                trx.commit().map(|_| {
-                    eprintln!("watch committed");
-                    Ok(watch)
+    let fut = ok(()).and_then(|_| {
+        let watch = ready(db.create_trx()).and_then(|trx| {
+            eprintln!("setting watch");
+            let watch = trx.watch(KEY);
+            trx.commit().map(|_| {
+                eprintln!("watch committed");
+                Ok(watch)
+            })
+        });
+
+        let write = ready(db.create_trx()).and_then(|trx| {
+            eprintln!("writing value");
+
+            let value = common::random_str(10);
+            trx.set(KEY, value.as_bytes());
+            trx.commit().map(|_| {
+                eprintln!("write committed");
+
+                Ok(())
+            })
+        });
+
+        // 1. Setup a watch with a key
+        watch.and_then(move |watch| {
+            // 2. After the watch is installed, try to update the key.
+            write
+                .and_then(move |_| {
+                    // 3. After updating the key, waiting for the watch
+                    watch
                 })
-            });
-
-            let write = ready(db.create_trx()).and_then(|trx| {
-                eprintln!("writing value");
-
-                let value = common::random_str(10);
-                trx.set(KEY, value.as_bytes());
-                trx.commit().map(|_| {
-                    eprintln!("write committed");
+                .map(|_| {
+                    // 4. watch fired as expected
+                    eprintln!("watch fired");
 
                     Ok(())
                 })
-            });
-
-            // 1. Setup a watch with a key
-            watch.and_then(move |watch| {
-                // 2. After the watch is installed, try to update the key.
-                write
-                    .and_then(move |_| {
-                        // 3. After updating the key, waiting for the watch
-                        watch
-                    })
-                    .map(|_| {
-                        // 4. watch fired as expected
-                        eprintln!("watch fired");
-
-                        Ok(())
-                    })
-            })
-        });
+        })
+    });
 
     block_on(fut).expect("failed to run")
 }
