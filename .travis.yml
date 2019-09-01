@@ -6,23 +6,23 @@ matrix:
   include:
     # optional feature variations
     # we want full coverage, include all features...
-    - rust: stable
-      env: NAME=stable
-           RUST_BACKTRACE=full
+#     - rust: stable
+#       env: NAME=stable
+#            RUST_BACKTRACE=full
 
-    - rust: beta
-      env: NAME=beta
-           RUST_BACKTRACE=full
+#     - rust: beta
+#       env: NAME=beta
+#            RUST_BACKTRACE=full
 
-    - os: osx
-      rust: stable
-      env: NAME=macos
-           RUST_BACKTRACE=full
+#     - os: osx
+#       rust: stable
+#       env: NAME=macos
+#            RUST_BACKTRACE=full
 
-    - os: windows
-      rust: stable
-      env: NAME=windows
-           RUST_BACKTRACE=full
+#     - os: windows
+#       rust: stable
+#       env: NAME=windows
+#            RUST_BACKTRACE=full
 
     - rust: nightly
       env: RUST_BACKTRACE=full
