@@ -23,6 +23,6 @@ build_script:
   - cargo test --manifest-path foundationdb-sys/Cargo.toml
   - cargo test --manifest-path foundationdb-gen/Cargo.toml
   - cargo test --manifest-path foundationdb/Cargo.toml
-  - cargo test --manifest-path foundationdb/Cargo.toml --no-default-features --features fdb-6_0
+  - cargo test --manifest-path foundationdb/Cargo.toml --no-default-features --features fdb-6_1
   - cargo test --manifest-path foundationdb-bench/Cargo.toml
   - cargo run --manifest-path foundationdb/Cargo.toml --example class-scheduling
