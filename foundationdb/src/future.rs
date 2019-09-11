@@ -21,13 +21,16 @@ use foundationdb_sys as fdb;
 use futures;
 
 use crate::error::{self, Result};
+use futures::task::AtomicWaker;
 use std::pin::Pin;
-use std::task::{Context, Poll, Waker};
+use std::sync::Arc;
+use std::task::{Context, Poll};
 
 /// An opaque type that represents a Future in the FoundationDB C API.
 pub(crate) struct FdbFuture {
     f: Option<*mut fdb::FDBFuture>,
-    cb_active: bool,
+    waker: Arc<AtomicWaker>,
+    registered: bool,
 }
 
 impl FdbFuture {
@@ -35,7 +38,8 @@ impl FdbFuture {
     pub(crate) unsafe fn new(f: *mut fdb::FDBFuture) -> Self {
         Self {
             f: Some(f),
-            cb_active: false,
+            waker: Arc::new(AtomicWaker::new()),
+            registered: false,
         }
     }
 }
@@ -56,28 +60,29 @@ impl futures::Future for FdbFuture {
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let f = self.f.expect("cannot poll after resolve");
 
-        if !self.cb_active {
-            let b = Box::new(cx.waker().clone());
-            let b = Box::into_raw(b);
-            let ptr = b as *mut std::ffi::c_void;
-            self.cb_active = true;
-            unsafe {
-                fdb::fdb_future_set_callback(f, Some(fdb_future_callback), ptr);
-            }
-
-            return Poll::Pending;
-        }
+        self.waker.register(cx.waker());
 
         let ready = unsafe { fdb::fdb_future_is_ready(f) };
-        if ready == 0 {
-            return Poll::Pending;
+        if ready != 0 {
+            unsafe { error::eval(fdb::fdb_future_get_error(f))? };
+
+            // The result is taking ownership of fdb::FDBFuture
+            let g = FdbFutureResult::new(self.f.take().unwrap());
+            return Poll::Ready(Ok(g));
         }
 
-        unsafe { error::eval(fdb::fdb_future_get_error(f))? };
+        if !self.registered {
+            let w = self.waker.clone();
+            let wp = Arc::into_raw(w);
 
-        // The result is taking ownership of fdb::FDBFuture
-        let g = FdbFutureResult::new(self.f.take().unwrap());
-        Poll::Ready(Ok(g))
+            unsafe {
+                let ret = fdb::fdb_future_set_callback(f, Some(fdb_future_callback), wp as *mut _);
+                debug_assert!(ret == 0);
+            }
+            self.registered = true;
+        }
+
+        Poll::Pending
     }
 }
 
@@ -87,8 +92,9 @@ extern "C" fn fdb_future_callback(
     _f: *mut fdb::FDBFuture,
     callback_parameter: *mut ::std::os::raw::c_void,
 ) {
-    let b = unsafe { Box::from_raw(callback_parameter as *mut Waker) };
-    b.wake();
+    let waker_ptr: *const AtomicWaker = callback_parameter as *const _;
+    let waker = unsafe { Arc::from_raw(waker_ptr) };
+    waker.wake();
 }
 
 /// Represents the output of fdb_future_get_keyvalue_array().
