@@ -21,24 +21,28 @@ travis-ci = { repository = "bluejekyll/foundationdb-rs" }
 # codecov = { repository = "bluejekyll/foundationdb-rs", branch = "master", service = "github" }
 
 [features]
-default = ["fdb-6_0", "uuid"]
+default = ["fdb-6_1", "serde"]
 
 fdb-5_1 = [ "foundationdb-sys/fdb-5_1" ]
 fdb-5_2 = [ "foundationdb-sys/fdb-5_2" ]
 fdb-6_0 = [ "foundationdb-sys/fdb-6_0" ]
+fdb-6_1 = [ "foundationdb-sys/fdb-6_1" ]
+fdb-6_2 = [ "foundationdb-sys/fdb-6_2" ]
 
 [build-dependencies]
-foundationdb-gen = { version = "0.1.0", path = "../foundationdb-gen" }
+foundationdb-gen = { path = "../foundationdb-gen" }
 
 [dependencies]
 failure = "0.1"
 failure_derive = "0.1"
 foundationdb-sys = { version = "0.2.0", path = "../foundationdb-sys", default-features = false }
-futures = "0.1"
-lazy_static = "1.0"
-byteorder = "1.2"
-log = "0.4"
-uuid = { version = "0.7", optional = true }
+futures-preview = { version = "=0.3.0-alpha.19", features = ["async-await"] }
+memchr = "2.2.1"
+serde = { version = "1.0.102", optional = true }
+static_assertions = "1.0.0"
 
 [dev-dependencies]
+byteorder = "1.2"
+lazy_static = "1.0"
+log = "0.4"
 rand = "0.6"

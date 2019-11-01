@@ -1,14 +1,18 @@
-extern crate inflector;
 extern crate xml;
 #[macro_use]
 extern crate failure;
 
 type Result<T> = std::result::Result<T, failure::Error>;
 
-use inflector::cases::classcase;
-use inflector::cases::screamingsnakecase;
+use std::fmt;
+use std::fmt::Write;
 use xml::attribute::OwnedAttribute;
 use xml::reader::{EventReader, XmlEvent};
+
+const TAB1: &str = "    ";
+const TAB2: &str = "        ";
+const TAB3: &str = "            ";
+const TAB4: &str = "                ";
 
 #[derive(Debug)]
 struct FdbScope {
@@ -16,98 +20,67 @@ struct FdbScope {
     options: Vec<FdbOption>,
 }
 impl FdbScope {
-    fn gen_ty(&self) -> String {
-        let mut s = String::new();
+    fn gen_ty<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
         let with_ty = self.with_ty();
 
         if with_ty {
-            s += "#[derive(Clone,Debug)]\n";
+            writeln!(w, "#[derive(Clone, Debug)]")?;
         } else {
-            s += "#[derive(Clone,Copy,Debug)]\n";
+            writeln!(w, "#[derive(Clone, Copy, Debug)]")?;
         }
-        s += "pub enum ";
-        s += &self.name;
-        s += "{\n";
+        writeln!(w, "pub enum {name} {{", name = self.name)?;
 
         let with_ty = self.with_ty();
         for option in self.options.iter() {
-            s += &option.gen_ty(with_ty);
+            option.gen_ty(w, with_ty)?;
         }
-        s += "}\n";
-
-        s
+        writeln!(w, "}}")
     }
 
-    fn gen_impl(&self) -> String {
-        let mut s = String::new();
-        s += "impl ";
-        s += &self.name;
-        s += " {\n";
-
-        s += &self.gen_code();
-        s += &self.gen_apply();
-
-        s += "}\n";
-        s
+    fn gen_impl<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
+        writeln!(w, "impl {name} {{", name = self.name)?;
+        self.gen_code(w)?;
+        self.gen_apply(w)?;
+        writeln!(w, "}}")
     }
 
-    fn gen_code(&self) -> String {
-        let mut s = String::new();
-        s += &format!("pub fn code(&self) -> fdb::FDB{} {{\n", self.name);
-        s += "match *self {\n";
+    fn gen_code<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
+        writeln!(
+            w,
+            "{t}pub fn code(&self) -> fdb::FDB{name} {{",
+            t = TAB1,
+            name = self.name,
+        )?;
+        writeln!(w, "{t}match *self {{", t = TAB2)?;
 
         let enum_prefix = self.c_enum_prefix();
         let with_ty = self.with_ty();
 
         for option in self.options.iter() {
-            let rs_name = match option.name.as_ref() {
-                "AppendIfFit" => "AppendIfFits",
-                s => s
-            };
-
-            s += &format!("{}::{}", self.name, rs_name);
-
-            if with_ty {
-                if let Some(_ty) = option.get_ty() {
-                    s += "(ref _v)"
-                }
-            }
-
-            let mut enum_name = screamingsnakecase::to_screaming_snake_case(&option.name);
-            if self.name != "MutationType" || option.name == "AppendIfFit" {
-                enum_name = Self::fix_enum_name(&enum_name);
-            }
-
-            s += &format!(" => fdb::{}{},\n", enum_prefix, enum_name);
+            writeln!(
+                w,
+                "{t}{scope}::{name}{param} => fdb::{enum_prefix}{code},",
+                t = TAB3,
+                scope = self.name,
+                name = option.name,
+                param = if let (true, Some(..)) = (with_ty, option.get_ty()) {
+                    "(..)"
+                } else {
+                    ""
+                },
+                enum_prefix = enum_prefix,
+                code = option.c_name,
+            )?;
         }
 
-        s += "}\n}\n";
-
-        s
+        writeln!(w, "{t}}}", t = TAB2)?;
+        writeln!(w, "{t}}}", t = TAB1)
     }
 
-    fn fix_enum_name(name: &str) -> String {
-        let tab = [
-            ("BYTE", "BYTES"),
-            ("WATCH", "WATCHES"),
-            ("PEER", "PEERS"),
-            ("THREAD", "THREADS"),
-            ("KEY", "KEYS"),
-            ("FIT", "FITS"),
-        ];
-
-        for &(ref from, ref to) in tab.iter() {
-            if name.ends_with(from) {
-                return format!("{}{}", &name[0..(name.len() - from.len())], to);
-            }
-        }
-        name.to_owned()
-    }
-
-    fn gen_apply(&self) -> String {
+    fn gen_apply<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
         let fn_name = match self.apply_fn_name() {
             Some(name) => name,
-            _ => return String::new(),
+            _ => return Ok(()),
         };
 
         let first_arg = match self.apply_arg_name() {
@@ -115,13 +88,14 @@ impl FdbScope {
             None => String::new(),
         };
 
-        let mut s = String::new();
-        s += &format!(
-            "pub unsafe fn apply(&self{}) -> std::result::Result<(), error::Error> {{\n",
-            first_arg
-        );
-        s += "let code = self.code();\n";
-        s += "let err = match *self {\n";
+        writeln!(
+            w,
+            "{t}pub unsafe fn apply(&self{args}) -> std::result::Result<(), error::Error> {{",
+            t = TAB1,
+            args = first_arg
+        )?;
+        writeln!(w, "{t}let code = self.code();", t = TAB2)?;
+        writeln!(w, "{t}let err = match *self {{", t = TAB2)?;
 
         let args = if first_arg.is_empty() {
             "code"
@@ -130,45 +104,53 @@ impl FdbScope {
         };
 
         for option in self.options.iter() {
-            s += &format!("{}::{}", self.name, option.name);
-
+            write!(w, "{}{}::{}", TAB3, self.name, option.name)?;
             match option.param_type {
                 FdbOptionTy::Empty => {
-                    s += &format!(" => fdb::{}({}, std::ptr::null(), 0),\n", fn_name, args);
+                    writeln!(w, " => fdb::{}({}, std::ptr::null(), 0),", fn_name, args)?;
                 }
                 FdbOptionTy::Int => {
-                    s += "(v) => {\n";
-                    s += "let data: [u8;8] = std::mem::transmute(v as i64);\n";
-                    s += &format!(
-                        "fdb::{}({}, data.as_ptr() as *const u8, 8)\n",
-                        fn_name, args
-                    );
-                    s += "},";
+                    writeln!(w, "(v) => {{")?;
+                    writeln!(
+                        w,
+                        "{}let data: [u8;8] = std::mem::transmute(v as i64);",
+                        TAB4,
+                    )?;
+                    writeln!(
+                        w,
+                        "{}fdb::{}({}, data.as_ptr() as *const u8, 8)",
+                        TAB4, fn_name, args
+                    )?;
+                    writeln!(w, "{t}}}", t = TAB3)?;
                 }
                 FdbOptionTy::Bytes => {
-                    s += "(ref v) => {\n";
-                    s += &format!(
-                        "fdb::{}({}, v.as_ptr() as *const u8, v.len() as i32)\n",
-                        fn_name, args
-                    );
-                    s += "},";
+                    writeln!(w, "(ref v) => {{")?;
+                    writeln!(
+                        w,
+                        "{}fdb::{}({}, v.as_ptr() as *const u8, v.len() as i32)\n",
+                        TAB4, fn_name, args
+                    )?;
+                    writeln!(w, "{t}}}", t = TAB3)?;
                 }
                 FdbOptionTy::Str => {
-                    s += "(ref v) => {\n";
-                    s += &format!(
-                        "fdb::{}({}, v.as_ptr() as *const u8, v.len() as i32)\n",
-                        fn_name, args
-                    );
-                    s += "},";
+                    writeln!(w, "(ref v) => {{")?;
+                    writeln!(
+                        w,
+                        "{}fdb::{}({}, v.as_ptr() as *const u8, v.len() as i32)\n",
+                        TAB4, fn_name, args
+                    )?;
+                    writeln!(w, "{t}}}", t = TAB3)?;
                 }
             }
         }
 
-        s += "};\n";
-        s += "if err != 0 { Err(error::Error::from(err)) } else { Ok(()) }\n";
-        s += "}\n";
-
-        s
+        writeln!(w, "{t}}};", t = TAB2)?;
+        writeln!(
+            w,
+            "{t}if err != 0 {{ Err(error::Error::from_error_code(err)) }} else {{ Ok(()) }}",
+            t = TAB2,
+        )?;
+        writeln!(w, "{t}}}", t = TAB1)
     }
 
     fn with_ty(&self) -> bool {
@@ -227,6 +209,7 @@ impl std::default::Default for FdbOptionTy {
 #[derive(Default, Debug)]
 struct FdbOption {
     name: String,
+    c_name: String,
     code: i32,
     param_type: FdbOptionTy,
     param_description: String,
@@ -235,40 +218,48 @@ struct FdbOption {
 }
 
 impl FdbOption {
-    fn gen_ty(&self, with_ty: bool) -> String {
-        let mut s = String::new();
-
+    fn gen_ty<W: fmt::Write>(&self, w: &mut W, with_ty: bool) -> fmt::Result {
         if !self.param_description.is_empty() {
-            s += "/// ";
-            s += &self.param_description;
-            s += "\n///\n";
+            writeln!(w, "{t}/// {desc}", t = TAB1, desc = self.param_description)?;
+            writeln!(w, "{t}///", t = TAB1)?;
         }
         if !self.description.is_empty() {
-            s += "/// ";
-            s += &self.description;
-            s += "\n";
+            writeln!(w, "{t}/// {desc}", t = TAB1, desc = self.description)?;
         }
 
-        s += &self.name;
-        if with_ty {
-            if let Some(ty) = self.get_ty() {
-                s += "(";
-                s += ty;
-                s += ")";
-            }
+        if let (true, Some(ty)) = (with_ty, self.get_ty()) {
+            writeln!(w, "{t}{name}({ty}),", t = TAB1, name = self.name, ty = ty)?;
+        } else {
+            writeln!(w, "{t}{name},", t = TAB1, name = self.name)?;
         }
-        s += ",\n";
-        s
+        Ok(())
     }
 
     fn get_ty(&self) -> Option<&'static str> {
         match self.param_type {
-            FdbOptionTy::Int => Some("u32"),
+            FdbOptionTy::Int => Some("i32"),
             FdbOptionTy::Str => Some("String"),
             FdbOptionTy::Bytes => Some("Vec<u8>"),
             FdbOptionTy::Empty => None,
         }
     }
+}
+
+fn to_rs_enum_name(v: &str) -> String {
+    let mut is_start_of_word = true;
+    v.chars()
+        .filter_map(|c| {
+            if c == '_' {
+                is_start_of_word = true;
+                None
+            } else if is_start_of_word {
+                is_start_of_word = false;
+                Some(c.to_ascii_uppercase())
+            } else {
+                Some(c)
+            }
+        })
+        .collect()
 }
 
 impl From<Vec<OwnedAttribute>> for FdbOption {
@@ -278,10 +269,8 @@ impl From<Vec<OwnedAttribute>> for FdbOption {
             let v = attr.value;
             match attr.name.local_name.as_str() {
                 "name" => {
-                    opt.name = classcase::to_class_case(&v);
-                    if opt.name == "AppendIfFit" {
-                        opt.name = String::from("AppendIfFits");
-                    };
+                    opt.name = to_rs_enum_name(v.as_str());
+                    opt.c_name = v.to_uppercase();
                 }
                 "code" => {
                     opt.code = v.parse().unwrap();
@@ -328,7 +317,7 @@ where
             } => {
                 ensure!(name.local_name == "Option", "unexpected token");
 
-                let option = FdbOption::from(attributes);
+                let option = FdbOption::from(attributes.clone());
                 if !option.hidden {
                     options.push(option);
                 }
@@ -352,7 +341,8 @@ const OPTIONS_DATA: &[u8] = include_bytes!("/usr/include/foundationdb/fdb.option
 const OPTIONS_DATA: &[u8] = include_bytes!("/usr/local/include/foundationdb/fdb.options");
 
 #[cfg(target_os = "windows")]
-const OPTIONS_DATA: &[u8] = include_bytes!("C:/Program Files/foundationdb/include/foundationdb/fdb.options");
+const OPTIONS_DATA: &[u8] =
+    include_bytes!("C:/Program Files/foundationdb/include/foundationdb/fdb.options");
 
 pub fn emit() -> Result<String> {
     let mut reader = OPTIONS_DATA.as_ref();
@@ -361,7 +351,7 @@ pub fn emit() -> Result<String> {
     let mut scopes = Vec::new();
 
     while let Some(e) = iter.next() {
-        match e? {
+        match e.unwrap() {
             XmlEvent::StartElement {
                 name, attributes, ..
             } => {
@@ -371,7 +361,7 @@ pub fn emit() -> Result<String> {
                         .find(|attr| attr.name.local_name == "name")
                         .unwrap();
 
-                    let options = on_scope(&mut iter)?;
+                    let options = on_scope(&mut iter).unwrap();
                     scopes.push(FdbScope {
                         name: scope_name.value,
                         options,
@@ -385,15 +375,14 @@ pub fn emit() -> Result<String> {
         }
     }
 
-    let mut result = format!(
-        "{}\n{}\n{}\n\n",
-        "use std;", "use crate::error;", "use foundationdb_sys as fdb;"
-    );
-
+    let mut w = String::new();
+    writeln!(w, "use std;")?;
+    writeln!(w, "use crate::error;")?;
+    writeln!(w, "use foundationdb_sys as fdb;")?;
     for scope in scopes.iter() {
-        result.push_str(&format!("{}", scope.gen_ty()));
-        result.push_str(&format!("{}", scope.gen_impl()));
+        scope.gen_ty(&mut w)?;
+        scope.gen_impl(&mut w)?;
     }
 
-    Ok(result)
+    Ok(w)
 }

@@ -1,5 +1,5 @@
 [package]
-name = "foundationdb-bench"
+name = "foundationdb-bindingtester"
 version = "0.4.0"
 authors = [
     "Benjamin Fry <benjaminfry@me.com>", 
@@ -22,14 +22,11 @@ license = "MIT/Apache-2.0"
 [badges]
 travis-ci = { repository = "bluejekyll/foundationdb-rs" }
 
-
 [dependencies]
-rand = "0.6"
-futures-preview = { version = "=0.3.0-alpha.19", features = ["async-await"] }
-foundationdb = { version = "*", path = "../foundationdb" }
-stopwatch = "0"
-log = "0.4"
 env_logger = "0.6"
+foundationdb = { path = "../foundationdb", features = ["serde"] }
+foundationdb-sys = { version = "0.2.0", path = "../foundationdb-sys", default-features = false }
+futures-preview = { version = "=0.3.0-alpha.19", features = ["async-await"] }
+log = "0.4"
+serde = { version = "1.0.102" }
 structopt = "0.2"
-
-[build-dependencies]

@@ -14,16 +14,15 @@ use std::fmt::{self, Display};
 
 use failure::{Backtrace, Context, Fail};
 
-use foundationdb_sys as fdb_sys;
 use crate::options;
-use crate::tuple;
+use foundationdb_sys as fdb_sys;
 
 pub(crate) fn eval(error_code: fdb_sys::fdb_error_t) -> Result<()> {
     let rust_code = error_code as i32;
     if rust_code == 0 {
         Ok(())
     } else {
-        Err(Error::from(error_code))
+        Err(Error::from_error_code(error_code))
     }
 }
 
@@ -31,11 +30,6 @@ pub(crate) fn eval(error_code: fdb_sys::fdb_error_t) -> Result<()> {
 #[derive(Debug)]
 pub struct Error {
     kind: Context<ErrorKind>,
-    // Not all retryable error should be retried. For example, error_code=1020 transaction conflict
-    // error is always retryable (so `Error::is_retryable` always returns `true`), while it
-    // should not be retried if `TransactionOption::RetryLimit` is exceeded. So we should keep
-    // track whether the error should be retried or not.
-    should_retry: bool,
 }
 
 /// An error from Fdb with associated code and message
@@ -49,19 +43,13 @@ pub enum ErrorKind {
         /// The error string as defined by FoundationDB
         error_str: &'static str,
     },
-    /// Encoding/Decoding errors related to Tuple
-    #[fail(display = "Internal error with tuple encoding/decoding: {}", error)]
-    Tuple {
-        /// The cause of this error
-        error: tuple::Error,
-    },
 }
 
 /// An Fdb Result type
 pub type Result<T> = std::result::Result<T, Error>;
 
 impl Fail for Error {
-    fn cause(&self) -> Option<&Fail> {
+    fn cause(&self) -> Option<&dyn Fail> {
         self.kind.cause()
     }
 
@@ -76,19 +64,10 @@ impl Display for Error {
     }
 }
 
-impl From<tuple::Error> for Error {
-    fn from(error: tuple::Error) -> Self {
-        Error {
-            kind: Context::new(ErrorKind::Tuple { error }),
-            should_retry: false,
-        }
-    }
-}
-
 impl Error {
     /// Converts from the raw Fdb error code into an `Error`
-    pub fn from(error_code: fdb_sys::fdb_error_t) -> Self {
-        let error_str = unsafe { CStr::from_ptr(fdb_sys::fdb_get_error(error_code)) };
+    pub fn from_error_code(error_code: fdb_sys::fdb_error_t) -> Self {
+        let error_str = unsafe { CStr::from_ptr::<'static>(fdb_sys::fdb_get_error(error_code)) };
 
         Error {
             kind: Context::new(ErrorKind::Fdb {
@@ -97,74 +76,40 @@ impl Error {
                     .to_str()
                     .expect("bad error string from FoundationDB"),
             }),
-            should_retry: false,
+        }
+    }
+
+    fn is_error_predicate(&self, predicate: options::ErrorPredicate) -> bool {
+        match *self.kind.get_context() {
+            ErrorKind::Fdb { error_code, .. } => {
+                let check = unsafe {
+                    fdb_sys::fdb_error_predicate(predicate.code() as i32, error_code) as i32
+                };
+
+                check != 0
+            }
         }
     }
 
     /// Indicates the transaction may have succeeded, though not in a way the system can verify.
     pub fn is_maybe_committed(&self) -> bool {
-        match *self.kind.get_context() {
-            ErrorKind::Fdb { error_code, .. } => {
-                let check = unsafe {
-                    fdb_sys::fdb_error_predicate(
-                        options::ErrorPredicate::MaybeCommitted.code() as i32,
-                        error_code,
-                    ) as i32
-                };
-
-                check != 0
-            }
-            _ => false,
-        }
+        self.is_error_predicate(options::ErrorPredicate::MaybeCommitted)
     }
 
     /// Indicates the operations in the transactions should be retried because of transient error.
     pub fn is_retryable(&self) -> bool {
-        match *self.kind.get_context() {
-            ErrorKind::Fdb { error_code, .. } => {
-                let check = unsafe {
-                    fdb_sys::fdb_error_predicate(
-                        options::ErrorPredicate::Retryable.code() as i32,
-                        error_code,
-                    ) as i32
-                };
-
-                check != 0
-            }
-            _ => false,
-        }
+        self.is_error_predicate(options::ErrorPredicate::Retryable)
     }
 
     /// Indicates the transaction has not committed, though in a way that can be retried.
     pub fn is_retryable_not_committed(&self) -> bool {
-        match *self.kind.get_context() {
-            ErrorKind::Fdb { error_code, .. } => {
-                let check = unsafe {
-                    fdb_sys::fdb_error_predicate(
-                        options::ErrorPredicate::RetryableNotCommitted.code() as i32,
-                        error_code,
-                    ) as i32
-                };
-
-                check != 0
-            }
-            _ => false,
-        }
+        self.is_error_predicate(options::ErrorPredicate::RetryableNotCommitted)
     }
 
     /// Error code
     pub fn code(&self) -> i32 {
         match *self.kind.get_context() {
             ErrorKind::Fdb { error_code, .. } => error_code,
-            _ => 4000,
         }
-    }
-
-    pub(crate) fn set_should_retry(&mut self, should_retry: bool) {
-        self.should_retry = should_retry;
-    }
-
-    pub(crate) fn should_retry(&self) -> bool {
-        self.should_retry
     }
 }

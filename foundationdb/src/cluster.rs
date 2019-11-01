@@ -10,8 +10,8 @@
 //!
 //! https://apple.github.io/foundationdb/api-c.html#cluster
 
-use foundationdb_sys as fdb;
 use crate::future::*;
+use foundationdb_sys as fdb;
 use futures::{Async, Future};
 use std;
 use std::sync::Arc;

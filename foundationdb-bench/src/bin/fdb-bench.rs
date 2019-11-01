@@ -38,72 +38,9 @@ impl Counter {
     }
 }
 
-struct BenchRunner {
-    #[allow(unused)]
-    db: Database,
-    counter: Counter,
-    key_buf: Vec<u8>,
-    val_buf: Vec<u8>,
-    rng: StepRng,
-    trx: Option<Transaction>,
-    trx_batch_size: usize,
-}
-
-impl BenchRunner {
-    fn new(db: Database, rng: StepRng, counter: Counter, opt: &Opt) -> Self {
-        let mut key_buf = Vec::with_capacity(opt.key_len);
-        key_buf.resize(opt.key_len, 0u8);
-
-        let mut val_buf = Vec::with_capacity(opt.val_len);
-        val_buf.resize(opt.val_len, 0u8);
-
-        let trx = db.create_trx().expect("failed to create trx");
-
-        Self {
-            db,
-            counter,
-            key_buf,
-            val_buf,
-
-            rng,
-            trx: Some(trx),
-            trx_batch_size: opt.trx_batch_size,
-        }
-    }
-
-    //TODO: impl future
-    fn run(self) -> Box<Future<Item = (), Error = Error>> {
-        Box::new(loop_fn(self, Self::step))
-    }
-
-    //TODO: impl future
-    fn step(mut self) -> Box<Future<Item = Loop<(), Self>, Error = Error>> {
-        let trx = self.trx.take().unwrap();
-
-        for _ in 0..self.trx_batch_size {
-            self.rng.fill_bytes(&mut self.key_buf);
-            self.rng.fill_bytes(&mut self.val_buf);
-            self.key_buf[0] = 0x01;
-            trx.set(&self.key_buf, &self.val_buf);
-        }
-
-        let f = trx.commit().map(move |trx| {
-            trx.reset();
-            self.trx = Some(trx);
-
-            if self.counter.decr(self.trx_batch_size) {
-                Loop::Continue(self)
-            } else {
-                Loop::Break(())
-            }
-        });
-        Box::new(f)
-    }
-}
-
 #[derive(Clone)]
 struct Bench {
-    db: Database,
+    db: Arc<Database>,
     opt: Opt,
 }
 
@@ -124,7 +61,9 @@ impl Bench {
             let range = start..end;
             let counter = counter.clone();
             let b = self.clone();
-            let handle = std::thread::spawn(move || b.run_range(range, counter).wait());
+            let handle = std::thread::spawn(move || {
+                futures::executor::block_on(b.clone().run_range(range, counter))
+            });
             handles.push(handle);
 
             start = end;
@@ -146,22 +85,41 @@ impl Bench {
         );
     }
 
-    fn run_range(
-        &self,
-        r: std::ops::Range<usize>,
-        counter: Counter,
-    ) -> Box<Future<Item = (), Error = Error>> {
-        let runners = r
-            .into_iter()
-            .map(|n| {
-                // With deterministic Rng, benchmark with same parameters will overwrite same set
-                // of keys again, which makes benchmark result stable.
-                let rng = StepRng::new(n as u64, 1);
-                BenchRunner::new(self.db.clone(), rng, counter.clone(), &self.opt).run()
-            }).collect::<Vec<_>>();
+    async fn run_range(&self, r: std::ops::Range<usize>, counter: Counter) -> Result<()> {
+        try_join_all(r.map(|n| {
+            // With deterministic Rng, benchmark with same parameters will overwrite same set
+            // of keys again, which makes benchmark result stable.
+            let rng = StepRng::new(n as u64, 1);
+            self.run_bench(rng, counter.clone())
+        }))
+        .await?;
+        Ok(())
+    }
 
-        let f = join_all(runners).map(|_| ());
-        Box::new(f)
+    async fn run_bench(&self, mut rng: StepRng, counter: Counter) -> Result<()> {
+        let mut key_buf = Vec::with_capacity(self.opt.key_len);
+        key_buf.resize(self.opt.key_len, 0u8);
+
+        let mut val_buf = Vec::with_capacity(self.opt.val_len);
+        val_buf.resize(self.opt.val_len, 0u8);
+
+        let trx_batch_size = self.opt.trx_batch_size;
+        let mut trx = self.db.create_trx()?;
+
+        loop {
+            for _ in 0..trx_batch_size {
+                rng.fill_bytes(&mut key_buf);
+                rng.fill_bytes(&mut val_buf);
+                key_buf[0] = 0x01;
+                trx.set(&key_buf, &val_buf);
+            }
+
+            trx = trx.commit().await?.reset();
+
+            if !counter.decr(trx_batch_size) {
+                break Ok(());
+            }
+        }
     }
 }
 
@@ -189,34 +147,14 @@ struct Opt {
 fn main() {
     env_logger::init();
     let opt = Opt::from_args();
-
     info!("opt: {:?}", opt);
 
-    let network = fdb::init().expect("failed to init network");
+    let network = fdb::boot().expect("failed to init network");
 
-    let handle = std::thread::spawn(move || {
-        let error = network.run();
-
-        if let Err(error) = error {
-            panic!("fdb_run_network: {}", error);
-        }
-    });
-
-    network.wait();
-
-    let cluster_path = fdb::default_config_path();
-    let cluster = Cluster::new(cluster_path)
-        .wait()
-        .expect("failed to create cluster");
-
-    let db = cluster
-        .create_database()
-        .wait()
-        .expect("failed to get database");
+    let db = Arc::new(fdb::Database::default().expect("failed to get database"));
 
     let bench = Bench { db, opt };
     bench.run();
 
-    network.stop().expect("failed to stop network");
-    handle.join().expect("failed to join fdb thread");
+    drop(network);
 }

@@ -1,15 +1,12 @@
-extern crate rand;
-extern crate std;
-
-use foundationdb::*;
+use lazy_static::lazy_static;
 
 /// generate random string. Foundationdb watch only fires when value changed, so updating with same
 /// value twice will not fire watches. To make examples work over multiple run, we use random
 /// string as a value.
 #[allow(unused)]
 pub fn random_str(len: usize) -> String {
-    use self::rand::distributions::Alphanumeric;
-    use self::rand::Rng;
+    use rand::distributions::Alphanumeric;
+    use rand::Rng;
 
     let mut rng = rand::thread_rng();
     ::std::iter::repeat(())
@@ -18,53 +15,12 @@ pub fn random_str(len: usize) -> String {
         .collect::<String>()
 }
 
-#[allow(unused)]
-pub fn setup_static() {
-    let _env = &*ENV;
-}
-
 lazy_static! {
-    static ref ENV: TestEnv = { TestEnv::new() };
+    static ref ENV: foundationdb::fdb_api::NetworkAutoStop =
+        foundationdb::boot().expect("fdb boot failed");
 }
 
-pub struct TestEnv {
-    network: network::Network,
-    handle: Option<std::thread::JoinHandle<()>>,
-}
-
-impl TestEnv {
-    pub fn new() -> Self {
-        let network = fdb_api::FdbApiBuilder::default()
-            .build()
-            .expect("failed to init api")
-            .network()
-            .build()
-            .expect("failed to init network");
-
-        let handle = std::thread::spawn(move || {
-            let error = network.run();
-
-            if let Err(error) = error {
-                panic!("fdb_run_network: {}", error);
-            }
-        });
-
-        network.wait();
-
-        Self {
-            network,
-            handle: Some(handle),
-        }
-    }
-}
-
-impl Drop for TestEnv {
-    fn drop(&mut self) {
-        self.network.stop().expect("failed to stop network");
-        self.handle
-            .take()
-            .expect("cannot dropped twice")
-            .join()
-            .expect("failed to join fdb thread");
-    }
+#[allow(unused)]
+pub fn boot() {
+    let _end = &*ENV;
 }

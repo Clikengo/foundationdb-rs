@@ -1,677 +1,199 @@
-use std::{self, io::Write};
-#[cfg(feature = "uuid")]
-use uuid::Uuid;
+use super::Bytes;
+use serde::de;
+use serde::ser::SerializeSeq;
+use serde::{Deserializer, Serializer};
+use std::borrow::Cow;
+use std::convert::TryFrom;
+use std::fmt;
+use std::result::Result;
 
-use byteorder::{self, ByteOrder};
-use crate::tuple::{Decode, Encode, Error, Result, Tuple, TupleDepth};
-
-/// Various tuple types
-pub(super) const NIL: u8 = 0x00;
-const BYTES: u8 = 0x01;
-const STRING: u8 = 0x02;
-pub(super) const NESTED: u8 = 0x05;
-const INTZERO: u8 = 0x14;
-const POSINTEND: u8 = 0x1d;
-const NEGINTSTART: u8 = 0x0b;
-const FLOAT: u8 = 0x20;
-const DOUBLE: u8 = 0x21;
-const FALSE: u8 = 0x26;
-const TRUE: u8 = 0x27;
-#[cfg(feature = "uuid")]
-const UUID: u8 = 0x30;
-const VERSIONSTAMP: u8 = 0x33;
-
-pub(super) const ESCAPE: u8 = 0xff;
-
-const SIZE_LIMITS: &[i64] = &[
-    0,
-    (1 << (1 * 8)) - 1,
-    (1 << (2 * 8)) - 1,
-    (1 << (3 * 8)) - 1,
-    (1 << (4 * 8)) - 1,
-    (1 << (5 * 8)) - 1,
-    (1 << (6 * 8)) - 1,
-    (1 << (7 * 8)) - 1,
-];
-
-/// A single tuple element
-#[derive(Clone, Debug, PartialEq)]
-pub enum Element {
-    /// Corresponse with nothing, ie the Nil byte
-    Empty,
-    /// A sequence of bytes to be written to the stream
-    Bytes(Vec<u8>),
-    /// A string
-    String(String),
-    /// A recursive Tuple
-    Tuple(Tuple),
-    /// An i64
-    I64(i64),
-    /// An f32
-    F32(f32),
-    /// An f64
-    F64(f64),
-    /// A bool
+#[derive(Clone, PartialEq, Debug)]
+pub enum Element<'a> {
+    Nil,
     Bool(bool),
-    /// A UUID, requires the uuid feature/library
-    #[cfg(feature = "uuid")]
-    Uuid(Uuid),
-    #[doc(hidden)]
-    __Nonexhaustive,
+    Int(i64),
+    UInt(u64),
+    Float(f64),
+    String(Cow<'a, str>),
+    Bytes(Bytes<'a>),
+    Tuple(Vec<Element<'a>>),
 }
 
-pub(super) trait Type: Copy {
-    /// verifies the value matches this type
-    fn expect(self, value: u8) -> Result<()>;
-
-    /// Validates this is a known type
-    fn is_valid(self) -> Result<()>;
-
-    /// writes this to w
-    fn write<W: Write>(self, w: &mut W) -> std::io::Result<()>;
-}
-
-fn encode_bytes<W: Write>(w: &mut W, buf: &[u8]) -> std::io::Result<()> {
-    for b in buf {
-        b.write(w)?;
-        if *b == 0 {
-            ESCAPE.write(w)?;
-        }
-    }
-    NIL.write(w)
-}
-
-fn decode_bytes(buf: &[u8]) -> Result<(Vec<u8>, usize)> {
-    let mut out = Vec::<u8>::with_capacity(buf.len());
-    let mut offset = 0;
-    loop {
-        if offset >= buf.len() {
-            return Err(Error::EOF);
-        }
-
-        // is the null marker at the offset
-        if NIL.expect(buf[offset]).is_ok() {
-            if offset + 1 < buf.len() && buf[offset + 1] == ESCAPE {
-                out.push(NIL);
-                offset += 2;
-                continue;
-            } else {
-                break;
-            }
-        }
-        out.push(buf[offset]);
-        offset += 1;
-    }
-    Ok((out, offset + 1))
-}
-
-fn adjust_float_bytes(b: &mut [u8], encode: bool) {
-    if (encode && b[0] & 0x80 != 0x00) || (!encode && b[0] & 0x80 == 0x00) {
-        // Negative numbers: flip all of the bytes.
-        for byte in b.iter_mut() {
-            *byte = *byte ^ 0xff
-        }
-    } else {
-        // Positive number: flip just the sign bit.
-        b[0] = b[0] ^ 0x80
-    }
-}
-
-fn bisect_left(val: i64) -> usize {
-    SIZE_LIMITS.iter().position(|v| val <= *v).unwrap_or(8)
-}
-
-impl Type for u8 {
-    /// verifies the value matches this type
-    fn expect(self, value: u8) -> Result<()> {
-        if self == value {
-            Ok(())
-        } else {
-            Err(Error::InvalidType { value })
-        }
-    }
-
-    /// Validates this is a known type
-    fn is_valid(self) -> Result<()> {
+impl<'a> Element<'a> {
+    pub fn into_owned(self) -> Element<'static> {
         match self {
-            NIL => Ok(()),
-            BYTES => Ok(()),
-            STRING => Ok(()),
-            NESTED => Ok(()),
-            INTZERO => Ok(()),
-            POSINTEND => Ok(()),
-            NEGINTSTART => Ok(()),
-            FLOAT => Ok(()),
-            DOUBLE => Ok(()),
-            FALSE => Ok(()),
-            TRUE => Ok(()),
-            #[cfg(feature = "uuid")]
-            UUID => Ok(()),
-            VERSIONSTAMP => Ok(()),
-            _ => Err(Error::InvalidType { value: self }),
+            Element::Nil => Element::Nil,
+            Element::Bool(v) => Element::Bool(v),
+            Element::Int(v) => Element::Int(v),
+            Element::UInt(v) => Element::UInt(v),
+            Element::Float(v) => Element::Float(v),
+            Element::String(v) => Element::String(Cow::Owned(v.into_owned())),
+            Element::Bytes(v) => Element::Bytes(v.into_owned().into()),
+            Element::Tuple(v) => Element::Tuple(v.into_iter().map(|e| e.into_owned()).collect()),
         }
     }
 
-    fn write<W: Write>(self, w: &mut W) -> std::io::Result<()> {
-        w.write_all(&[self])
-    }
-}
-
-impl<'a, T: Encode> Encode for &'a T {
-    fn encode<W: Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> std::io::Result<()> {
-        T::encode(self, w, tuple_depth)
-    }
-}
-
-impl Encode for bool {
-    fn encode<W: Write>(&self, w: &mut W, _tuple_depth: TupleDepth) -> std::io::Result<()> {
-        if *self {
-            TRUE.write(w)
-        } else {
-            FALSE.write(w)
+    pub fn as_bool(&self) -> Option<bool> {
+        match self {
+            &Element::Bool(v) => Some(v),
+            _ => None,
         }
     }
-}
 
-impl Decode for bool {
-    fn decode(buf: &[u8], _tuple_depth: TupleDepth) -> Result<(Self, usize)> {
-        if buf.is_empty() {
-            return Err(Error::EOF);
-        }
-
-        match buf[0] {
-            FALSE => Ok((false, 1)),
-            TRUE => Ok((true, 1)),
-            v => Err(Error::InvalidType { value: v }),
+    pub fn as_i64(&self) -> Option<i64> {
+        match self {
+            &Element::Int(v) => Some(v),
+            &Element::UInt(v) => i64::try_from(v).ok(),
+            _ => None,
         }
     }
-}
 
-impl Encode for () {
-    fn encode<W: Write>(&self, w: &mut W, _tuple_depth: TupleDepth) -> std::io::Result<()> {
-        NIL.write(w)
-    }
-}
-
-impl Decode for () {
-    fn decode(buf: &[u8], _tuple_depth: TupleDepth) -> Result<(Self, usize)> {
-        if buf.is_empty() {
-            return Err(Error::EOF);
+    pub fn as_u64(&self) -> Option<u64> {
+        match self {
+            &Element::Int(v) => u64::try_from(v).ok(),
+            &Element::UInt(v) => Some(v),
+            _ => None,
         }
-
-        NIL.expect(buf[0])?;
-        Ok(((), 1))
     }
-}
 
-#[cfg(feature = "uuid")]
-impl Encode for Uuid {
-    fn encode<W: Write>(&self, w: &mut W, _tuple_depth: TupleDepth) -> std::io::Result<()> {
-        UUID.write(w)?;
-        w.write_all(self.as_bytes())
-    }
-}
-
-#[cfg(feature = "uuid")]
-impl Decode for Uuid {
-    fn decode(buf: &[u8], _tuple_depth: TupleDepth) -> Result<(Self, usize)> {
-        if buf.len() < 17 {
-            return Err(Error::EOF);
+    pub fn as_str(&self) -> Option<&str> {
+        match self {
+            Element::String(v) => Some(&v),
+            _ => None,
         }
-
-        UUID.expect(buf[0])?;
-
-        let mut uuid = [0u8; 16];
-        uuid.copy_from_slice(&buf[1..17]);
-
-        Ok((Uuid::from_slice(&uuid)?, 17))
     }
-}
 
-impl<'a> Encode for &'a str {
-    fn encode<W: Write>(&self, w: &mut W, _tuple_depth: TupleDepth) -> std::io::Result<()> {
-        STRING.write(w)?;
-        encode_bytes(w, self.as_bytes())
-    }
-}
-
-impl Encode for String {
-    fn encode<W: Write>(&self, w: &mut W, _tuple_depth: TupleDepth) -> std::io::Result<()> {
-        STRING.write(w)?;
-        encode_bytes(w, self.as_bytes())
-    }
-}
-
-impl Decode for String {
-    fn decode(buf: &[u8], _tuple_depth: TupleDepth) -> Result<(Self, usize)> {
-        if buf.len() < 2 {
-            return Err(Error::EOF);
+    pub fn as_bytes(&self) -> Option<&Bytes> {
+        match self {
+            Element::Bytes(v) => Some(v),
+            _ => None,
         }
-
-        STRING.expect(buf[0])?;
-
-        let (bytes, offset) = decode_bytes(&buf[1..])?;
-        Ok((String::from_utf8(bytes)?, offset + 1))
     }
-}
 
-impl Encode for Vec<Element> {
-    fn encode<W: Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> std::io::Result<()> {
-        // TODO: should this only write the Nested markers in the case of tuple_depth?
-        NESTED.write(w)?;
-        for v in self {
-            match v {
-                &Element::Empty => {
-                    // Empty value in nested tuple is encoded with [NIL, ESCAPE] to disambiguate
-                    // itself with end-of-tuple marker.
-                    NIL.write(w)?;
-                    ESCAPE.write(w)?;
-                }
-                v => {
-                    v.encode(w, tuple_depth.increment())?;
-                }
-            }
-        }
-        NIL.write(w)
-    }
-}
-
-impl Decode for Vec<Element> {
-    fn decode(mut buf: &[u8], tuple_depth: TupleDepth) -> Result<(Self, usize)> {
-        if buf.len() < 2 {
-            return Err(Error::EOF);
-        }
-
-        // TODO: should this only write the Nested markers in the case of tuple_depth?
-        NESTED.expect(buf[0])?;
-        let len = buf.len();
-        buf = &buf[1..];
-
-        let mut tuples = Vec::new();
-        loop {
-            if buf.is_empty() {
-                // tuple must end with NIL byte
-                return Err(Error::EOF);
-            }
-
-            if buf[0] == NIL {
-                if buf.len() > 1 && buf[1] == ESCAPE {
-                    // nested Empty value, which is encoded to [NIL, ESCAPE]
-                    tuples.push(Element::Empty);
-                    buf = &buf[2..];
-                    continue;
-                }
-
-                buf = &buf[1..];
-                break;
-            }
-
-            let (tuple, offset) = Element::decode(buf, tuple_depth.increment())?;
-            tuples.push(tuple);
-            buf = &buf[offset..];
-        }
-
-        // skip the final null
-        Ok((tuples, len - buf.len()))
-    }
-}
-
-impl<'a> Encode for &'a [u8] {
-    fn encode<W: Write>(&self, w: &mut W, _tuple_depth: TupleDepth) -> std::io::Result<()> {
-        BYTES.write(w)?;
-        encode_bytes(w, self)
-    }
-}
-
-impl Encode for Vec<u8> {
-    fn encode<W: Write>(&self, w: &mut W, _tuple_depth: TupleDepth) -> std::io::Result<()> {
-        BYTES.write(w)?;
-        encode_bytes(w, self.as_slice())
-    }
-}
-
-impl Decode for Vec<u8> {
-    fn decode(buf: &[u8], _tuple_depth: TupleDepth) -> Result<(Self, usize)> {
-        if buf.len() < 2 {
-            return Err(Error::EOF);
-        }
-
-        BYTES.expect(buf[0])?;
-
-        let (bytes, offset) = decode_bytes(&buf[1..])?;
-        Ok((bytes, offset + 1))
-    }
-}
-
-impl Encode for f32 {
-    fn encode<W: Write>(&self, w: &mut W, _tuple_depth: TupleDepth) -> std::io::Result<()> {
-        FLOAT.write(w)?;
-
-        let mut buf: [u8; 4] = Default::default();
-        byteorder::BE::write_f32(&mut buf, *self);
-        adjust_float_bytes(&mut buf, true);
-
-        w.write_all(&buf)
-    }
-}
-
-impl Decode for f32 {
-    fn decode(buf: &[u8], _tuple_depth: TupleDepth) -> Result<(Self, usize)> {
-        if buf.len() < 5 {
-            return Err(Error::EOF);
-        }
-
-        FLOAT.expect(buf[0])?;
-
-        let mut data: [u8; 4] = Default::default();
-        data.copy_from_slice(&buf[1..5]);
-        adjust_float_bytes(&mut data, false);
-
-        let val = byteorder::BE::read_f32(&data);
-        Ok((val, 5))
-    }
-}
-
-impl Encode for f64 {
-    fn encode<W: Write>(&self, w: &mut W, _tuple_depth: TupleDepth) -> std::io::Result<()> {
-        DOUBLE.write(w)?;
-
-        let mut buf: [u8; 8] = Default::default();
-        byteorder::BE::write_f64(&mut buf, *self);
-        adjust_float_bytes(&mut buf, true);
-
-        w.write_all(&buf)
-    }
-}
-
-impl Decode for f64 {
-    fn decode(buf: &[u8], _tuple_depth: TupleDepth) -> Result<(Self, usize)> {
-        if buf.len() < 9 {
-            return Err(Error::EOF);
-        }
-
-        DOUBLE.expect(buf[0])?;
-
-        let mut data: [u8; 8] = Default::default();
-        data.copy_from_slice(&buf[1..9]);
-        adjust_float_bytes(&mut data, false);
-
-        let val = byteorder::BE::read_f64(&data);
-        Ok((val, 9))
-    }
-}
-
-impl Encode for i64 {
-    fn encode<W: Write>(&self, w: &mut W, _tuple_depth: TupleDepth) -> std::io::Result<()> {
-        let mut code = INTZERO;
-        let n;
-        let mut buf: [u8; 8] = Default::default();
-
-        if *self > 0 {
-            n = bisect_left(*self);
-            code += n as u8;
-            byteorder::BE::write_i64(&mut buf, *self);
-        } else {
-            n = bisect_left(-*self);
-            code -= n as u8;
-            byteorder::BE::write_i64(&mut buf, SIZE_LIMITS[n] + *self);
-        }
-
-        w.write_all(&[code])?;
-        w.write_all(&buf[(8 - n)..8])
-    }
-}
-
-impl Decode for i64 {
-    fn decode(buf: &[u8], _tuple_depth: TupleDepth) -> Result<(Self, usize)> {
-        if buf.is_empty() {
-            return Err(Error::EOF);
-        }
-        let header = buf[0];
-        if header < 0x0c || header > 0x1c {
-            return Err(Error::InvalidType { value: header });
-        }
-
-        // if it's 0
-        if INTZERO.expect(header).is_ok() {
-            return Ok((0, 1));
-        }
-
-        let mut data: [u8; 8] = Default::default();
-        if header > INTZERO {
-            let n = usize::from(header - INTZERO);
-            if n + 1 > buf.len() {
-                return Err(Error::InvalidData);
-            }
-
-            (&mut data[(8 - n)..8]).copy_from_slice(&buf[1..(n + 1)]);
-            let val = byteorder::BE::read_i64(&data);
-            Ok((val, n + 1))
-        } else {
-            let n = usize::from(INTZERO - header);
-            if n + 1 > buf.len() {
-                return Err(Error::InvalidData);
-            }
-
-            (&mut data[(8 - n)..8]).copy_from_slice(&buf[1..(n + 1)]);
-            let shift = (1 << (n * 8)) - 1;
-            let val = byteorder::BE::read_i64(&data);
-            Ok((val - shift, n + 1))
+    pub fn as_tuple(&self) -> Option<&[Element<'a>]> {
+        match self {
+            Element::Tuple(v) => Some(v.as_slice()),
+            _ => None,
         }
     }
 }
 
-impl<T> Encode for Option<T>
-where
-    T: Encode,
-{
-    fn encode<W: Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> std::io::Result<()> {
-        match *self {
-            Some(ref t) => t.encode(w, tuple_depth),
-            None => {
-                // only at tuple depth greater than 1...
-                if tuple_depth.depth() > 1 {
-                    NIL.write(w)?;
-                    ESCAPE.write(w)
-                } else {
-                    NIL.write(w)
-                }
-            }
-        }
-    }
-}
-
-impl<T> Decode for Option<T>
-where
-    T: Decode,
-{
-    fn decode(buf: &[u8], tuple_depth: TupleDepth) -> Result<(Self, usize)> {
-        match *buf.get(0).ok_or(Error::EOF)? {
-            NIL => {
-                // custom escape markers are only needed in Nested tuples...
-                if tuple_depth.depth() > 1 {
-                    let byte = *buf.get(1).ok_or(Error::InvalidData)?;
-                    ESCAPE.expect(byte)?;
-                    Ok((None, 2))
-                } else {
-                    Ok((None, 1))
-                }
-            }
-            _ => T::decode(buf, tuple_depth).map(|(t, offset)| (Some(t), offset)),
-        }
-    }
-}
-
-impl Encode for Element {
-    fn encode<W: Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> std::io::Result<()> {
-        use self::Element::*;
-
-        match *self {
-            Empty => Encode::encode(&(), w, tuple_depth),
-            Bytes(ref v) => Encode::encode(v, w, tuple_depth),
-            String(ref v) => Encode::encode(v, w, tuple_depth),
-            Tuple(ref v) => Encode::encode(&v.0, w, tuple_depth),
-            I64(ref v) => Encode::encode(v, w, tuple_depth),
-            F32(ref v) => Encode::encode(v, w, tuple_depth),
-            F64(ref v) => Encode::encode(v, w, tuple_depth),
-            Bool(ref v) => Encode::encode(v, w, tuple_depth),
-            #[cfg(feature = "uuid")]
-            Uuid(ref v) => Encode::encode(v, w, tuple_depth),
-            // Ugly hack
-            // We will be able to drop this once #[non_exhaustive]
-            // lands on `stable`
-            __Nonexhaustive => panic!("__Nonexhaustive is private"),
-        }
-    }
-}
-
-impl Decode for Element {
-    fn decode(buf: &[u8], tuple_depth: TupleDepth) -> Result<(Self, usize)> {
-        if buf.is_empty() {
-            return Err(Error::EOF);
-        }
-
-        let code = buf[0];
-        match code {
-            NIL => Ok((Element::Empty, 1)),
-            BYTES => {
-                let (v, offset) = Decode::decode(buf, tuple_depth)?;
-                Ok((Element::Bytes(v), offset))
-            }
-            STRING => {
-                let (v, offset) = Decode::decode(buf, tuple_depth)?;
-                Ok((Element::String(v), offset))
-            }
-            FLOAT => {
-                let (v, offset) = Decode::decode(buf, tuple_depth)?;
-                Ok((Element::F32(v), offset))
-            }
-            DOUBLE => {
-                let (v, offset) = Decode::decode(buf, tuple_depth)?;
-                Ok((Element::F64(v), offset))
-            }
-            FALSE => Ok((Element::Bool(false), 1)),
-            TRUE => Ok((Element::Bool(false), 1)),
-            #[cfg(feature = "uuid")]
-            UUID => {
-                let (v, offset) = Decode::decode(buf, tuple_depth)?;
-                Ok((Element::Uuid(v), offset))
-            }
-            NESTED => {
-                let (v, offset) = Decode::decode(buf, tuple_depth)?;
-                Ok((Element::Tuple(Tuple(v)), offset))
-            }
-            val => {
-                if val >= NEGINTSTART && val <= POSINTEND {
-                    let (v, offset) = Decode::decode(buf, tuple_depth)?;
-                    Ok((Element::I64(v), offset))
-                } else {
-                    //TODO: Versionstamp, ...
-                    Err(Error::InvalidData)
-                }
-            }
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::tuple::Tuple;
-
-    fn test_round_trip<S>(val: S, buf: &[u8])
+impl<'a> serde::Serialize for Element<'a> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Encode + Decode + std::fmt::Debug + PartialEq,
+        S: Serializer,
     {
-        assert_eq!(val, Decode::try_from(buf).unwrap());
-        assert_eq!(buf, Encode::to_vec(&val).as_slice());
+        match self {
+            &Element::Nil => serializer.serialize_none(),
+            &Element::Bool(b) => serializer.serialize_bool(b),
+            &Element::Int(i) => serializer.serialize_i64(i),
+            &Element::UInt(u) => serializer.serialize_u64(u),
+            &Element::Float(f) => serializer.serialize_f64(f),
+            &Element::String(ref c) => serializer.serialize_str(&c),
+            &Element::Bytes(ref b) => serializer.serialize_bytes(&b),
+            &Element::Tuple(ref v) => {
+                let mut seq = serializer.serialize_seq(Some(v.len()))?;
+                for element in v {
+                    seq.serialize_element(element)?;
+                }
+                seq.end()
+            }
+        }
+    }
+}
+
+struct ElementVisitor;
+
+impl<'a> de::Visitor<'a> for ElementVisitor {
+    type Value = Element<'a>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a borrowed byte array")
     }
 
-    #[test]
-    fn test_element() {
-        // Some testcases are generated by following python script
-        // [ord(v) for v in fdb.tuple.pack(tup)]
-
-        // bool
-        test_round_trip(false, &[FALSE]);
-        test_round_trip(true, &[TRUE]);
-
-        // empty
-        test_round_trip((), &[NIL]);
-
-        // int
-        test_round_trip(0i64, &[INTZERO]);
-        test_round_trip(1i64, &[0x15, 1]);
-        test_round_trip(-1i64, &[0x13, 254]);
-        test_round_trip(100i64, &[21, 100]);
-
-        test_round_trip(10000i64, &[22, 39, 16]);
-        test_round_trip(-100i64, &[19, 155]);
-        test_round_trip(-10000i64, &[18, 216, 239]);
-        test_round_trip(-1000000i64, &[17, 240, 189, 191]);
-
-        // boundary condition
-        test_round_trip(255i64, &[21, 255]);
-        test_round_trip(256i64, &[22, 1, 0]);
-        test_round_trip(-255i64, &[19, 0]);
-        test_round_trip(-256i64, &[18, 254, 255]);
-
-        // float
-        test_round_trip(1.6f64, &[33, 191, 249, 153, 153, 153, 153, 153, 154]);
-
-        // string
-        test_round_trip(String::from("hello"), &[2, 104, 101, 108, 108, 111, 0]);
-
-        // binary
-        test_round_trip(b"hello".to_vec(), &[1, 104, 101, 108, 108, 111, 0]);
-        test_round_trip(vec![0], &[1, 0, 0xff, 0]);
-        test_round_trip(
-            Element::Tuple(Tuple(vec![
-                Element::String("hello".to_string()),
-                Element::String("world".to_string()),
-                Element::I64(42),
-            ])),
-            &[
-                NESTED, /*hello*/ 2, 104, 101, 108, 108, 111, 0, /*world*/ 2, 119, 111,
-                114, 108, 100, 0, /*42*/ 21, 42, /*end nested*/
-                NIL,
-            ],
-        );
-
-        test_round_trip(
-            Element::Tuple(Tuple(vec![
-                Element::Bytes(vec![0]),
-                Element::Empty,
-                Element::Tuple(Tuple(vec![Element::Bytes(vec![0]), Element::Empty])),
-            ])),
-            &[5, 1, 0, 255, 0, 0, 255, 5, 1, 0, 255, 0, 0, 255, 0, 0],
-        );
+    fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Element::Bool(v))
     }
 
-    #[test]
-    fn test_decode_nested() {
-        use crate::tuple::Decode;
-
-        assert!(Tuple::try_from(&[NESTED]).is_err());
-        assert!(Tuple::try_from(&[NESTED, NIL]).is_ok());
-        assert!(Tuple::try_from(&[NESTED, INTZERO]).is_err());
-        assert!(Tuple::try_from(&[NESTED, NIL, NESTED, NIL]).is_ok());
-        assert!(Tuple::try_from(&[NESTED, NESTED, NESTED, NIL, NIL, NIL]).is_ok());
+    fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Element::Int(v))
     }
 
-    #[test]
-    fn test_option() {
-        assert_eq!(&Some(42_i64).to_vec(), &[21, 42]);
-        assert_eq!(&None::<i64>.to_vec(), &[0]);
+    fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Element::UInt(v))
+    }
 
-        assert_eq!(Some(42), Decode::try_from(&[21, 42]).expect("Some(42)"));
-        assert_eq!(None::<i64>, Decode::try_from(&[0]).expect("None::<i64>"));
+    fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Element::Float(v))
+    }
 
-        assert!(<(i64, Option<i64>)>::try_from(&[0]).is_err());
-        assert!(<(i64, Option<i64>)>::try_from(&[21, 42, 0]).is_ok());
-        assert!(
-            // one of the inner Nones, is missing the final escape byte...
-            <(i64, (Option<i64>, Option<i64>))>::try_from(&[21, 42, 5, 0, 255, 0, 0]).is_err()
-        );
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Element::String(Cow::Owned(v.to_owned())))
+    }
+
+    fn visit_borrowed_str<E>(self, v: &'a str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Element::String(Cow::Borrowed(v)))
+    }
+
+    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Element::String(Cow::Owned(v)))
+    }
+
+    fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Element::Bytes(Bytes(Cow::Owned(v.to_owned()))))
+    }
+
+    fn visit_borrowed_bytes<E>(self, v: &'a [u8]) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Element::Bytes(Bytes(Cow::Borrowed(v))))
+    }
+
+    fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Element::Bytes(Bytes(Cow::Owned(v))))
+    }
+
+    fn visit_none<E>(self) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Element::Nil)
+    }
+}
+
+impl<'de: 'a, 'a> serde::Deserialize<'de> for Element<'a> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_any(ElementVisitor)
     }
 }

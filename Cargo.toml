@@ -1,8 +1,11 @@
 [workspace]
-members = ["foundationdb", 
-           "foundationdb-sys",
-           "foundationdb-gen",
-           "foundationdb-bench"]
+members = [
+    "foundationdb", 
+    "foundationdb-sys",
+    "foundationdb-gen",
+    "foundationdb-bench",
+    "foundationdb-bindingtester",
+]
 
 [profile.release]
 debug = true

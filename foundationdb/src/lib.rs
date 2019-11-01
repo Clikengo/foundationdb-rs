@@ -52,95 +52,71 @@
 //! ## Example
 //!
 //! ```rust
-//! extern crate futures;
-//! extern crate foundationdb;
+//! use futures::prelude::*;
+//! use std::ops::Deref;
 //!
-//! # fn main() {
+//! async fn async_main() -> foundationdb::error::Result<()> {
+//!     let db = foundationdb::Database::default()?;
+//!     
+//!     // write a value
+//!     let trx = db.create_trx()?;
+//!     trx.set(b"hello", b"world"); // errors will be returned in the future result
+//!     trx.commit().await?;
 //!
-//! use std::thread;
-//! use futures::future::*;
-//! use foundationdb::{self, *};
+//!     // read a value
+//!     let trx = db.create_trx()?;
+//!     let maybe_value = trx.get(b"hello", false).await?;
+//!     let value = maybe_value.unwrap(); // unwrap the option
 //!
-//! let network = foundationdb::init().expect("failed to initialize Fdb client");
+//!     assert_eq!(b"world", value.deref());
 //!
-//! let handle = std::thread::spawn(move || {
-//!     let error = network.run();
+//!     Ok(())
+//! }
 //!
-//!     if let Err(error) = error {
-//!         panic!("fdb_run_network: {}", error);
-//!     }
-//! });
-//!
-//! // wait for the network thread to be started
-//! network.wait();
-//!
-//! // work with Fdb
-//! let db = Cluster::new(foundationdb::default_config_path())
-//!     .and_then(|cluster| cluster.create_database())
-//!     .wait().expect("failed to create Cluster");
-//!
-//! // set a value
-//! let trx = db.create_trx().expect("failed to create transaction");
-//!
-//! trx.set(b"hello", b"world"); // errors will be returned in the future result
-//! trx.commit()
-//!     .wait()
-//!     .expect("failed to set hello to world");
-//!
-//! // read a value
-//! let trx = db.create_trx().expect("failed to create transaction");
-//! let result = trx.get(b"hello", false).wait().expect("failed to read world from hello");
-//!
-//! let value: &[u8] = result.value()
-//!     .unwrap();   // unwrap the option
-//!
-//! // should print "hello world"
-//! println!("hello {}", String::from_utf8_lossy(value));
-//!
+//! let network = foundationdb::boot().expect("failed to initialize Fdb");
+//! futures::executor::block_on(async_main()).expect("failed to run");
 //! // cleanly shutdown the client
-//! network.stop().expect("failed to stop Fdb client");
-//! handle.join();
-//!
-//! # }
+//! drop(network);
 //! ```
 //!
 //! ## API stability
 //!
 //! *WARNING* Until the 1.0 release of this library, the API may be in constant flux.
 
-#![deny(missing_docs)]
+//#![deny(missing_docs)]
 
 #[macro_use]
 extern crate failure;
-#[macro_use]
-extern crate failure_derive;
-extern crate byteorder;
-extern crate foundationdb_sys;
-#[macro_use]
-extern crate futures;
-#[cfg(feature = "uuid")]
-extern crate uuid;
 
+#[macro_use]
+extern crate static_assertions;
+
+#[cfg(any(feature = "fdb-5_1", feature = "fdb-5_2", feature = "fdb-6_0"))]
 pub mod cluster;
 pub mod database;
 pub mod error;
 pub mod fdb_api;
 pub mod future;
 pub mod keyselector;
-pub mod network;
 /// Generated configuration types for use with the various `set_option` functions
 #[allow(missing_docs)]
 pub mod options;
-mod subspace;
 pub mod transaction;
+
+#[cfg(feature = "serde")]
 pub mod tuple;
 
-//move to prelude?
+#[cfg(any(feature = "fdb-5_1", feature = "fdb-5_2", feature = "fdb-6_0"))]
 pub use crate::cluster::Cluster;
-pub use crate::database::Database;
-pub use crate::error::Error;
-pub use crate::subspace::Subspace;
-pub use crate::transaction::Transaction;
+
+pub use crate::database::{Database, TransactError, TransactOption};
+pub use crate::error::Error as FdbError;
+pub use crate::error::Result as FdbResult;
+pub use crate::keyselector::KeySelector;
+pub use crate::transaction::{
+    RangeOptionBuilder, Transaction, TransactionCancelled, TransactionCommitError,
+    TransactionCommitted,
+};
 
 /// Initialize the FoundationDB Client API, this can only be called once per process.
 ///
@@ -152,62 +128,14 @@ pub use crate::transaction::Transaction;
 /// # Examples
 ///
 /// ```rust
-/// use std::thread;
-/// use foundationdb;
-///
-/// let network = foundationdb::init().expect("failed to initialize Fdb");
-///
-/// let handle = std::thread::spawn(move || {
-///     let error = network.run();
-///
-///     if let Err(error) = error {
-///         panic!("fdb_run_network: {}", error);
-///     }
-/// });
-///
-/// network.wait();
+/// let network = foundationdb::boot().expect("failed to initialize Fdb");
 ///
 /// // do some interesting things with the API...
 ///
-/// network.stop().expect("failed to stop network");
-/// handle.join().expect("failed to join fdb thread");
+/// drop(network)
 /// ```
-pub fn init() -> error::Result<network::Network> {
-    fdb_api::FdbApiBuilder::default().build()?.network().build()
-}
-
-/// Initialize the FoundationDB Client API, this can only be called once per process.
-///
-/// # Returns
-///
-/// A `NetworkBuilder` which can be used to configure the FoundationDB Client API Network.
-///
-/// # Example
-///
-/// ```rust
-/// use foundationdb;
-/// use foundationdb::options::NetworkOption;
-///
-/// let network = foundationdb::default_api()
-///     .expect("failed to initialize API version")
-///     .set_option(NetworkOption::DisableClientStatisticsLogging)
-///     .expect("failed to set option")
-///     .build()
-///     .expect("failed to initialize network");
-///
-/// // see example on `init`
-/// ```
-pub fn default_api() -> error::Result<network::NetworkBuilder> {
-    Ok(fdb_api::FdbApiBuilder::default().build()?.network())
-}
-
-/// Allows the API version, etc, to be configured before starting.
-///
-/// # Returns
-///
-/// A `FdbApiBuilder` which can be used to configure the FoundationDB Client API version, etc.
-pub fn builder() -> fdb_api::FdbApiBuilder {
-    fdb_api::FdbApiBuilder::default()
+pub fn boot() -> error::Result<fdb_api::NetworkAutoStop> {
+    fdb_api::FdbApiBuilder::default().build()?.boot()
 }
 
 /// Returns the default Fdb cluster configuration file path
