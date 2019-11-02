@@ -1226,7 +1226,7 @@ fn main() {
 
     let api_version = args[2].parse::<i32>().expect("failed to parse api version");
 
-    let network = fdb_api::FdbApiBuilder::default()
+    let network = api::FdbApiBuilder::default()
         .set_runtime_version(api_version)
         .build()
         .expect("failed to initialize FoundationDB API")

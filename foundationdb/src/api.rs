@@ -151,7 +151,7 @@ impl NetworkStop {
     /// # Example
     ///
     /// ```rust
-    /// let (runner, cond) = foundationdb::fdb_api::FdbApiBuilder::default()
+    /// let (runner, cond) = foundationdb::api::FdbApiBuilder::default()
     ///     .build()
     ///     .expect("failed to init api")
     ///     .build()
