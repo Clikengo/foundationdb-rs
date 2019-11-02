@@ -1,4 +1,4 @@
-use super::Bytes;
+use super::{Bytes, Versionstamp};
 use serde::de;
 use serde::ser::SerializeSeq;
 use serde::{Deserializer, Serializer};
@@ -16,6 +16,7 @@ pub enum Element<'a> {
     Float(f64),
     String(Cow<'a, str>),
     Bytes(Bytes<'a>),
+    Versionstamp(Versionstamp),
     Tuple(Vec<Element<'a>>),
 }
 
@@ -29,6 +30,7 @@ impl<'a> Element<'a> {
             Element::Float(v) => Element::Float(v),
             Element::String(v) => Element::String(Cow::Owned(v.into_owned())),
             Element::Bytes(v) => Element::Bytes(v.into_owned().into()),
+            Element::Versionstamp(v) => Element::Versionstamp(v),
             Element::Tuple(v) => Element::Tuple(v.into_iter().map(|e| e.into_owned()).collect()),
         }
     }
@@ -91,6 +93,9 @@ impl<'a> serde::Serialize for Element<'a> {
             &Element::Float(f) => serializer.serialize_f64(f),
             &Element::String(ref c) => serializer.serialize_str(&c),
             &Element::Bytes(ref b) => serializer.serialize_bytes(&b),
+            &Element::Versionstamp(ref b) => {
+                serializer.serialize_newtype_struct("Versionstamp", &b)
+            }
             &Element::Tuple(ref v) => {
                 let mut seq = serializer.serialize_seq(Some(v.len()))?;
                 for element in v {
@@ -186,6 +191,15 @@ impl<'a> de::Visitor<'a> for ElementVisitor {
         E: de::Error,
     {
         Ok(Element::Nil)
+    }
+
+    fn visit_newtype_struct<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: serde::de::Deserializer<'a>,
+    {
+        Ok(Element::Versionstamp(deserializer.deserialize_bytes(
+            super::versionstamp::VersionstampVisitor,
+        )?))
     }
 }
 

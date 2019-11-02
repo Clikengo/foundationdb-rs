@@ -9,11 +9,16 @@ use std::str;
 pub struct Deserializer<'de> {
     input: &'de [u8],
     nested: usize,
+    is_versionstamp: bool,
 }
 
 impl<'de> Deserializer<'de> {
     pub fn new(input: &'de [u8]) -> Self {
-        Deserializer { input, nested: 0 }
+        Deserializer {
+            input,
+            nested: 0,
+            is_versionstamp: false,
+        }
     }
 }
 
@@ -301,6 +306,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             FLOAT => self.deserialize_f32(visitor),
             DOUBLE => self.deserialize_f64(visitor),
             FALSE | TRUE => self.deserialize_bool(visitor),
+            VERSIONSTAMP => self.deserialize_newtype_struct("Versionstamp", visitor),
             found => Err(Error::BadCode {
                 found,
                 expected: None,
@@ -363,10 +369,16 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        self.parse_code(BYTES)?;
-        match self.parse_slice()? {
-            Cow::Borrowed(slice) => visitor.visit_borrowed_bytes(slice),
-            Cow::Owned(bytes) => visitor.visit_byte_buf(bytes),
+        if self.is_versionstamp {
+            self.parse_code(VERSIONSTAMP)?;
+            let bytes = self.parse_bytes(12)?;
+            visitor.visit_bytes(bytes)
+        } else {
+            self.parse_code(BYTES)?;
+            match self.parse_slice()? {
+                Cow::Borrowed(slice) => visitor.visit_borrowed_bytes(slice),
+                Cow::Owned(bytes) => visitor.visit_byte_buf(bytes),
+            }
         }
     }
 
@@ -411,11 +423,14 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     }
 
     // For example `struct Millimeters(u8).`
-    fn deserialize_newtype_struct<V>(self, _name: &'static str, visitor: V) -> Result<V::Value>
+    fn deserialize_newtype_struct<V>(self, name: &'static str, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        visitor.visit_newtype_struct(self)
+        self.is_versionstamp = name == "Versionstamp";
+        let r = visitor.visit_newtype_struct(&mut *self);
+        self.is_versionstamp = false;
+        r
     }
 
     fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value>

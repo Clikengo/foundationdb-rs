@@ -6,11 +6,16 @@ use std::mem;
 pub struct Serializer<W> {
     pub output: W,
     nested: usize,
+    is_versionstamp: bool,
 }
 
 impl<W> Serializer<W> {
     pub fn new(output: W) -> Self {
-        Serializer { output, nested: 0 }
+        Serializer {
+            output,
+            nested: 0,
+            is_versionstamp: false,
+        }
     }
 }
 
@@ -163,8 +168,19 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
     }
 
     fn serialize_bytes(self, v: &[u8]) -> Result<()> {
-        self.output.write_all(&[BYTES])?;
-        self.write_bytes(v)
+        if self.is_versionstamp {
+            match v.len() {
+                12 => {
+                    self.output.write_all(&[VERSIONSTAMP])?;
+                    self.output.write_all(v)?;
+                }
+                _ => return Err(Error::BadVersionstamp),
+            }
+        } else {
+            self.output.write_all(&[BYTES])?;
+            self.write_bytes(v)?;
+        }
+        Ok(())
     }
 
     fn serialize_none(self) -> Result<()> {
@@ -205,11 +221,14 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
     }
 
     // For example `struct Millimeters(u8).`
-    fn serialize_newtype_struct<T>(self, _name: &'static str, value: &T) -> Result<()>
+    fn serialize_newtype_struct<T>(self, name: &'static str, value: &T) -> Result<()>
     where
         T: ?Sized + Serialize,
     {
-        value.serialize(&mut *self)
+        self.is_versionstamp = name == "Versionstamp";
+        let ret = value.serialize(&mut *self);
+        self.is_versionstamp = false;
+        ret
     }
 
     // For example the `E::N` in `enum E { N(u8) }`.

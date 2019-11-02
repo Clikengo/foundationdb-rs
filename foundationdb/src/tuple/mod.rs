@@ -2,6 +2,7 @@ pub mod de;
 mod element;
 pub mod ser;
 mod subspace;
+mod versionstamp;
 
 use std::borrow::Cow;
 use std::fmt::{self, Display};
@@ -11,6 +12,7 @@ use std::result;
 
 pub use element::Element;
 pub use subspace::Subspace;
+pub use versionstamp::Versionstamp;
 
 const NIL: u8 = 0x00;
 const BYTES: u8 = 0x01;
@@ -25,8 +27,9 @@ const FALSE: u8 = 0x26;
 const TRUE: u8 = 0x27;
 #[cfg(feature = "uuid")]
 const UUID: u8 = 0x30;
-// TODO const VERSIONSTAMP_88: u8 = 0x33;
-// TODO const VERSIONSTAMP_96: u8 = 0x33;
+// Not a single official binding is implementing 80 Bit versionstamp...
+// const VERSIONSTAMP_88: u8 = 0x32;
+const VERSIONSTAMP: u8 = 0x33;
 
 const ENUM: u8 = 0x40;
 
@@ -44,6 +47,7 @@ pub enum Error {
     BadCharValue(u32),
     BadCode { found: u8, expected: Option<u8> },
     BadPrefix,
+    BadVersionstamp,
 }
 
 impl From<io::Error> for Error {
@@ -228,6 +232,30 @@ mod tests {
         test_serde(256i32, &[0x16, 1, 0]);
         test_serde(-255i16, &[0x13, 0]);
         test_serde(-256i64, &[0x12, 254, 255]);
+
+        // versionstamp
+        test_serde(
+            Versionstamp::complete(b"\xaa\xbb\xcc\xdd\xee\xff\x00\x01\x02\x03".clone(), 0),
+            b"\x33\xaa\xbb\xcc\xdd\xee\xff\x00\x01\x02\x03\x00\x00",
+        );
+        test_serde(
+            Versionstamp::complete(b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a".clone(), 657),
+            b"\x33\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x02\x91",
+        );
+        test_serde(
+            Element::Versionstamp(Versionstamp::complete(
+                b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a".clone(),
+                657,
+            )),
+            b"\x33\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x02\x91",
+        );
+        test_serde(
+            (Element::Versionstamp(Versionstamp::complete(
+                b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a".clone(),
+                657,
+            )),),
+            b"\x33\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x02\x91",
+        );
     }
 
     #[test]
