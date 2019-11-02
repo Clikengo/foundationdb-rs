@@ -12,7 +12,7 @@ mod common;
 async fn test_watch_async() -> error::Result<()> {
     const KEY: &'static [u8] = b"test-watch";
 
-    let db = Database::default()?;
+    let db = common::database().await?;
 
     eprintln!("setting watch");
     let trx = db.create_trx()?;
@@ -41,7 +41,7 @@ fn test_watch() {
 async fn test_watch_without_commit_async() -> error::Result<()> {
     const KEY: &'static [u8] = b"test-watch-2";
 
-    let db = Database::default()?;
+    let db = common::database().await?;
 
     eprintln!("setting watch");
     let trx = db.create_trx()?;

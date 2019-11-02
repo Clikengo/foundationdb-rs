@@ -16,7 +16,7 @@ mod common;
 async fn test_get_range_async() -> error::Result<()> {
     const N: usize = 10000;
 
-    let db = Database::default()?;
+    let db = common::database().await?;
 
     {
         let trx = db.create_trx()?;

@@ -286,7 +286,9 @@ async fn perform_op(
 }
 
 async fn simulate_students(student_id: usize, num_ops: usize) {
-    let db = Database::default().expect("failed to get database");
+    let db = Database::new_compat(None)
+        .await
+        .expect("failed to get database");
 
     let student_id = format!("s{}", student_id);
     let mut rng = rand::thread_rng();
@@ -366,7 +368,8 @@ async fn run_sim(db: &Database, students: usize, ops_per_student: usize) {
 fn main() {
     let network = fdb::boot().expect("failed to initialize FoundationDB");
 
-    let db = Database::default().expect("failed to get database");
+    let db = futures::executor::block_on(fdb::Database::new_compat(None))
+        .expect("failed to get database");
     futures::executor::block_on(init(&db, &*ALL_CLASSES));
     println!("Initialized");
     futures::executor::block_on(run_sim(&db, 10, 10));

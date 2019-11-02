@@ -1221,7 +1221,7 @@ fn main() {
 
     let mut cluster_path = None;
     if args.len() > 3 {
-        cluster_path = Some(&args[3]);
+        cluster_path = Some(args[3].as_str());
     }
 
     let api_version = args[2].parse::<i32>().expect("failed to parse api version");
@@ -1233,12 +1233,8 @@ fn main() {
         .boot()
         .expect("failed to initialize FoundationDB network thread");
 
-    let db = if let Some(cluster_path) = cluster_path {
-        Database::from_path(cluster_path)
-    } else {
-        Database::default()
-    }
-    .expect("failed to get database");
+    let db = futures::executor::block_on(fdb::Database::new_compat(cluster_path))
+        .expect("failed to get database");
     let mut sm = StackMachine::new(&db, prefix.to_owned());
     futures::executor::block_on(sm.run(db)).unwrap();
 

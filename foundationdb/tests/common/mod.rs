@@ -1,3 +1,4 @@
+use foundationdb as fdb;
 use lazy_static::lazy_static;
 
 /// generate random string. Foundationdb watch only fires when value changed, so updating with same
@@ -16,11 +17,14 @@ pub fn random_str(len: usize) -> String {
 }
 
 lazy_static! {
-    static ref ENV: foundationdb::api::NetworkAutoStop =
-        foundationdb::boot().expect("fdb boot failed");
+    static ref ENV: fdb::api::NetworkAutoStop = fdb::boot().expect("fdb boot failed");
 }
 
 #[allow(unused)]
 pub fn boot() {
     let _end = &*ENV;
+}
+
+pub async fn database() -> fdb::FdbResult<fdb::Database> {
+    fdb::Database::new_compat(None).await
 }

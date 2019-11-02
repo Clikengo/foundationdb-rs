@@ -17,7 +17,7 @@ fn test_set_get() {
     futures::executor::block_on(test_set_get_async()).expect("failed to run")
 }
 async fn test_set_get_async() -> error::Result<()> {
-    let db = Database::default()?;
+    let db = common::database().await?;
 
     let trx = db.create_trx()?;
     trx.set(b"hello", b"world");
@@ -42,7 +42,7 @@ fn test_get_multi() {
     futures::executor::block_on(test_get_multi_async()).expect("failed to run")
 }
 async fn test_get_multi_async() -> error::Result<()> {
-    let db = Database::default()?;
+    let db = common::database().await?;
 
     let trx = db.create_trx()?;
     let keys: &[&[u8]] = &[b"hello", b"world", b"foo", b"bar"];
@@ -58,7 +58,7 @@ fn test_set_conflict() {
 }
 async fn test_set_conflict_async() -> error::Result<()> {
     let key = b"test_set_conflict";
-    let db = Database::default()?;
+    let db = common::database().await?;
 
     let trx1 = db.create_trx()?;
     let trx2 = db.create_trx()?;
@@ -83,7 +83,7 @@ fn test_set_conflict_snapshot() {
 }
 async fn test_set_conflict_snapshot_async() -> error::Result<()> {
     let key = b"test_set_conflict_snapshot";
-    let db = Database::default()?;
+    let db = common::database().await?;
 
     let trx1 = db.create_trx()?;
     let trx2 = db.create_trx()?;
@@ -144,7 +144,7 @@ async fn test_transact_async() -> error::Result<()> {
     }
 
     let try_count = Arc::new(AtomicUsize::new(0));
-    let db = Database::default()?;
+    let db = common::database().await?;
     let res = db
         .transact(
             &db,
@@ -167,7 +167,7 @@ fn test_versionstamp() {
 }
 async fn test_versionstamp_async() -> error::Result<()> {
     const KEY: &[u8] = b"test_versionstamp";
-    let db = Database::default()?;
+    let db = common::database().await?;
 
     let trx = db.create_trx()?;
     trx.set(KEY, common::random_str(10).as_bytes());
@@ -184,7 +184,7 @@ fn test_read_version() {
     futures::executor::block_on(test_read_version_async()).expect("failed to run")
 }
 async fn test_read_version_async() -> error::Result<()> {
-    let db = Database::default()?;
+    let db = common::database().await?;
 
     let trx = db.create_trx()?;
     trx.get_read_version().await?;
@@ -199,7 +199,7 @@ fn test_set_read_version() {
 }
 async fn test_set_read_version_async() -> error::Result<()> {
     const KEY: &[u8] = b"test_set_read_version";
-    let db = Database::default()?;
+    let db = common::database().await?;
 
     let trx = db.create_trx()?;
     trx.set_read_version(0);

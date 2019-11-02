@@ -27,7 +27,7 @@ async fn atomic_add(db: &Database, key: &[u8], value: i64) -> error::Result<()> 
 async fn test_atomic_async() -> error::Result<()> {
     const KEY: &[u8] = b"test-atomic";
 
-    let db = Database::default()?;
+    let db = common::database().await?;
 
     println!("clear!");
     {

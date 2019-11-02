@@ -17,8 +17,6 @@ use std::time::{Duration, Instant};
 
 use foundationdb_sys as fdb_sys;
 
-#[cfg(any(feature = "fdb-5_1", feature = "fdb-5_2", feature = "fdb-6_0"))]
-use crate::cluster::*;
 use crate::error::{self, Error as FdbError, Result};
 use crate::options;
 use crate::transaction::*;
@@ -30,15 +28,27 @@ use futures::prelude::*;
 /// Modifications to a database are performed via transactions.
 ///
 pub struct Database {
-    inner: NonNull<fdb_sys::FDBDatabase>,
+    pub(crate) inner: NonNull<fdb_sys::FDBDatabase>,
 }
 unsafe impl Send for Database {}
 unsafe impl Sync for Database {}
+impl Drop for Database {
+    fn drop(&mut self) {
+        unsafe {
+            fdb_sys::fdb_database_destroy(self.inner.as_ptr());
+        }
+    }
+}
 
+#[cfg(not(any(feature = "fdb-5_1", feature = "fdb-5_2", feature = "fdb-6_0")))]
 impl Database {
-    fn new(path: *const std::os::raw::c_char) -> Result<Database> {
+    pub fn new(path: Option<&str>) -> Result<Database> {
+        let path_str = path.map(|path| std::ffi::CString::new(path).unwrap());
+        let path_ptr = path_str
+            .map(|path| path.as_ptr())
+            .unwrap_or(std::ptr::null());
         let mut v: *mut fdb_sys::FDBDatabase = std::ptr::null_mut();
-        let err = unsafe { fdb_sys::fdb_create_database(path, &mut v as *mut _) };
+        let err = unsafe { fdb_sys::fdb_create_database(path_ptr, &mut v as *mut _) };
         error::eval(err)?;
         Ok(Database {
             inner: NonNull::new(v)
@@ -47,12 +57,27 @@ impl Database {
     }
 
     pub fn from_path(path: &str) -> Result<Database> {
-        let path_str = std::ffi::CString::new(path).unwrap();
-        Database::new(path_str.as_ptr())
+        Self::new(Some(path))
     }
 
     pub fn default() -> Result<Database> {
-        Database::new(std::ptr::null())
+        Self::new(None)
+    }
+}
+
+impl Database {
+    pub async fn new_compat(path: Option<&str>) -> Result<Database> {
+        #[cfg(any(feature = "fdb-5_1", feature = "fdb-5_2", feature = "fdb-6_0"))]
+        {
+            let cluster = crate::cluster::Cluster::new(path).await?;
+            let database = cluster.create_database().await?;
+            Ok(database)
+        }
+
+        #[cfg(not(any(feature = "fdb-5_1", feature = "fdb-5_2", feature = "fdb-6_0")))]
+        {
+            Ok(fdb::Database::new(path))
+        }
     }
 
     /// Called to set an option an on `Database`.
@@ -153,14 +178,6 @@ where
 impl TransactError for FdbError {
     fn try_into_fdb_error(self) -> std::result::Result<FdbError, Self> {
         Ok(self)
-    }
-}
-
-impl Drop for Database {
-    fn drop(&mut self) {
-        unsafe {
-            fdb_sys::fdb_database_destroy(self.inner.as_ptr());
-        }
     }
 }
 
