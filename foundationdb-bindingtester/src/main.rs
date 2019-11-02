@@ -6,11 +6,15 @@ use foundationdb_sys as fdb_sys;
 
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::io::Write;
 use std::pin::Pin;
+use std::sync::Arc;
+use std::thread;
 
 use fdb::error::Error;
 use fdb::keyselector::KeySelector;
 use fdb::options::{ConflictRangeType, DatabaseOption, TransactionOption};
+use fdb::transaction::RangeOption;
 use fdb::tuple::{de::from_bytes, ser::into_bytes, ser::to_bytes, Bytes, Element, Subspace};
 use fdb::*;
 use futures::future;
@@ -34,7 +38,7 @@ fn mutation_from_str(s: &str) -> MutationType {
         "SET_VERSIONSTAMPED_VALUE" => MutationType::SetVersionstampedValue,
         "BYTE_MIN" => MutationType::ByteMin,
         "BYTE_MAX" => MutationType::ByteMax,
-        _ => unimplemented!(),
+        _ => unimplemented!("mutation_from_str({})", s),
     }
 }
 
@@ -47,7 +51,7 @@ pub fn streaming_from_value(val: i32) -> StreamingMode {
         fdb_sys::FDBStreamingMode_FDB_STREAMING_MODE_MEDIUM => StreamingMode::Medium,
         fdb_sys::FDBStreamingMode_FDB_STREAMING_MODE_LARGE => StreamingMode::Large,
         fdb_sys::FDBStreamingMode_FDB_STREAMING_MODE_SERIAL => StreamingMode::Serial,
-        _ => unimplemented!(),
+        _ => unimplemented!("streaming_from_value({})", val),
     }
 }
 
@@ -374,6 +378,8 @@ struct StackMachine {
 
     // A last seen FDB version, which is a 64-bit integer.
     last_version: i64,
+
+    threads: Vec<thread::JoinHandle<()>>,
 }
 
 fn strinc(key: Bytes) -> Bytes {
@@ -388,8 +394,7 @@ fn strinc(key: Bytes) -> Bytes {
 }
 
 impl StackMachine {
-    fn new(db: &Database, prefix: String) -> Self {
-        let prefix = Bytes::from(prefix.clone().into_bytes());
+    fn new(db: &Database, prefix: Bytes<'static>) -> Self {
         let cur_transaction = prefix.clone();
         let mut transactions = HashMap::new();
         transactions.insert(
@@ -403,6 +408,7 @@ impl StackMachine {
             stack: Vec::new(),
             cur_transaction,
             last_version: 0,
+            threads: Vec::new(),
         }
     }
 
@@ -531,7 +537,12 @@ impl StackMachine {
         self.stack.push(item);
     }
 
-    async fn run_step(&mut self, db: &Database, number: usize, mut instr: Instr) -> FdbResult<()> {
+    async fn run_step(
+        &mut self,
+        db: Arc<Database>,
+        number: usize,
+        mut instr: Instr,
+    ) -> FdbResult<()> {
         use crate::InstrCode::*;
 
         let is_db = instr.pop_database();
@@ -1068,12 +1079,31 @@ impl StackMachine {
             TuplePackWithVersionstamp => {
                 let prefix = self.pop_bytes().await;
                 let n: usize = self.pop_item().await;
+                debug!("tuple_pack_with_versionstamp {:?} {}", prefix, n);
                 let mut buf = Vec::new();
                 for _ in 0..n {
-                    let mut data = self.pop_data().await;
-                    buf.append(&mut data);
+                    let element: Element = self.pop_element().await;
+                    debug!(" - {:?}", element);
+                    buf.push(element);
                 }
-                unimplemented!()
+
+                let tuple = Element::Tuple(buf);
+                let i = tuple.count_incomplete_versionstamp();
+
+                self.push_item(
+                    number,
+                    &Bytes::from(if i == 0 {
+                        b"ERROR: NONE".as_ref()
+                    } else if i > 0 {
+                        b"ERROR: MULTIPLE".as_ref()
+                    } else {
+                        b"OK".as_ref()
+                    }),
+                );
+                if i == 1 {
+                    let packed = to_bytes(&tuple).unwrap();
+                    self.push_item(number, &Bytes::from(packed));
+                }
             }
 
             // Pops the top item off of the stack as PACKED, and then unpacks PACKED into a
@@ -1119,10 +1149,56 @@ impl StackMachine {
             // state. The new stack machine should begin executing instructions concurrent
             // with the current stack machine through a language-appropriate mechanism.
             StartThread => {
-                let prefix = self.pop_bytes();
-                unimplemented!()
+                let prefix = self.pop_bytes().await;
+                debug!("start_thread {:?}", prefix);
+                let db = db.clone();
+                self.threads.push(
+                    thread::Builder::new()
+                        .name(format!("{:?}", prefix))
+                        .spawn(move || {
+                            let mut sm = StackMachine::new(&db, prefix.clone());
+                            futures::executor::block_on(sm.run(db)).unwrap();
+                            sm.join();
+                            debug!("thread {:?} exit", prefix);
+                        })
+                        .unwrap(),
+                );
             }
-            WaitEmpty => {}
+
+            // Pops the top item off of the stack as PREFIX. Blocks execution until the
+            // range with prefix PREFIX is not present in the database. This should be
+            // implemented as a polling loop inside of a language- and binding-appropriate
+            // retryable construct which synthesizes FoundationDB error 1020 when the range
+            // is not empty. Pushes the string "WAITED_FOR_EMPTY" onto the stack when
+            // complete.
+            WaitEmpty => {
+                let prefix = self.pop_bytes().await;
+                debug!("wait_empty {:?}", prefix);
+                let (begin, end) = range(prefix);
+
+                async fn wait_for_empty(
+                    trx: &Transaction,
+                    begin: &[u8],
+                    end: &[u8],
+                ) -> FdbResult<()> {
+                    let range = trx
+                        .get_range(&RangeOption::from((begin, end)), 1, false)
+                        .await?;
+
+                    debug!("wait_empty {:?} range {}", Bytes::from(begin), range.len());
+                    if range.len() != 0 {
+                        return Err(Error::from_error_code(1020));
+                    }
+                    Ok(())
+                }
+                db.transact(
+                    (begin, end),
+                    |trx, (begin, end)| wait_for_empty(trx, &begin, &end).boxed_local(),
+                    TransactOption::default(),
+                )
+                .await?;
+                self.push_item(number, &Bytes::from(b"WAITED_FOR_EMPTY".as_ref()));
+            }
 
             UnitTests => {
                 db.set_option(DatabaseOption::LocationCacheSize(100001))?;
@@ -1193,28 +1269,44 @@ impl StackMachine {
         Ok(())
     }
 
-    async fn run(&mut self, db: Database) -> FdbResult<()> {
+    async fn run(&mut self, db: Arc<Database>) -> FdbResult<()> {
         info!("Fetching instructions...");
         let instrs = self.fetch_instr(&db.create_trx()?).await?;
         info!("{} instructions found", instrs.len());
 
         for (i, instr) in instrs.into_iter().enumerate() {
             info!("{}/{}, {:?}", i, self.stack.len(), instr);
-            self.run_step(&db, i, instr).await?;
-
-            /*
-            if i == 135 {
-                break;
-            }
-            */
+            self.run_step(db.clone(), i, instr).await?;
         }
 
         Ok(())
     }
+
+    fn join(&mut self) {
+        for handle in self.threads.drain(0..) {
+            handle.join().expect("joined thread to not panic");
+        }
+    }
 }
 
 fn main() {
-    env_logger::init();
+    let now = std::time::Instant::now();
+    env_logger::Builder::from_default_env()
+        .format(move |buf, record| {
+            let current_thread = thread::current();
+            let thread_name = current_thread.name().unwrap_or("?");
+            writeln!(
+                buf,
+                "{} {} {} - {}",
+                (std::time::Instant::now() - now).as_millis(),
+                thread_name,
+                record.level(),
+                record.args()
+            )
+        })
+        .format_timestamp_millis()
+        .target(env_logger::Target::Stdout)
+        .init();
 
     let args = std::env::args().collect::<Vec<_>>();
     let prefix = &args[1];
@@ -1233,10 +1325,14 @@ fn main() {
         .boot()
         .expect("failed to initialize FoundationDB network thread");
 
-    let db = futures::executor::block_on(fdb::Database::new_compat(cluster_path))
-        .expect("failed to get database");
-    let mut sm = StackMachine::new(&db, prefix.to_owned());
+    let db = Arc::new(
+        futures::executor::block_on(fdb::Database::new_compat(cluster_path))
+            .expect("failed to get database"),
+    );
+
+    let mut sm = StackMachine::new(&db, Bytes::from(prefix.to_owned().into_bytes()));
     futures::executor::block_on(sm.run(db)).unwrap();
+    sm.join();
 
     drop(network);
 }

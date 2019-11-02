@@ -198,16 +198,32 @@ impl<'a> Default for RangeOption<'a> {
     }
 }
 
+impl<'a> From<(&'a [u8], &'a [u8])> for RangeOption<'a> {
+    fn from((begin, end): (&'a [u8], &'a [u8])) -> Self {
+        RangeOptionBuilder::from((begin, end)).build()
+    }
+}
+
 /// A Builder with which options need to used for a range query.
 pub struct RangeOptionBuilder<'a>(RangeOption<'a>);
+
+impl<'a> From<(&'a [u8], &'a [u8])> for RangeOptionBuilder<'a> {
+    fn from((begin, end): (&'a [u8], &'a [u8])) -> Self {
+        Self::new(
+            KeySelector::first_greater_or_equal(Cow::Borrowed(begin)),
+            KeySelector::first_greater_or_equal(Cow::Borrowed(end)),
+        )
+    }
+}
 
 impl<'a> RangeOptionBuilder<'a> {
     /// Creates new builder with given key selectors.
     pub fn new(begin: KeySelector<'a>, end: KeySelector<'a>) -> Self {
-        let mut opt = RangeOption::default();
-        opt.begin = begin.to_owned();
-        opt.end = end.to_owned();
-        RangeOptionBuilder(opt)
+        RangeOptionBuilder(RangeOption {
+            begin,
+            end,
+            ..RangeOption::default()
+        })
     }
 
     /// If non-zero, indicates the maximum number of key-value pairs to return.

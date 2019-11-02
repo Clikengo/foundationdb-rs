@@ -66,11 +66,11 @@ impl<'a> serde::Serialize for Versionstamp {
 }
 
 impl<'a> Element<'a> {
-    pub fn has_incomplete_versionstamp(&self) -> bool {
+    pub fn count_incomplete_versionstamp(&self) -> usize {
         match self {
-            Element::Versionstamp(v) => !v.is_complete(),
-            Element::Tuple(v) => v.iter().any(Element::has_incomplete_versionstamp),
-            _ => false,
+            Element::Versionstamp(v) if !v.is_complete() => 1,
+            Element::Tuple(v) => v.iter().map(Element::count_incomplete_versionstamp).sum(),
+            _ => 0,
         }
     }
 }
