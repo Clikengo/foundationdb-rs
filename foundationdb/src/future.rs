@@ -282,9 +282,9 @@ impl Deref for FdbFutureValues {
 #[repr(C, packed(4))]
 pub struct KeyValue {
     key: *const u8,
-    key_len: u32,
+    key_len: i32,
     value: *const u8,
-    value_len: u32,
+    value_len: i32,
 }
 impl KeyValue {
     /// key

@@ -127,7 +127,7 @@ impl FdbScope {
                     writeln!(w, "(ref v) => {{")?;
                     writeln!(
                         w,
-                        "{}fdb::{}({}, v.as_ptr() as *const u8, v.len() as i32)\n",
+                        "{}fdb::{}({}, v.as_ptr() as *const u8, i32::try_from(v.len()).expect(\"len to fit in i32\"))\n",
                         TAB4, fn_name, args
                     )?;
                     writeln!(w, "{t}}}", t = TAB3)?;
@@ -136,7 +136,7 @@ impl FdbScope {
                     writeln!(w, "(ref v) => {{")?;
                     writeln!(
                         w,
-                        "{}fdb::{}({}, v.as_ptr() as *const u8, v.len() as i32)\n",
+                        "{}fdb::{}({}, v.as_ptr() as *const u8, i32::try_from(v.len()).expect(\"len to fit in i32\"))\n",
                         TAB4, fn_name, args
                     )?;
                     writeln!(w, "{t}}}", t = TAB3)?;

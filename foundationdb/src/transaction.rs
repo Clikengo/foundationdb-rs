@@ -116,6 +116,7 @@ unsafe impl Send for Transaction {}
 unsafe impl Sync for Transaction {}
 
 /// Converts Rust `bool` into `fdb::fdb_bool_t`
+#[inline]
 fn fdb_bool(v: bool) -> fdb::fdb_bool_t {
     if v {
         1
@@ -123,15 +124,27 @@ fn fdb_bool(v: bool) -> fdb::fdb_bool_t {
         0
     }
 }
-
-/// Foundationdb API uses `c_int` type as a length of a value, while Rust uses `usize` for. Rust
-/// inteface uses `usize` if it represents length or size of something. Those `usize` values should
-/// be converted to `c_int` before passed to ffi, because naive casting with `v as i32` will
-/// convert some `usize` values to unsigned one.
-/// TODO: check if inverse function is needed, `cint_to_usize(v: c_int) -> usize`?
-fn usize_trunc(v: usize) -> std::os::raw::c_int {
-    if v > std::i32::MAX as usize {
-        std::i32::MAX
+#[inline]
+fn fdb_len(len: usize, context: &'static str) -> std::os::raw::c_int {
+    assert!(
+        len <= i32::max_value() as usize,
+        "{}.len() > i32::max_value()",
+        context
+    );
+    len as i32
+}
+#[inline]
+fn fdb_iteration(iteration: usize) -> std::os::raw::c_int {
+    if iteration > i32::max_value() as usize {
+        0 // this will cause client_invalid_operation
+    } else {
+        iteration as i32
+    }
+}
+#[inline]
+fn fdb_limit(v: usize) -> std::os::raw::c_int {
+    if v > i32::max_value() as usize {
+        i32::max_value()
     } else {
         v as i32
     }
@@ -257,9 +270,9 @@ impl Transaction {
             fdb::fdb_transaction_set(
                 self.inner.as_ptr(),
                 key.as_ptr(),
-                key.len() as i32,
+                fdb_len(key.len(), "key"),
                 value.as_ptr(),
-                value.len() as i32,
+                fdb_len(value.len(), "value"),
             )
         }
     }
@@ -272,9 +285,10 @@ impl Transaction {
     ///
     /// * `key_name` - the name of the key to be removed from the database.
     pub fn clear(&self, key: &[u8]) {
-        unsafe { fdb::fdb_transaction_clear(self.inner.as_ptr(), key.as_ptr(), key.len() as i32) }
+        unsafe {
+            fdb::fdb_transaction_clear(self.inner.as_ptr(), key.as_ptr(), fdb_len(key.len(), "key"))
+        }
     }
-
     /// Reads a value from the database snapshot represented by transaction.
     ///
     /// Returns an FDBFuture which will be set to the value of key_name in the database. You must first wait for the FDBFuture to be ready, check for errors, call fdb_future_get_value() to extract the value, and then destroy the FDBFuture with fdb_future_destroy().
@@ -291,7 +305,7 @@ impl Transaction {
             fdb::fdb_transaction_get(
                 self.inner.as_ptr(),
                 key.as_ptr() as *const _,
-                key.len() as i32,
+                fdb_len(key.len(), "key"),
                 fdb_bool(snapshot),
             )
         })
@@ -320,9 +334,9 @@ impl Transaction {
             fdb::fdb_transaction_atomic_op(
                 self.inner.as_ptr(),
                 key.as_ptr() as *const _,
-                key.len() as i32,
+                fdb_len(key.len(), "key"),
                 param.as_ptr() as *const _,
-                param.len() as i32,
+                fdb_len(param.len(), "param"),
                 op_type.code(),
             )
         }
@@ -341,9 +355,9 @@ impl Transaction {
             fdb::fdb_transaction_get_key(
                 self.inner.as_ptr(),
                 key.as_ptr() as *const _,
-                key.len() as i32,
+                fdb_len(key.len(), "key"),
                 fdb_bool(selector.or_equal()),
-                selector.offset() as i32,
+                selector.offset(),
                 fdb_bool(snapshot),
             )
         })
@@ -391,17 +405,17 @@ impl Transaction {
             fdb::fdb_transaction_get_range(
                 self.inner.as_ptr(),
                 key_begin.as_ptr() as *const _,
-                key_begin.len() as i32,
+                fdb_len(key_begin.len(), "key_begin"),
                 fdb_bool(begin.or_equal()),
-                begin.offset() as i32,
+                begin.offset(),
                 key_end.as_ptr() as *const _,
-                key_end.len() as i32,
+                fdb_len(key_end.len(), "key_end"),
                 fdb_bool(end.or_equal()),
-                end.offset() as i32,
-                usize_trunc(opt.limit.unwrap_or(0)),
-                usize_trunc(opt.target_bytes),
+                end.offset(),
+                fdb_limit(opt.limit.unwrap_or(0)),
+                fdb_limit(opt.target_bytes),
                 opt.mode.code(),
-                iteration as i32,
+                fdb_iteration(iteration),
                 fdb_bool(snapshot),
                 fdb_bool(opt.reverse),
             )
@@ -419,9 +433,9 @@ impl Transaction {
             fdb::fdb_transaction_clear_range(
                 self.inner.as_ptr(),
                 begin.as_ptr() as *const _,
-                begin.len() as i32,
+                fdb_len(begin.len(), "begin"),
                 end.as_ptr() as *const _,
-                end.len() as i32,
+                fdb_len(end.len(), "end"),
             )
         }
     }
@@ -486,7 +500,7 @@ impl Transaction {
             fdb::fdb_transaction_get_addresses_for_key(
                 self.inner.as_ptr(),
                 key.as_ptr(),
-                key.len() as i32,
+                fdb_len(key.len(), "key"),
             )
         })
     }
@@ -522,7 +536,7 @@ impl Transaction {
             fdb::fdb_transaction_watch(
                 self.inner.as_ptr(),
                 key.as_ptr() as *const _,
-                key.len() as i32,
+                fdb_len(key.len(), "key"),
             )
         })
     }
@@ -618,9 +632,9 @@ impl Transaction {
             fdb::fdb_transaction_add_conflict_range(
                 self.inner.as_ptr(),
                 begin.as_ptr() as *const _,
-                begin.len() as i32,
+                fdb_len(begin.len(), "begin"),
                 end.as_ptr() as *const _,
-                end.len() as i32,
+                fdb_len(end.len(), "end"),
                 ty.code(),
             )
         };

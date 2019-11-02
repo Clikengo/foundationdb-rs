@@ -20,7 +20,7 @@ use foundationdb_sys as fdb_sys;
 
 /// Returns the max api version of the underlying Fdb C API Client
 pub fn get_max_api_version() -> i32 {
-    unsafe { fdb_sys::fdb_get_max_api_version() as i32 }
+    unsafe { fdb_sys::fdb_get_max_api_version() }
 }
 
 static VERSION_SELECTED: AtomicBool = AtomicBool::new(false);

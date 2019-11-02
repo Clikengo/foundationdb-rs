@@ -18,7 +18,7 @@ use crate::options;
 use foundationdb_sys as fdb_sys;
 
 pub(crate) fn eval(error_code: fdb_sys::fdb_error_t) -> Result<()> {
-    let rust_code = error_code as i32;
+    let rust_code: i32 = error_code;
     if rust_code == 0 {
         Ok(())
     } else {
@@ -71,7 +71,7 @@ impl Error {
 
         Error {
             kind: Context::new(ErrorKind::Fdb {
-                error_code: error_code as i32,
+                error_code,
                 error_str: error_str
                     .to_str()
                     .expect("bad error string from FoundationDB"),
@@ -82,9 +82,7 @@ impl Error {
     fn is_error_predicate(&self, predicate: options::ErrorPredicate) -> bool {
         match *self.kind.get_context() {
             ErrorKind::Fdb { error_code, .. } => {
-                let check = unsafe {
-                    fdb_sys::fdb_error_predicate(predicate.code() as i32, error_code) as i32
-                };
+                let check = unsafe { fdb_sys::fdb_error_predicate(predicate.code(), error_code) };
 
                 check != 0
             }
