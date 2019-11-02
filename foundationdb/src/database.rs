@@ -76,7 +76,7 @@ impl Database {
 
         #[cfg(not(any(feature = "fdb-5_1", feature = "fdb-5_2", feature = "fdb-6_0")))]
         {
-            Ok(fdb::Database::new(path))
+            Database::new(path)
         }
     }
 
