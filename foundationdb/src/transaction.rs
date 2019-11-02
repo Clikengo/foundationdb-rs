@@ -386,6 +386,15 @@ impl Transaction {
         })
     }
 
+    pub fn get_ranges_keyvalues<'a>(
+        &'a self,
+        opt: RangeOption<'a>,
+        snapshot: bool,
+    ) -> impl TryStream<Ok = FdbFutureValue, Error = Error> + 'a {
+        self.get_ranges(opt, snapshot)
+            .map_ok(|values| stream::iter(values.into_iter().map(Ok)))
+            .try_flatten()
+    }
     /// Reads all key-value pairs in the database snapshot represented by transaction (potentially
     /// limited by limit, target_bytes, or mode) which have a key lexicographically greater than or
     /// equal to the key resolved by the begin key selector and lexicographically less than the key

@@ -29,6 +29,7 @@ use std::ops::Deref;
 use std::os::raw::c_char;
 use std::pin::Pin;
 use std::ptr::NonNull;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use foundationdb_sys as fdb;
@@ -266,6 +267,101 @@ impl Deref for FdbFutureValues {
                 self.len as usize,
             ))
         }
+    }
+}
+
+impl<'a> IntoIterator for &'a FdbFutureValues {
+    type Item = &'a KeyValue;
+    type IntoIter = std::slice::Iter<'a, KeyValue>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.deref().iter()
+    }
+}
+impl IntoIterator for FdbFutureValues {
+    type Item = FdbFutureValue;
+    type IntoIter = FdbFutureValuesIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        FdbFutureValuesIter {
+            f: Rc::new(self._f),
+            keyvalues: self.keyvalues,
+            len: self.len,
+            pos: 0,
+        }
+    }
+}
+
+pub struct FdbFutureValuesIter {
+    f: Rc<FdbFutureHandle>,
+    keyvalues: *const fdb::FDBKeyValue,
+    len: i32,
+    pos: i32,
+}
+impl Iterator for FdbFutureValuesIter {
+    type Item = FdbFutureValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.nth(0)
+    }
+
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        let pos = (self.pos as usize).checked_add(n);
+        match pos {
+            Some(pos) if pos < self.len as usize => {
+                // safe because pos < self.len
+                let keyvalue = unsafe { self.keyvalues.add(pos) };
+                self.pos = pos as i32 + 1;
+
+                Some(FdbFutureValue {
+                    _f: self.f.clone(),
+                    keyvalue,
+                })
+            }
+            _ => {
+                self.pos = self.len;
+                None
+            }
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let rem = (self.len - self.pos) as usize;
+        (rem, Some(rem))
+    }
+}
+impl ExactSizeIterator for FdbFutureValuesIter {}
+impl DoubleEndedIterator for FdbFutureValuesIter {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.nth_back(0)
+    }
+
+    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+        if n < self.pos as usize {
+            // safe because n < self.pos
+            self.pos -= 1 + n as i32;
+            let keyvalue = unsafe { self.keyvalues.add(self.pos as usize) };
+
+            Some(FdbFutureValue {
+                _f: self.f.clone(),
+                keyvalue,
+            })
+        } else {
+            self.pos = 0;
+            None
+        }
+    }
+}
+
+pub struct FdbFutureValue {
+    _f: Rc<FdbFutureHandle>,
+    keyvalue: *const fdb::FDBKeyValue,
+}
+impl Deref for FdbFutureValue {
+    type Target = KeyValue;
+    fn deref(&self) -> &Self::Target {
+        assert_eq_size!(KeyValue, fdb::FDBKeyValue);
+        assert_eq_align!(KeyValue, fdb::FDBKeyValue);
+        unsafe { std::mem::transmute(self.keyvalue) }
     }
 }
 
