@@ -201,6 +201,17 @@ impl<'a> de::Visitor<'a> for ElementVisitor {
             super::versionstamp::VersionstampVisitor,
         )?))
     }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::SeqAccess<'a>,
+    {
+        let mut tuple = Vec::with_capacity(seq.size_hint().unwrap_or(0));
+        while let Some(element) = seq.next_element()? {
+            tuple.push(element)
+        }
+        Ok(Element::Tuple(tuple))
+    }
 }
 
 impl<'de: 'a, 'a> serde::Deserialize<'de> for Element<'a> {

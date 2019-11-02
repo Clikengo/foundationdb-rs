@@ -242,6 +242,22 @@ mod tests {
             Versionstamp::complete(b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a".clone(), 657),
             b"\x33\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x02\x91",
         );
+    }
+
+    #[test]
+    fn test_bindingtester() {
+        test_serde("NEW_TRANSACTION".to_string(), b"\x02NEW_TRANSACTION\x00");
+        test_serde(
+            vec!["NEW_TRANSACTION".to_string()],
+            b"\x02NEW_TRANSACTION\x00",
+        );
+    }
+
+    #[test]
+    fn test_element() {
+        test_serde(Element::Bool(true), &[TRUE]);
+        test_serde(Element::Bool(false), &[FALSE]);
+        test_serde(Element::Int(-1), &[0x13, 254]);
         test_serde(
             Element::Versionstamp(Versionstamp::complete(
                 b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a".clone(),
@@ -256,14 +272,23 @@ mod tests {
             )),),
             b"\x33\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x02\x91",
         );
-    }
-
-    #[test]
-    fn test_bindingtester() {
-        test_serde("NEW_TRANSACTION".to_string(), b"\x02NEW_TRANSACTION\x00");
         test_serde(
-            vec!["NEW_TRANSACTION".to_string()],
-            b"\x02NEW_TRANSACTION\x00",
+            (Element::Versionstamp(Versionstamp::complete(
+                b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a".clone(),
+                657,
+            )),),
+            b"\x33\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x02\x91",
+        );
+        test_serde(
+            vec![Element::Bool(true), Element::Bool(false)],
+            &[TRUE, FALSE],
+        );
+        test_serde(
+            vec![Element::Tuple(vec![
+                Element::Bool(true),
+                Element::Bool(false),
+            ])],
+            &[NESTED, TRUE, FALSE, NIL],
         );
     }
 }
