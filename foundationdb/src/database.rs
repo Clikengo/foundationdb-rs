@@ -48,7 +48,7 @@ impl Database {
             .map(|path| path.as_ptr())
             .unwrap_or(std::ptr::null());
         let mut v: *mut fdb_sys::FDBDatabase = std::ptr::null_mut();
-        let err = unsafe { fdb_sys::fdb_create_database(path_ptr, &mut v as *mut _) };
+        let err = unsafe { fdb_sys::fdb_create_database(path_ptr, &mut v) };
         error::eval(err)?;
         Ok(Database {
             inner: NonNull::new(v)
@@ -88,9 +88,8 @@ impl Database {
     /// Creates a new transaction on the given database.
     pub fn create_trx(&self) -> Result<Transaction> {
         let mut trx: *mut fdb_sys::FDBTransaction = std::ptr::null_mut();
-        let err = unsafe {
-            fdb_sys::fdb_database_create_transaction(self.inner.as_ptr(), &mut trx as *mut _)
-        };
+        let err =
+            unsafe { fdb_sys::fdb_database_create_transaction(self.inner.as_ptr(), &mut trx) };
         error::eval(err)?;
         Ok(Transaction::new(NonNull::new(trx).expect(
             "fdb_database_create_transaction to not return null if there is no error",

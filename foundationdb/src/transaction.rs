@@ -33,10 +33,7 @@ impl TransactionCommitted {
     pub fn committed_version(&self) -> Result<i64> {
         let mut version: i64 = 0;
         error::eval(unsafe {
-            fdb_sys::fdb_transaction_get_committed_version(
-                self.tr.inner.as_ptr(),
-                &mut version as *mut _,
-            )
+            fdb_sys::fdb_transaction_get_committed_version(self.tr.inner.as_ptr(), &mut version)
         })?;
         Ok(version)
     }
@@ -310,7 +307,7 @@ impl Transaction {
         FdbFuture::new(unsafe {
             fdb_sys::fdb_transaction_get(
                 self.inner.as_ptr(),
-                key.as_ptr() as *const _,
+                key.as_ptr(),
                 fdb_len(key.len(), "key"),
                 fdb_bool(snapshot),
             )
@@ -339,9 +336,9 @@ impl Transaction {
         unsafe {
             fdb_sys::fdb_transaction_atomic_op(
                 self.inner.as_ptr(),
-                key.as_ptr() as *const _,
+                key.as_ptr(),
                 fdb_len(key.len(), "key"),
-                param.as_ptr() as *const _,
+                param.as_ptr(),
                 fdb_len(param.len(), "param"),
                 op_type.code(),
             )
@@ -360,7 +357,7 @@ impl Transaction {
         FdbFuture::new(unsafe {
             fdb_sys::fdb_transaction_get_key(
                 self.inner.as_ptr(),
-                key.as_ptr() as *const _,
+                key.as_ptr(),
                 fdb_len(key.len(), "key"),
                 fdb_bool(selector.or_equal()),
                 selector.offset(),
@@ -419,11 +416,11 @@ impl Transaction {
         FdbFuture::new(unsafe {
             fdb_sys::fdb_transaction_get_range(
                 self.inner.as_ptr(),
-                key_begin.as_ptr() as *const _,
+                key_begin.as_ptr(),
                 fdb_len(key_begin.len(), "key_begin"),
                 fdb_bool(begin.or_equal()),
                 begin.offset(),
-                key_end.as_ptr() as *const _,
+                key_end.as_ptr(),
                 fdb_len(key_end.len(), "key_end"),
                 fdb_bool(end.or_equal()),
                 end.offset(),
@@ -446,9 +443,9 @@ impl Transaction {
         unsafe {
             fdb_sys::fdb_transaction_clear_range(
                 self.inner.as_ptr(),
-                begin.as_ptr() as *const _,
+                begin.as_ptr(),
                 fdb_len(begin.len(), "begin"),
-                end.as_ptr() as *const _,
+                end.as_ptr(),
                 fdb_len(end.len(), "end"),
             )
         }
@@ -549,7 +546,7 @@ impl Transaction {
         FdbFuture::new(unsafe {
             fdb_sys::fdb_transaction_watch(
                 self.inner.as_ptr(),
-                key.as_ptr() as *const _,
+                key.as_ptr(),
                 fdb_len(key.len(), "key"),
             )
         })
@@ -647,9 +644,9 @@ impl Transaction {
         let err = unsafe {
             fdb_sys::fdb_transaction_add_conflict_range(
                 self.inner.as_ptr(),
-                begin.as_ptr() as *const _,
+                begin.as_ptr(),
                 fdb_len(begin.len(), "begin"),
-                end.as_ptr() as *const _,
+                end.as_ptr(),
                 fdb_len(end.len(), "end"),
                 ty.code(),
             )

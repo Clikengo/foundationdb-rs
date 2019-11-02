@@ -144,9 +144,7 @@ impl TryFrom<FdbFutureHandle> for FdbFutureSlice {
         let mut value = std::ptr::null();
         let mut len = 0;
 
-        error::eval(unsafe {
-            fdb_sys::fdb_future_get_key(f.as_ptr(), &mut value as *mut _, &mut len as *mut _)
-        })?;
+        error::eval(unsafe { fdb_sys::fdb_future_get_key(f.as_ptr(), &mut value, &mut len) })?;
 
         Ok(FdbFutureSlice { _f: f, value, len })
     }
@@ -161,12 +159,7 @@ impl TryFrom<FdbFutureHandle> for Option<FdbFutureSlice> {
         let mut len = 0;
 
         error::eval(unsafe {
-            fdb_sys::fdb_future_get_value(
-                f.as_ptr(),
-                &mut present as *mut _,
-                &mut value as *mut _,
-                &mut len as *mut _,
-            )
+            fdb_sys::fdb_future_get_value(f.as_ptr(), &mut present, &mut value, &mut len)
         })?;
 
         Ok(if present == 0 {
