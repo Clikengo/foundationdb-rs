@@ -376,7 +376,7 @@ pub fn emit() -> Result<String> {
     }
 
     let mut w = String::new();
-    writeln!(w, "use std;")?;
+    writeln!(w, "use std::convert::TryFrom;")?;
     writeln!(w, "use crate::error;")?;
     writeln!(w, "use foundationdb_sys as fdb;")?;
     for scope in scopes.iter() {
