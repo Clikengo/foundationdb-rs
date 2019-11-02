@@ -91,11 +91,11 @@ extern crate failure;
 #[macro_use]
 extern crate static_assertions;
 
+pub mod api;
 #[cfg(any(feature = "fdb-5_1", feature = "fdb-5_2", feature = "fdb-6_0"))]
 pub mod cluster;
 pub mod database;
 pub mod error;
-pub mod fdb_api;
 pub mod future;
 pub mod keyselector;
 /// Generated configuration types for use with the various `set_option` functions
@@ -134,8 +134,8 @@ pub use crate::transaction::{
 ///
 /// drop(network)
 /// ```
-pub fn boot() -> error::Result<fdb_api::NetworkAutoStop> {
-    fdb_api::FdbApiBuilder::default().build()?.boot()
+pub fn boot() -> error::Result<api::NetworkAutoStop> {
+    api::FdbApiBuilder::default().build()?.boot()
 }
 
 /// Returns the default Fdb cluster configuration file path

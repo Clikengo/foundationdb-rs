@@ -16,7 +16,7 @@ pub fn random_str(len: usize) -> String {
 }
 
 lazy_static! {
-    static ref ENV: foundationdb::fdb_api::NetworkAutoStop =
+    static ref ENV: foundationdb::api::NetworkAutoStop =
         foundationdb::boot().expect("fdb boot failed");
 }
 
