@@ -10,7 +10,7 @@
 //!
 //! https://apple.github.io/foundationdb/api-c.html#transaction
 
-use foundationdb_sys as fdb;
+use foundationdb_sys as fdb_sys;
 use std::borrow::Cow;
 use std::fmt;
 use std::ops::Deref;
@@ -21,7 +21,9 @@ use crate::future::*;
 use crate::keyselector::*;
 use crate::options;
 
-use futures::{future, future::Either, stream, Future, FutureExt, TryFutureExt, TryStream};
+use futures::{
+    future, future::Either, stream, Future, FutureExt, TryFutureExt, TryStream, TryStreamExt,
+};
 
 pub struct TransactionCommitted {
     tr: Transaction,
@@ -31,7 +33,7 @@ impl TransactionCommitted {
     pub fn committed_version(&self) -> Result<i64> {
         let mut version: i64 = 0;
         error::eval(unsafe {
-            fdb::fdb_transaction_get_committed_version(
+            fdb_sys::fdb_transaction_get_committed_version(
                 self.tr.inner.as_ptr(),
                 &mut version as *mut _,
             )
@@ -57,7 +59,7 @@ impl TransactionCommitError {
 
     pub fn on_error(self) -> impl Future<Output = Result<Transaction>> {
         FdbFuture::<()>::new(unsafe {
-            fdb::fdb_transaction_on_error(self.tr.inner.as_ptr(), self.err.code())
+            fdb_sys::fdb_transaction_on_error(self.tr.inner.as_ptr(), self.err.code())
         })
         .map_ok(|()| self.tr)
     }
@@ -110,14 +112,14 @@ type TransactionResult = std::result::Result<TransactionCommitted, TransactionCo
 pub struct Transaction {
     // Order of fields should not be changed, because Rust drops field top-to-bottom, and
     // transaction should be dropped before cluster.
-    inner: NonNull<fdb::FDBTransaction>,
+    inner: NonNull<fdb_sys::FDBTransaction>,
 }
 unsafe impl Send for Transaction {}
 unsafe impl Sync for Transaction {}
 
-/// Converts Rust `bool` into `fdb::fdb_bool_t`
+/// Converts Rust `bool` into `fdb_sys::fdb_bool_t`
 #[inline]
-fn fdb_bool(v: bool) -> fdb::fdb_bool_t {
+fn fdb_bool(v: bool) -> fdb_sys::fdb_bool_t {
     if v {
         1
     } else {
@@ -248,7 +250,7 @@ impl<'a> RangeOptionBuilder<'a> {
 
 // TODO: many implementations left
 impl Transaction {
-    pub(crate) fn new(inner: NonNull<fdb::FDBTransaction>) -> Self {
+    pub(crate) fn new(inner: NonNull<fdb_sys::FDBTransaction>) -> Self {
         Self { inner }
     }
 
@@ -267,7 +269,7 @@ impl Transaction {
     /// * `value` - the value to be inserted into the database
     pub fn set(&self, key: &[u8], value: &[u8]) {
         unsafe {
-            fdb::fdb_transaction_set(
+            fdb_sys::fdb_transaction_set(
                 self.inner.as_ptr(),
                 key.as_ptr(),
                 fdb_len(key.len(), "key"),
@@ -286,7 +288,11 @@ impl Transaction {
     /// * `key_name` - the name of the key to be removed from the database.
     pub fn clear(&self, key: &[u8]) {
         unsafe {
-            fdb::fdb_transaction_clear(self.inner.as_ptr(), key.as_ptr(), fdb_len(key.len(), "key"))
+            fdb_sys::fdb_transaction_clear(
+                self.inner.as_ptr(),
+                key.as_ptr(),
+                fdb_len(key.len(), "key"),
+            )
         }
     }
     /// Reads a value from the database snapshot represented by transaction.
@@ -302,7 +308,7 @@ impl Transaction {
     /// TODO: implement: snapshot Non-zero if this is a snapshot read.
     pub fn get(&self, key: &[u8], snapshot: bool) -> FdbFuture<Option<FdbFutureSlice>> {
         FdbFuture::new(unsafe {
-            fdb::fdb_transaction_get(
+            fdb_sys::fdb_transaction_get(
                 self.inner.as_ptr(),
                 key.as_ptr() as *const _,
                 fdb_len(key.len(), "key"),
@@ -331,7 +337,7 @@ impl Transaction {
     /// the use of a key-value pair as a counter.
     pub fn atomic_op(&self, key: &[u8], param: &[u8], op_type: options::MutationType) {
         unsafe {
-            fdb::fdb_transaction_atomic_op(
+            fdb_sys::fdb_transaction_atomic_op(
                 self.inner.as_ptr(),
                 key.as_ptr() as *const _,
                 fdb_len(key.len(), "key"),
@@ -352,7 +358,7 @@ impl Transaction {
     pub fn get_key(&self, selector: &KeySelector, snapshot: bool) -> FdbFuture<FdbFutureSlice> {
         let key = selector.key();
         FdbFuture::new(unsafe {
-            fdb::fdb_transaction_get_key(
+            fdb_sys::fdb_transaction_get_key(
                 self.inner.as_ptr(),
                 key.as_ptr() as *const _,
                 fdb_len(key.len(), "key"),
@@ -411,7 +417,7 @@ impl Transaction {
         let key_end = end.key();
 
         FdbFuture::new(unsafe {
-            fdb::fdb_transaction_get_range(
+            fdb_sys::fdb_transaction_get_range(
                 self.inner.as_ptr(),
                 key_begin.as_ptr() as *const _,
                 fdb_len(key_begin.len(), "key_begin"),
@@ -430,7 +436,6 @@ impl Transaction {
             )
         })
     }
-
     /// Modify the database snapshot represented by transaction to remove all keys (if any) which
     /// are lexicographically greater than or equal to the given begin key and lexicographically
     /// less than the given end_key.
@@ -439,7 +444,7 @@ impl Transaction {
     /// `Tranasction::commit`.
     pub fn clear_range(&self, begin: &[u8], end: &[u8]) {
         unsafe {
-            fdb::fdb_transaction_clear_range(
+            fdb_sys::fdb_transaction_clear_range(
                 self.inner.as_ptr(),
                 begin.as_ptr() as *const _,
                 fdb_len(begin.len(), "begin"),
@@ -463,7 +468,7 @@ impl Transaction {
     ///
     /// Normally, commit will wait for outstanding reads to return. However, if those reads were snapshot reads or the transaction option for disabling “read-your-writes” has been invoked, any outstanding reads will immediately return errors.
     pub fn commit(self) -> impl Future<Output = TransactionResult> {
-        FdbFuture::<()>::new(unsafe { fdb::fdb_transaction_commit(self.inner.as_ptr()) }).map(
+        FdbFuture::<()>::new(unsafe { fdb_sys::fdb_transaction_commit(self.inner.as_ptr()) }).map(
             move |r| match r {
                 Ok(()) => Ok(TransactionCommitted { tr: self }),
                 Err(err) => Err(TransactionCommitError { tr: self, err }),
@@ -473,7 +478,7 @@ impl Transaction {
 
     pub fn on_error(self, err: &Error) -> impl Future<Output = Result<Transaction>> {
         FdbFuture::<()>::new(unsafe {
-            fdb::fdb_transaction_on_error(self.inner.as_ptr(), err.code())
+            fdb_sys::fdb_transaction_on_error(self.inner.as_ptr(), err.code())
         })
         .map_ok(|()| self)
     }
@@ -494,7 +499,7 @@ impl Transaction {
     /// transaction_cancelled error, the commit may have occurred or may occur in the future. This
     /// can make it more difficult to reason about the order in which transactions occur.
     pub fn cancel(self) -> TransactionCancelled {
-        unsafe { fdb::fdb_transaction_cancel(self.inner.as_ptr()) };
+        unsafe { fdb_sys::fdb_transaction_cancel(self.inner.as_ptr()) };
         TransactionCancelled { tr: self }
     }
 
@@ -506,7 +511,7 @@ impl Transaction {
     /// string array, and then destroy the FDBFuture with fdb_future_destroy().
     pub fn get_addresses_for_key(&self, key: &[u8]) -> FdbFuture<FdbFutureAddresses> {
         FdbFuture::new(unsafe {
-            fdb::fdb_transaction_get_addresses_for_key(
+            fdb_sys::fdb_transaction_get_addresses_for_key(
                 self.inner.as_ptr(),
                 key.as_ptr(),
                 fdb_len(key.len(), "key"),
@@ -542,7 +547,7 @@ impl Transaction {
     /// needed should be cancelled by calling fdb_future_cancel() on its returned future.
     pub fn watch(&self, key: &[u8]) -> FdbFuture<()> {
         FdbFuture::new(unsafe {
-            fdb::fdb_transaction_watch(
+            fdb_sys::fdb_transaction_watch(
                 self.inner.as_ptr(),
                 key.as_ptr() as *const _,
                 fdb_len(key.len(), "key"),
@@ -559,7 +564,9 @@ impl Transaction {
     /// This can be called multiple times before the transaction is committed.
     #[cfg(feature = "fdb-6_2")]
     pub fn get_approximate_size(&self) -> FdbFuture<i64> {
-        FdbFuture::new(unsafe { fdb::fdb_transaction_get_approximate_size(self.inner.as_ptr()) })
+        FdbFuture::new(unsafe {
+            fdb_sys::fdb_transaction_get_approximate_size(self.inner.as_ptr())
+        })
     }
 
     /// Returns an FDBFuture which will be set to the versionstamp which was used by any
@@ -575,7 +582,7 @@ impl Transaction {
     ///
     /// Most applications will not call this function.
     pub fn get_versionstamp(&self) -> FdbFuture<FdbFutureSlice> {
-        FdbFuture::new(unsafe { fdb::fdb_transaction_get_versionstamp(self.inner.as_ptr()) })
+        FdbFuture::new(unsafe { fdb_sys::fdb_transaction_get_versionstamp(self.inner.as_ptr()) })
     }
 
     /// The transaction obtains a snapshot read version automatically at the time of the first call
@@ -583,7 +590,7 @@ impl Transaction {
     /// deliberately compromised by transaction options) is guaranteed to represent all
     /// transactions which were reported committed before that call.
     pub fn get_read_version(&self) -> FdbFuture<i64> {
-        FdbFuture::new(unsafe { fdb::fdb_transaction_get_read_version(self.inner.as_ptr()) })
+        FdbFuture::new(unsafe { fdb_sys::fdb_transaction_get_read_version(self.inner.as_ptr()) })
     }
 
     /// Sets the snapshot read version used by a transaction.
@@ -594,7 +601,7 @@ impl Transaction {
     /// error_code_future_version. If any of fdb_transaction_get_*() have been called on this
     /// transaction already, the result is undefined.
     pub fn set_read_version(&self, version: i64) {
-        unsafe { fdb::fdb_transaction_set_read_version(self.inner.as_ptr(), version) }
+        unsafe { fdb_sys::fdb_transaction_set_read_version(self.inner.as_ptr(), version) }
     }
 
     /// Reset transaction to its initial state.
@@ -606,7 +613,7 @@ impl Transaction {
     /// fdb_database_create_transaction(). It is not necessary to call fdb_transaction_reset()
     /// when handling an error with fdb_transaction_on_error() since the transaction has already been reset.
     pub fn reset(&mut self) {
-        unsafe { fdb::fdb_transaction_reset(self.inner.as_ptr()) }
+        unsafe { fdb_sys::fdb_transaction_reset(self.inner.as_ptr()) }
     }
 
     /// Implements the recommended retry and backoff behavior for a transaction. This function
@@ -638,7 +645,7 @@ impl Transaction {
         ty: options::ConflictRangeType,
     ) -> Result<()> {
         let err = unsafe {
-            fdb::fdb_transaction_add_conflict_range(
+            fdb_sys::fdb_transaction_add_conflict_range(
                 self.inner.as_ptr(),
                 begin.as_ptr() as *const _,
                 fdb_len(begin.len(), "begin"),
@@ -654,7 +661,7 @@ impl Transaction {
 impl Drop for Transaction {
     fn drop(&mut self) {
         unsafe {
-            fdb::fdb_transaction_destroy(self.inner.as_ptr());
+            fdb_sys::fdb_transaction_destroy(self.inner.as_ptr());
         }
     }
 }

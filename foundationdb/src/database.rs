@@ -15,7 +15,7 @@ use std::pin::Pin;
 use std::ptr::NonNull;
 use std::time::{Duration, Instant};
 
-use foundationdb_sys as fdb;
+use foundationdb_sys as fdb_sys;
 
 #[cfg(any(feature = "fdb-5_1", feature = "fdb-5_2", feature = "fdb-6_0"))]
 use crate::cluster::*;
@@ -30,15 +30,15 @@ use futures::prelude::*;
 /// Modifications to a database are performed via transactions.
 ///
 pub struct Database {
-    inner: NonNull<fdb::FDBDatabase>,
+    inner: NonNull<fdb_sys::FDBDatabase>,
 }
 unsafe impl Send for Database {}
 unsafe impl Sync for Database {}
 
 impl Database {
     fn new(path: *const std::os::raw::c_char) -> Result<Database> {
-        let mut v: *mut fdb::FDBDatabase = std::ptr::null_mut();
-        let err = unsafe { fdb::fdb_create_database(path, &mut v as *mut _) };
+        let mut v: *mut fdb_sys::FDBDatabase = std::ptr::null_mut();
+        let err = unsafe { fdb_sys::fdb_create_database(path, &mut v as *mut _) };
         error::eval(err)?;
         Ok(Database {
             inner: NonNull::new(v)
@@ -62,9 +62,9 @@ impl Database {
 
     /// Creates a new transaction on the given database.
     pub fn create_trx(&self) -> Result<Transaction> {
-        let mut trx: *mut fdb::FDBTransaction = std::ptr::null_mut();
+        let mut trx: *mut fdb_sys::FDBTransaction = std::ptr::null_mut();
         let err = unsafe {
-            fdb::fdb_database_create_transaction(self.inner.as_ptr(), &mut trx as *mut _)
+            fdb_sys::fdb_database_create_transaction(self.inner.as_ptr(), &mut trx as *mut _)
         };
         error::eval(err)?;
         Ok(Transaction::new(NonNull::new(trx).expect(
@@ -159,7 +159,7 @@ impl TransactError for FdbError {
 impl Drop for Database {
     fn drop(&mut self) {
         unsafe {
-            fdb::fdb_database_destroy(self.inner.as_ptr());
+            fdb_sys::fdb_database_destroy(self.inner.as_ptr());
         }
     }
 }

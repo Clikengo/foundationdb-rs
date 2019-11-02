@@ -47,7 +47,7 @@ impl FdbScope {
     fn gen_code<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
         writeln!(
             w,
-            "{t}pub fn code(&self) -> fdb::FDB{name} {{",
+            "{t}pub fn code(&self) -> fdb_sys::FDB{name} {{",
             t = TAB1,
             name = self.name,
         )?;
@@ -59,7 +59,7 @@ impl FdbScope {
         for option in self.options.iter() {
             writeln!(
                 w,
-                "{t}{scope}::{name}{param} => fdb::{enum_prefix}{code},",
+                "{t}{scope}::{name}{param} => fdb_sys::{enum_prefix}{code},",
                 t = TAB3,
                 scope = self.name,
                 name = option.name,
@@ -84,7 +84,7 @@ impl FdbScope {
         };
 
         let first_arg = match self.apply_arg_name() {
-            Some(name) => format!(", target: *mut fdb::{}", name),
+            Some(name) => format!(", target: *mut fdb_sys::{}", name),
             None => String::new(),
         };
 
@@ -107,7 +107,11 @@ impl FdbScope {
             write!(w, "{}{}::{}", TAB3, self.name, option.name)?;
             match option.param_type {
                 FdbOptionTy::Empty => {
-                    writeln!(w, " => fdb::{}({}, std::ptr::null(), 0),", fn_name, args)?;
+                    writeln!(
+                        w,
+                        " => fdb_sys::{}({}, std::ptr::null(), 0),",
+                        fn_name, args
+                    )?;
                 }
                 FdbOptionTy::Int => {
                     writeln!(w, "(v) => {{")?;
@@ -118,7 +122,7 @@ impl FdbScope {
                     )?;
                     writeln!(
                         w,
-                        "{}fdb::{}({}, data.as_ptr() as *const u8, 8)",
+                        "{}fdb_sys::{}({}, data.as_ptr() as *const u8, 8)",
                         TAB4, fn_name, args
                     )?;
                     writeln!(w, "{t}}}", t = TAB3)?;
@@ -127,7 +131,8 @@ impl FdbScope {
                     writeln!(w, "(ref v) => {{")?;
                     writeln!(
                         w,
-                        "{}fdb::{}({}, v.as_ptr() as *const u8, i32::try_from(v.len()).expect(\"len to fit in i32\"))\n",
+                        "{}fdb_sys::{}({}, v.as_ptr() as *const u8, \
+                         i32::try_from(v.len()).expect(\"len to fit in i32\"))\n",
                         TAB4, fn_name, args
                     )?;
                     writeln!(w, "{t}}}", t = TAB3)?;
@@ -136,7 +141,8 @@ impl FdbScope {
                     writeln!(w, "(ref v) => {{")?;
                     writeln!(
                         w,
-                        "{}fdb::{}({}, v.as_ptr() as *const u8, i32::try_from(v.len()).expect(\"len to fit in i32\"))\n",
+                        "{}fdb_sys::{}({}, v.as_ptr() as *const u8, \
+                         i32::try_from(v.len()).expect(\"len to fit in i32\"))\n",
                         TAB4, fn_name, args
                     )?;
                     writeln!(w, "{t}}}", t = TAB3)?;
@@ -378,7 +384,7 @@ pub fn emit() -> Result<String> {
     let mut w = String::new();
     writeln!(w, "use std::convert::TryFrom;")?;
     writeln!(w, "use crate::error;")?;
-    writeln!(w, "use foundationdb_sys as fdb;")?;
+    writeln!(w, "use foundationdb_sys as fdb_sys;")?;
     for scope in scopes.iter() {
         scope.gen_ty(&mut w)?;
         scope.gen_impl(&mut w)?;

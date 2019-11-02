@@ -32,16 +32,16 @@ use std::ptr::NonNull;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use foundationdb_sys as fdb;
+use foundationdb_sys as fdb_sys;
 use futures::prelude::*;
 use futures::task::{AtomicWaker, Context, Poll};
 
 use crate::error::{self, Error, Result};
 
-pub struct FdbFutureHandle(NonNull<fdb::FDBFuture>);
+pub struct FdbFutureHandle(NonNull<fdb_sys::FDBFuture>);
 
 impl FdbFutureHandle {
-    pub const fn as_ptr(&self) -> *mut fdb::FDBFuture {
+    pub const fn as_ptr(&self) -> *mut fdb_sys::FDBFuture {
         self.0.as_ptr()
     }
 }
@@ -49,7 +49,7 @@ impl Drop for FdbFutureHandle {
     fn drop(&mut self) {
         // `fdb_future_destroy` cancels the future, so we don't need to call
         // `fdb_future_cancel` explicitly.
-        unsafe { fdb::fdb_future_destroy(self.as_ptr()) }
+        unsafe { fdb_sys::fdb_future_destroy(self.as_ptr()) }
     }
 }
 
@@ -65,7 +65,7 @@ impl<T> FdbFuture<T>
 where
     T: TryFrom<FdbFutureHandle, Error = Error> + Unpin,
 {
-    pub(crate) fn new(f: *mut fdb::FDBFuture) -> Self {
+    pub(crate) fn new(f: *mut fdb_sys::FDBFuture) -> Self {
         Self {
             f: Some(FdbFutureHandle(
                 NonNull::new(f).expect("FDBFuture to not be null"),
@@ -84,7 +84,7 @@ where
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Result<T>> {
         let f = self.f.as_ref().expect("cannot poll after resolve");
-        let ready = unsafe { fdb::fdb_future_is_ready(f.as_ptr()) };
+        let ready = unsafe { fdb_sys::fdb_future_is_ready(f.as_ptr()) };
         if ready == 0 {
             let f_ptr = f.as_ptr();
             let mut register = false;
@@ -97,7 +97,7 @@ where
                 let network_waker: Arc<AtomicWaker> = waker.clone();
                 let network_waker_ptr = Arc::into_raw(network_waker);
                 unsafe {
-                    fdb::fdb_future_set_callback(
+                    fdb_sys::fdb_future_set_callback(
                         f_ptr,
                         Some(fdb_future_callback),
                         network_waker_ptr as *mut _,
@@ -107,7 +107,7 @@ where
             Poll::Pending
         } else {
             Poll::Ready(
-                error::eval(unsafe { fdb::fdb_future_get_error(f.as_ptr()) })
+                error::eval(unsafe { fdb_sys::fdb_future_get_error(f.as_ptr()) })
                     .and_then(|()| T::try_from(self.f.take().expect("self.f.is_some()"))),
             )
         }
@@ -117,7 +117,7 @@ where
 // The callback from fdb C API can be called from multiple threads. so this callback should be
 // thread-safe.
 extern "C" fn fdb_future_callback(
-    _f: *mut fdb::FDBFuture,
+    _f: *mut fdb_sys::FDBFuture,
     callback_parameter: *mut ::std::os::raw::c_void,
 ) {
     let network_waker: Arc<AtomicWaker> = unsafe { Arc::from_raw(callback_parameter as *const _) };
@@ -145,7 +145,7 @@ impl TryFrom<FdbFutureHandle> for FdbFutureSlice {
         let mut len = 0;
 
         error::eval(unsafe {
-            fdb::fdb_future_get_key(f.as_ptr(), &mut value as *mut _, &mut len as *mut _)
+            fdb_sys::fdb_future_get_key(f.as_ptr(), &mut value as *mut _, &mut len as *mut _)
         })?;
 
         Ok(FdbFutureSlice { _f: f, value, len })
@@ -161,7 +161,7 @@ impl TryFrom<FdbFutureHandle> for Option<FdbFutureSlice> {
         let mut len = 0;
 
         error::eval(unsafe {
-            fdb::fdb_future_get_value(
+            fdb_sys::fdb_future_get_value(
                 f.as_ptr(),
                 &mut present as *mut _,
                 &mut value as *mut _,
@@ -191,7 +191,7 @@ impl TryFrom<FdbFutureHandle> for FdbFutureAddresses {
         let mut len = 0;
 
         error::eval(unsafe {
-            fdb::fdb_future_get_string_array(f.as_ptr(), &mut strings, &mut len)
+            fdb_sys::fdb_future_get_string_array(f.as_ptr(), &mut strings, &mut len)
         })?;
 
         Ok(FdbFutureAddresses {
@@ -226,7 +226,7 @@ impl Deref for FdbFutureAddress {
 
 pub struct FdbFutureValues {
     _f: FdbFutureHandle,
-    keyvalues: *const fdb::FDBKeyValue,
+    keyvalues: *const fdb_sys::FDBKeyValue,
     len: i32,
     pub(crate) more: bool,
 }
@@ -239,7 +239,7 @@ impl TryFrom<FdbFutureHandle> for FdbFutureValues {
         let mut more = 0;
 
         unsafe {
-            error::eval(fdb::fdb_future_get_keyvalue_array(
+            error::eval(fdb_sys::fdb_future_get_keyvalue_array(
                 f.as_ptr(),
                 &mut keyvalues,
                 &mut len,
@@ -259,8 +259,8 @@ impl TryFrom<FdbFutureHandle> for FdbFutureValues {
 impl Deref for FdbFutureValues {
     type Target = [KeyValue];
     fn deref(&self) -> &Self::Target {
-        assert_eq_size!(KeyValue, fdb::FDBKeyValue);
-        assert_eq_align!(KeyValue, fdb::FDBKeyValue);
+        assert_eq_size!(KeyValue, fdb_sys::FDBKeyValue);
+        assert_eq_align!(KeyValue, fdb_sys::FDBKeyValue);
         unsafe {
             std::mem::transmute(std::slice::from_raw_parts(
                 self.keyvalues,
@@ -294,7 +294,7 @@ impl IntoIterator for FdbFutureValues {
 
 pub struct FdbFutureValuesIter {
     f: Rc<FdbFutureHandle>,
-    keyvalues: *const fdb::FDBKeyValue,
+    keyvalues: *const fdb_sys::FDBKeyValue,
     len: i32,
     pos: i32,
 }
@@ -354,13 +354,13 @@ impl DoubleEndedIterator for FdbFutureValuesIter {
 
 pub struct FdbFutureValue {
     _f: Rc<FdbFutureHandle>,
-    keyvalue: *const fdb::FDBKeyValue,
+    keyvalue: *const fdb_sys::FDBKeyValue,
 }
 impl Deref for FdbFutureValue {
     type Target = KeyValue;
     fn deref(&self) -> &Self::Target {
-        assert_eq_size!(KeyValue, fdb::FDBKeyValue);
-        assert_eq_align!(KeyValue, fdb::FDBKeyValue);
+        assert_eq_size!(KeyValue, fdb_sys::FDBKeyValue);
+        assert_eq_align!(KeyValue, fdb_sys::FDBKeyValue);
         unsafe { std::mem::transmute(self.keyvalue) }
     }
 }
@@ -399,7 +399,7 @@ impl TryFrom<FdbFutureHandle> for i64 {
 
     fn try_from(f: FdbFutureHandle) -> Result<Self> {
         let mut version: i64 = 0;
-        error::eval(unsafe { fdb::fdb_future_get_version(f.as_ptr(), &mut version) })?;
+        error::eval(unsafe { fdb_sys::fdb_future_get_version(f.as_ptr(), &mut version) })?;
         Ok(version)
     }
 }
