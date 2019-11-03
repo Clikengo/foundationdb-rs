@@ -262,17 +262,34 @@ impl Instr {
     }
 }
 
-struct StackFutResult {
+struct StackResult {
     state: Option<(Bytes<'static>, TransactionState)>,
-    data: Vec<u8>,
+    data: FdbResult<Vec<u8>>,
 }
-impl From<Vec<u8>> for StackFutResult {
+impl From<Error> for StackResult {
+    fn from(err: Error) -> Self {
+        StackResult {
+            state: None,
+            data: Err(err),
+        }
+    }
+}
+impl From<Vec<u8>> for StackResult {
     fn from(data: Vec<u8>) -> Self {
-        StackFutResult { state: None, data }
+        StackResult {
+            state: None,
+            data: Ok(data),
+        }
     }
 }
 
-type StackFuture = Pin<Box<dyn Future<Output = FdbResult<StackFutResult>>>>;
+impl From<FdbResult<Vec<u8>>> for StackResult {
+    fn from(data: FdbResult<Vec<u8>>) -> Self {
+        StackResult { state: None, data }
+    }
+}
+
+type StackFuture = Pin<Box<dyn Future<Output = StackResult>>>;
 struct StackItem {
     number: usize,
     data: Option<Vec<u8>>,
@@ -283,32 +300,31 @@ impl StackItem {
     async fn await_fut(&mut self) -> Option<(Bytes<'static>, TransactionState)> {
         let mut ret = None;
         if let Some((_id, fut)) = self.fut.take() {
-            let data = fut
-                .await
-                .and_then(|r| {
-                    if let Some((name, state)) = r.state {
-                        trace!("{:?} = {:?}", name, state);
-                        match state {
-                            TransactionState::TransactionCommitError(e) => {
-                                let err = FdbError::from_error_code(e.code());
-                                ret = Some((name, TransactionState::TransactionCommitError(e)));
-                                return Err(err);
-                            }
-                            state => {
-                                ret = Some((name, state));
-                            }
-                        }
+            let StackResult { state, mut data } = fut.await;
+
+            if let Some((name, state)) = state {
+                trace!("{:?} = {:?}", name, state);
+                match state {
+                    TransactionState::TransactionCommitError(e) => {
+                        let err = FdbError::from_error_code(e.code());
+                        ret = Some((name, TransactionState::TransactionCommitError(e)));
+                        data = Err(err);
                     }
-                    Ok(r.data)
-                })
-                .unwrap_or_else(|err| {
-                    trace!("ERROR {:?}", err);
-                    let packed = pack(&(
-                        Bytes::from(b"ERROR".as_ref()),
-                        Bytes::from(format!("{}", err.code()).into_bytes()),
-                    ));
-                    pack(&Bytes::from(packed))
-                });
+                    state => {
+                        ret = Some((name, state));
+                    }
+                }
+            }
+
+            let data = data.unwrap_or_else(|err| {
+                trace!("ERROR {:?}", err);
+                let packed = pack(&(
+                    Bytes::from(b"ERROR".as_ref()),
+                    Bytes::from(format!("{}", err.code()).into_bytes()),
+                ));
+                pack(&Bytes::from(packed))
+            });
+
             self.data = Some(data);
         }
         ret
@@ -559,20 +575,19 @@ impl StackMachine {
     }
 
     fn push_res(&mut self, number: usize, res: FdbResult<()>, ok_str: &[u8]) {
-        self.push_item(
-            number,
-            &match res {
-                Ok(..) => Bytes::from(ok_str),
-                Err(err) => {
-                    trace!("ERROR {:?}", err);
-                    let packed = pack(&(
-                        Bytes::from(b"ERROR".as_ref()),
-                        Bytes::from(format!("{}", err.code()).into_bytes()),
-                    ));
-                    Bytes::from(packed)
-                }
-            },
-        );
+        match res {
+            Ok(..) => self.push_item(number, &Bytes::from(ok_str)),
+            Err(err) => self.push_err(number, err),
+        }
+    }
+
+    fn push_err(&mut self, number: usize, err: Error) {
+        trace!("ERROR {:?}", err);
+        let packed = pack(&(
+            Bytes::from(b"ERROR".as_ref()),
+            Bytes::from(format!("{}", err.code()).into_bytes()),
+        ));
+        self.push_item(number, &Bytes::from(packed));
     }
 
     async fn run_step(
@@ -635,6 +650,12 @@ impl StackMachine {
             // Does not modify the instruction numbers of the swapped items.
             Swap => {
                 let depth: usize = self.pop_item().await;
+                assert!(
+                    depth < self.stack.len(),
+                    "swap index invalid {} >= {}",
+                    depth,
+                    self.stack.len()
+                );
                 let depth_0 = self.stack.len() - 1;
                 let depth = depth_0 - depth;
                 debug!("swap {} {}", depth_0, depth);
@@ -736,9 +757,12 @@ impl StackMachine {
                 let f = trx
                     .take(trx_id)
                     .on_error(&error)
-                    .map_ok(|trx| StackFutResult {
-                        state: trx_name.map(|n| (n, TransactionState::Transaction(trx))),
-                        data: pack(&RESULT_NOT_PRESENT),
+                    .map(|res| match res {
+                        Ok(trx) => StackResult {
+                            state: trx_name.map(|n| (n, TransactionState::Transaction(trx))),
+                            data: Ok(pack(&RESULT_NOT_PRESENT)),
+                        },
+                        Err(err) => StackResult::from(err),
                     })
                     .boxed_local();
                 self.push_fut(number, 0, f);
@@ -754,13 +778,11 @@ impl StackMachine {
                 let f = trx
                     .as_mut()
                     .get(&key, instr.pop_snapshot())
-                    .map_ok(|v| {
-                        match v {
-                            Some(v) => pack(&Bytes::from(v.as_ref())),
-                            None => pack(&RESULT_NOT_PRESENT),
-                        }
-                        .into()
+                    .map_ok(|v| match v {
+                        Some(v) => pack(&Bytes::from(v.as_ref())),
+                        None => pack(&RESULT_NOT_PRESENT),
                     })
+                    .map(StackResult::from)
                     .boxed_local();
                 self.push_fut(number, 0, f);
                 pending = true;
@@ -781,19 +803,17 @@ impl StackMachine {
                     .as_mut()
                     .get_key(&selector, instr.pop_snapshot())
                     .map_ok(|key| {
-                        {
-                            let key = Bytes::from(key.as_ref());
-                            if key.starts_with(&prefix) {
-                                pack(&key)
-                            } else if key < prefix {
-                                pack(&prefix)
-                            } else {
-                                assert!(key > prefix);
-                                pack(&strinc(prefix))
-                            }
+                        let key = Bytes::from(key.as_ref());
+                        if key.starts_with(&prefix) {
+                            pack(&key)
+                        } else if key < prefix {
+                            pack(&prefix)
+                        } else {
+                            assert!(key > prefix);
+                            pack(&strinc(prefix))
                         }
-                        .into()
                     })
+                    .map(StackResult::from)
                     .boxed_local();
                 self.push_fut(number, 0, f);
                 pending = true;
@@ -804,6 +824,22 @@ impl StackMachine {
             // way using these parameters. The resulting range of n key-value pairs are
             // packed into a tuple as [k1,v1,k2,v2,...,kn,vn], and this single packed value
             // is pushed onto the stack.
+            //
+            // _STARTS_WITH:
+            //
+            // Pops the top four items off of the stack as PREFIX, LIMIT, REVERSE and
+            // STREAMING_MODE. Performs a prefix range read in a language-appropriate way
+            // using these parameters. Output is pushed onto the stack as with GET_RANGE.
+            //
+            // _SELECTOR:
+            //
+            // Pops the top ten items off of the stack as BEGIN_KEY, BEGIN_OR_EQUAL,
+            // BEGIN_OFFSET, END_KEY, END_OR_EQUAL, END_OFFSET, LIMIT, REVERSE,
+            // STREAMING_MODE, and PREFIX. Constructs key selectors BEGIN and END from
+            // the first six parameters, and then performs a range read in a language-
+            // appropriate way using BEGIN, END, LIMIT, REVERSE and STREAMING_MODE. Output
+            // is pushed onto the stack as with GET_RANGE, excluding any keys that do not
+            // begin with PREFIX.
             GetRange => {
                 let selector = instr.pop_selector();
                 let starts_with = instr.pop_starts_with();
@@ -855,8 +891,8 @@ impl StackMachine {
                     prefix: Option<Bytes<'static>>,
                     opt: transaction::RangeOption<'static>,
                     snapshot: bool,
-                ) -> FdbResult<StackFutResult> {
-                    let data: Vec<u8> = trx
+                ) -> StackResult {
+                    let res = trx
                         .get_ranges(opt, snapshot)
                         .try_fold(Vec::new(), move |mut out, kvs| {
                             for kv in kvs.iter() {
@@ -873,11 +909,11 @@ impl StackMachine {
                             }
                             future::ok(out)
                         })
-                        .await?;
-                    Ok(StackFutResult {
+                        .await;
+                    StackResult {
                         state: trx_name.map(|n| (n, TransactionState::Transaction(trx))),
-                        data: pack(&Bytes::from(data)),
-                    })
+                        data: res.map(|data| pack(&Bytes::from(data))),
+                    }
                 }
                 let trx_id = self.next_trx_id();
                 let f = get_range(trx.take(trx_id), trx_name, prefix, opt, snapshot).boxed_local();
@@ -885,35 +921,19 @@ impl StackMachine {
                 pending = true;
             }
 
-            //  TODO #### GET_RANGE_STARTS_WITH (_SNAPSHOT, _DATABASE)
-
-            // Pops the top four items off of the stack as PREFIX, LIMIT, REVERSE and
-            // STREAMING_MODE. Performs a prefix range read in a language-appropriate way
-            // using these parameters. Output is pushed onto the stack as with GET_RANGE.
-
-            // #### GET_RANGE_SELECTOR (_SNAPSHOT, _DATABASE)
-
-            // Pops the top ten items off of the stack as BEGIN_KEY, BEGIN_OR_EQUAL,
-            // BEGIN_OFFSET, END_KEY, END_OR_EQUAL, END_OFFSET, LIMIT, REVERSE,
-            // STREAMING_MODE, and PREFIX. Constructs key selectors BEGIN and END from
-            // the first six parameters, and then performs a range read in a language-
-            // appropriate way using BEGIN, END, LIMIT, REVERSE and STREAMING_MODE. Output
-            // is pushed onto the stack as with GET_RANGE, excluding any keys that do not
-            // begin with PREFIX.
-
             // Gets the current read version and stores it in the internal stack machine
             // state as the last seen version. Pushed the string "GOT_READ_VERSION" onto
             // the stack.
             GetReadVersion => {
                 let _snapshot = instr.pop_snapshot();
-                let version = trx
-                    .as_mut()
-                    .get_read_version()
-                    .await
-                    .expect("failed to get read version");
-
-                self.last_version = version;
-                self.push_item(number, &Bytes::from(b"GOT_READ_VERSION".as_ref()));
+                let version = trx.as_mut().get_read_version().await;
+                match version {
+                    Ok(version) => {
+                        self.last_version = version;
+                        self.push_item(number, &Bytes::from(b"GOT_READ_VERSION".as_ref()));
+                    }
+                    Err(err) => self.push_err(number, err),
+                }
             }
 
             // Calls get_versionstamp and pushes the resulting future onto the stack.
@@ -921,7 +941,8 @@ impl StackMachine {
                 let f = trx
                     .as_mut()
                     .get_versionstamp()
-                    .map_ok(|v| pack(&Bytes::from(v.as_ref())).into())
+                    .map_ok(|v| pack(&Bytes::from(v.as_ref())))
+                    .map(StackResult::from)
                     .boxed_local();
                 self.push_fut(number, 0, f);
                 pending = true;
@@ -1025,16 +1046,24 @@ impl StackMachine {
                 let mut end = begin.clone().into_owned();
                 end.push(0);
                 debug!("read_conflict_key {:?} {:?}", begin, end);
-                trx.as_mut()
-                    .add_conflict_range(&begin, &end, ConflictRangeType::Read)?;
+                self.push_res(
+                    number,
+                    trx.as_mut()
+                        .add_conflict_range(&begin, &end, ConflictRangeType::Read),
+                    b"SET_CONFLICT_KEY",
+                );
             }
             WriteConflictKey => {
                 let begin: Bytes = self.pop_bytes().await;
                 let mut end = begin.clone().into_owned();
                 end.push(0);
                 debug!("write_conflict_key {:?} {:?}", begin, end);
-                trx.as_mut()
-                    .add_conflict_range(&begin, &end, ConflictRangeType::Write)?;
+                self.push_res(
+                    number,
+                    trx.as_mut()
+                        .add_conflict_range(&begin, &end, ConflictRangeType::Write),
+                    b"SET_CONFLICT_KEY",
+                );
             }
             // Sets the NEXT_WRITE_NO_WRITE_CONFLICT_RANGE transaction option on the
             // current transaction. Does not modify the stack.
@@ -1052,19 +1081,19 @@ impl StackMachine {
                 let f = trx
                     .take(trx_id)
                     .commit()
-                    .map(|r| {
-                        Ok(match r {
-                            Ok(c) => StackFutResult {
-                                state: trx_name
-                                    .map(|n| (n, TransactionState::TransactionCommitted(c))),
-                                data: pack(&RESULT_NOT_PRESENT),
-                            },
-                            Err(c) => StackFutResult {
+                    .map(|r| match r {
+                        Ok(c) => StackResult {
+                            state: trx_name.map(|n| (n, TransactionState::TransactionCommitted(c))),
+                            data: Ok(pack(&RESULT_NOT_PRESENT)),
+                        },
+                        Err(c) => {
+                            let err = Error::from_error_code(c.code());
+                            StackResult {
                                 state: trx_name
                                     .map(|n| (n, TransactionState::TransactionCommitError(c))),
-                                data: Vec::new(),
-                            },
-                        })
+                                data: Err(err),
+                            }
+                        }
                     })
                     .boxed_local();
                 self.push_fut(number, trx_id, f);
@@ -1094,7 +1123,7 @@ impl StackMachine {
                     self.last_version = last_version;
                     self.push_item(number, &Bytes::from(b"GOT_COMMITTED_VERSION".as_ref()));
                 } else {
-                    panic!("committed_version() called on a non commited transaction");
+                    warn!("committed_version() called on a non commited transaction");
                 }
             }
 
@@ -1216,10 +1245,10 @@ impl StackMachine {
                     let data = self.pop_data().await;
                     tup.push(Bytes::from(data));
                 }
-
                 tup.sort();
-                let packed = pack(&tup);
-                self.push_item(number, &Bytes::from(packed));
+                for data in tup {
+                    self.push(number, data.into_owned());
+                }
             }
 
             // Pops the top item off of the stack. This will be a byte-string of length 4
@@ -1227,6 +1256,7 @@ impl StackMachine {
             // This is then converted into a float and pushed onto the stack.
             EncodeFloat => {
                 let bytes = self.pop_bytes().await;
+                debug!("encode_float {:?}", bytes);
                 let mut arr = [0; 4];
                 arr.copy_from_slice(&bytes);
                 let f = f32::from_bits(u32::from_be_bytes(arr));
@@ -1237,6 +1267,7 @@ impl StackMachine {
             // This is then converted into a double and pushed onto the stack.
             EncodeDouble => {
                 let bytes = self.pop_bytes().await;
+                debug!("encode_double {:?}", bytes);
                 let mut arr = [0; 8];
                 arr.copy_from_slice(&bytes);
                 let f = f64::from_bits(u64::from_be_bytes(arr));
@@ -1247,6 +1278,7 @@ impl StackMachine {
             // in big-endian order, and pushed onto the stack.
             DecodeFloat => {
                 let f: f32 = self.pop_item().await;
+                debug!("decode_float {}", f);
                 let packed = pack(&Bytes::from(f.to_bits().to_be_bytes().as_ref()));
                 self.push_item(number, &Bytes::from(packed));
             }
@@ -1255,6 +1287,7 @@ impl StackMachine {
             // in big-endian order, and pushed onto the stack.
             DecodeDouble => {
                 let f: f64 = self.pop_item().await;
+                debug!("decode_double {}", f);
                 let packed = pack(&Bytes::from(f.to_bits().to_be_bytes().as_ref()));
                 self.push_item(number, &Bytes::from(packed));
             }
@@ -1388,7 +1421,7 @@ impl StackMachine {
         info!("{} instructions found", instrs.len());
 
         for (i, instr) in instrs.into_iter().enumerate() {
-            info!("{}/{}, {:?}", i, self.stack.len(), instr);
+            trace!("{}/{}, {:?}", i, self.stack.len(), instr);
             self.run_step(db.clone(), i, instr).await?;
         }
 
@@ -1451,5 +1484,8 @@ fn main() {
     futures::executor::block_on(sm.run(db)).unwrap();
     sm.join();
 
+    info!("Closing...");
     drop(network);
+
+    info!("Done.");
 }
