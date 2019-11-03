@@ -24,9 +24,8 @@ travis-ci = { repository = "bluejekyll/foundationdb-rs" }
 
 [dependencies]
 env_logger = "0.7"
-foundationdb = { path = "../foundationdb", features = ["serde"] }
+foundationdb = { path = "../foundationdb", features = ["uuid"] }
 foundationdb-sys = { version = "0.2.0", path = "../foundationdb-sys", default-features = false }
 futures-preview = { version = "=0.3.0-alpha.19", features = ["async-await"] }
 log = "0.4"
-serde = { version = "1.0.102" }
 structopt = "0.2"

@@ -17,7 +17,7 @@ use futures::prelude::*;
 use rand::{rngs::ThreadRng, seq::SliceRandom};
 
 use foundationdb as fdb;
-use foundationdb::tuple::{de::from_bytes, ser::to_bytes, Subspace};
+use foundationdb::tuple::{pack, unpack, Subspace};
 use foundationdb::{
     Database, FdbError, RangeOptionBuilder, TransactError, TransactOption, Transaction,
 };
@@ -91,7 +91,7 @@ fn all_classes() -> Vec<String> {
 fn init_classes(trx: &Transaction, all_classes: &[String]) {
     let class_subspace = Subspace::from("class");
     for class in all_classes {
-        trx.set(&class_subspace.pack(class), &to_bytes(&100_i64).unwrap());
+        trx.set(&class_subspace.pack(class), &pack(&100_i64));
     }
 }
 
@@ -116,10 +116,10 @@ async fn get_available_classes(db: &Database) -> Vec<String> {
     let mut available_classes = Vec::<String>::new();
 
     for key_value in got_range.iter() {
-        let count: i64 = from_bytes(key_value.value()).expect("failed to decode count");
+        let count: i64 = unpack(key_value.value()).expect("failed to decode count");
 
         if count > 0 {
-            let class: String = from_bytes(key_value.key()).expect("failed to decode class");
+            let class: String = unpack(key_value.key()).expect("failed to decode class");
             available_classes.push(class);
         }
     }
@@ -128,7 +128,7 @@ async fn get_available_classes(db: &Database) -> Vec<String> {
 }
 
 async fn ditch_trx(trx: &Transaction, student: &str, class: &str) {
-    let attends_key = to_bytes(&("attends", student, class)).unwrap();
+    let attends_key = pack(&("attends", student, class));
 
     // TODO: should get take an &Encode? current impl does encourage &[u8] reuse...
     if trx
@@ -140,17 +140,17 @@ async fn ditch_trx(trx: &Transaction, student: &str, class: &str) {
         return;
     }
 
-    let class_key = to_bytes(&("class", class)).unwrap();
+    let class_key = pack(&("class", class));
     let available_seats = trx
         .get(&class_key, true)
         .await
         .expect("get failed")
         .expect("class seats were not initialized");
     let available_seats: i64 =
-        from_bytes::<i64>(&available_seats.deref()).expect("failed to decode i64") + 1;
+        unpack::<i64>(&available_seats.deref()).expect("failed to decode i64") + 1;
 
     //println!("{} ditching class: {}", student, class);
-    trx.set(&class_key, &to_bytes(&available_seats).unwrap());
+    trx.set(&class_key, &pack(&available_seats));
     trx.clear(&attends_key);
 }
 
@@ -164,7 +164,7 @@ async fn ditch(db: &Database, student: String, class: String) -> Result<()> {
 }
 
 async fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<()> {
-    let attends_key = to_bytes(&("attends", student, class)).unwrap();
+    let attends_key = pack(&("attends", student, class));
     if trx
         .get(&attends_key, true)
         .await
@@ -175,8 +175,8 @@ async fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<()>
         return Ok(());
     }
 
-    let class_key = to_bytes(&("class", class)).unwrap();
-    let available_seats: i64 = from_bytes(
+    let class_key = pack(&("class", class));
+    let available_seats: i64 = unpack(
         &trx.get(&class_key, true)
             .await
             .expect("get failed")
@@ -200,8 +200,8 @@ async fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<()>
     }
 
     //println!("{} taking class: {}", student, class);
-    trx.set(&class_key, &to_bytes(&(available_seats - 1)).unwrap());
-    trx.set(&attends_key, &to_bytes(&"").unwrap());
+    trx.set(&class_key, &pack(&(available_seats - 1)));
+    trx.set(&attends_key, &pack(&""));
 
     Ok(())
 }
@@ -355,7 +355,7 @@ async fn run_sim(db: &Database, students: usize, ops_per_student: usize) {
             .expect("get_range failed")
             .iter()
         {
-            let (_, s, class) = from_bytes::<(String, String, String)>(key_value.key()).unwrap();
+            let (_, s, class) = unpack::<(String, String, String)>(key_value.key()).unwrap();
             assert_eq!(student_id, s);
 
             println!("{} is taking: {}", student_id, class);

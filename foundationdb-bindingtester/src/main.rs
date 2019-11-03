@@ -15,7 +15,7 @@ use fdb::error::Error;
 use fdb::keyselector::KeySelector;
 use fdb::options::{ConflictRangeType, DatabaseOption, TransactionOption};
 use fdb::transaction::RangeOption;
-use fdb::tuple::{de::from_bytes, ser::into_bytes, ser::to_bytes, Bytes, Element, Subspace};
+use fdb::tuple::{pack, pack_into, unpack, Bytes, Element, Subspace, TuplePack, TupleUnpack};
 use fdb::*;
 use futures::future;
 use futures::prelude::*;
@@ -32,12 +32,14 @@ fn mutation_from_str(s: &str) -> MutationType {
         "BIT_OR" => MutationType::BitOr,
         "XOR" => MutationType::Xor,
         "BIT_XOR" => MutationType::BitXor,
+        "APPEND_IF_FITS" => MutationType::AppendIfFits,
         "MAX" => MutationType::Max,
         "MIN" => MutationType::Min,
         "SET_VERSIONSTAMPED_KEY" => MutationType::SetVersionstampedKey,
         "SET_VERSIONSTAMPED_VALUE" => MutationType::SetVersionstampedValue,
         "BYTE_MIN" => MutationType::ByteMin,
         "BYTE_MAX" => MutationType::ByteMax,
+        "COMPARE_AND_CLEAR" => MutationType::CompareAndClear,
         _ => unimplemented!("mutation_from_str({})", s),
     }
 }
@@ -189,7 +191,8 @@ impl Instr {
         use crate::InstrCode::*;
 
         let data = Bytes::from(data);
-        let tup: Vec<Element> = from_bytes(&data).unwrap();
+        trace!("inst {:?}", data);
+        let tup: Vec<Element> = unpack(&data).unwrap();
         let cmd = tup[0].as_str().unwrap();
 
         let (cmd, database) = has_opt(cmd, "_DATABASE");
@@ -198,7 +201,7 @@ impl Instr {
         let (cmd, selector) = has_opt(cmd, "_SELECTOR");
 
         let code = match cmd {
-            "PUSH" => Push(to_bytes(&tup[1]).unwrap()),
+            "PUSH" => Push(pack(&tup[1])),
             "DUP" => Dup,
             "EMPTY_STACK" => EmptyStack,
             "SWAP" => Swap,
@@ -273,7 +276,43 @@ type StackFuture = Pin<Box<dyn Future<Output = FdbResult<StackFutResult>>>>;
 struct StackItem {
     number: usize,
     data: Option<Vec<u8>>,
-    fut: Option<StackFuture>,
+    fut: Option<(usize, StackFuture)>,
+}
+
+impl StackItem {
+    async fn await_fut(&mut self) -> Option<(Bytes<'static>, TransactionState)> {
+        let mut ret = None;
+        if let Some((_id, fut)) = self.fut.take() {
+            let data = fut
+                .await
+                .and_then(|r| {
+                    if let Some((name, state)) = r.state {
+                        trace!("{:?} = {:?}", name, state);
+                        match state {
+                            TransactionState::TransactionCommitError(e) => {
+                                let err = FdbError::from_error_code(e.code());
+                                ret = Some((name, TransactionState::TransactionCommitError(e)));
+                                return Err(err);
+                            }
+                            state => {
+                                ret = Some((name, state));
+                            }
+                        }
+                    }
+                    Ok(r.data)
+                })
+                .unwrap_or_else(|err| {
+                    trace!("ERROR {:?}", err);
+                    let packed = pack(&(
+                        Bytes::from(b"ERROR".as_ref()),
+                        Bytes::from(format!("{}", err.code()).into_bytes()),
+                    ));
+                    pack(&Bytes::from(packed))
+                });
+            self.data = Some(data);
+        }
+        ret
+    }
 }
 
 impl Clone for StackItem {
@@ -309,7 +348,8 @@ enum TransactionState {
     Transaction(Transaction),
     TransactionCommitted(TransactionCommitted),
     TransactionCommitError(TransactionCommitError),
-    Pending,
+    Pending(usize),
+    Dead,
 }
 impl std::fmt::Debug for TransactionState {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -319,7 +359,8 @@ impl std::fmt::Debug for TransactionState {
             S::Transaction(..) => "Transaction",
             S::TransactionCommitted(..) => "TransactionCommitted",
             S::TransactionCommitError(..) => "TransactionCommitError",
-            S::Pending => "Pending",
+            S::Pending(..) => "Pending",
+            S::Dead => "Dead",
         }
         .fmt(f)
     }
@@ -328,7 +369,7 @@ impl std::fmt::Debug for TransactionState {
 impl TransactionState {
     fn reset(&mut self) {
         use TransactionState as S;
-        *self = match std::mem::replace(self, TransactionState::Pending) {
+        *self = match std::mem::replace(self, S::Dead) {
             S::TransactionCommitted(c) => S::Transaction(c.reset()),
             S::TransactionCommitError(c) => S::Transaction(c.reset()),
             c => c,
@@ -345,13 +386,13 @@ impl TransactionState {
         }
     }
 
-    fn take(&mut self) -> Transaction {
+    fn take(&mut self, id: usize) -> Transaction {
         use TransactionState as S;
 
         self.reset();
-        match std::mem::replace(self, TransactionState::Pending) {
+        match std::mem::replace(self, S::Dead) {
             S::Transaction(tr) => {
-                *self = S::Pending;
+                *self = S::Pending(id);
                 tr
             }
             _ => panic!("transaction is owned by a future that is still not done"),
@@ -380,6 +421,8 @@ struct StackMachine {
     last_version: i64,
 
     threads: Vec<thread::JoinHandle<()>>,
+
+    trx_counter: usize,
 }
 
 fn strinc(key: Bytes) -> Bytes {
@@ -409,7 +452,13 @@ impl StackMachine {
             cur_transaction,
             last_version: 0,
             threads: Vec::new(),
+            trx_counter: 0,
         }
+    }
+
+    fn next_trx_id(&mut self) -> usize {
+        self.trx_counter += 1;
+        self.trx_counter
     }
 
     async fn fetch_instr(&self, trx: &Transaction) -> Result<Vec<Instr>, Error> {
@@ -429,46 +478,18 @@ impl StackMachine {
 
     async fn pop(&mut self) -> StackItem {
         let mut item = self.stack.pop().expect("stack empty");
-        if let Some(fut) = item.fut.take() {
-            let data = fut
-                .await
-                .and_then(|r| {
-                    if let Some((name, state)) = r.state {
-                        trace!("{:?} = {:?}", name, state);
-                        match state {
-                            TransactionState::TransactionCommitError(e) => {
-                                let err = FdbError::from_error_code(e.code());
-                                self.transactions
-                                    .insert(name, TransactionState::TransactionCommitError(e));
-                                return Err(err);
-                            }
-                            state => {
-                                self.transactions.insert(name, state);
-                            }
-                        }
-                    }
-                    Ok(r.data)
-                })
-                .unwrap_or_else(|err| {
-                    trace!("ERROR {:?}", err);
-                    let packed = to_bytes(&(
-                        Bytes::from(b"ERROR".as_ref()),
-                        Bytes::from(format!("{}", err.code()).into_bytes()),
-                    ))
-                    .unwrap();
-                    to_bytes(&Bytes::from(packed)).unwrap()
-                });
-            item.data = Some(data);
+        if let Some((name, state)) = item.await_fut().await {
+            self.transactions.insert(name, state);
         }
         item
     }
 
     async fn pop_item<S>(&mut self) -> S
     where
-        S: for<'de> serde::Deserialize<'de>,
+        S: for<'de> TupleUnpack<'de>,
     {
         let data = self.pop_data().await;
-        match from_bytes(&data) {
+        match unpack(&data) {
             Ok(v) => v,
             Err(e) => {
                 panic!("failed to decode item {:?}: {:?}", Bytes::from(data), e);
@@ -478,7 +499,7 @@ impl StackMachine {
 
     async fn pop_bytes(&mut self) -> Bytes<'static> {
         let data = self.pop_data().await;
-        match from_bytes::<Bytes>(&data) {
+        match unpack::<Bytes>(&data) {
             Ok(v) => Bytes::from(v.into_owned()),
             Err(e) => {
                 panic!("failed to decode bytes {:?}: {:?}", Bytes::from(data), e);
@@ -488,10 +509,10 @@ impl StackMachine {
 
     async fn pop_element(&mut self) -> Element<'static> {
         let data = self.pop_data().await;
-        match from_bytes::<Element>(&data) {
+        match unpack::<Element>(&data) {
             Ok(v) => v.into_owned(),
             Err(e) => {
-                panic!("failed to decode bytes {:?}: {:?}", Bytes::from(data), e);
+                panic!("failed to decode element {:?}: {:?}", Bytes::from(data), e);
             }
         }
     }
@@ -514,9 +535,9 @@ impl StackMachine {
 
     fn push_item<S>(&mut self, number: usize, s: &S)
     where
-        S: serde::Serialize,
+        S: TuplePack,
     {
-        let data = to_bytes(s).unwrap();
+        let data = pack(s);
         self.push(number, data);
     }
 
@@ -528,13 +549,30 @@ impl StackMachine {
         });
     }
 
-    fn push_fut(&mut self, number: usize, fut: StackFuture) {
+    fn push_fut(&mut self, number: usize, id: usize, fut: StackFuture) {
         let item = StackItem {
             number,
             data: None,
-            fut: Some(fut),
+            fut: Some((id, fut)),
         };
         self.stack.push(item);
+    }
+
+    fn push_res(&mut self, number: usize, res: FdbResult<()>, ok_str: &[u8]) {
+        self.push_item(
+            number,
+            &match res {
+                Ok(..) => Bytes::from(ok_str),
+                Err(err) => {
+                    trace!("ERROR {:?}", err);
+                    let packed = pack(&(
+                        Bytes::from(b"ERROR".as_ref()),
+                        Bytes::from(format!("{}", err.code()).into_bytes()),
+                    ));
+                    Bytes::from(packed)
+                }
+            },
+        );
     }
 
     async fn run_step(
@@ -551,12 +589,23 @@ impl StackMachine {
         let (mut trx, trx_name) = if is_db {
             (TransactionState::Transaction(db.create_trx()?), None)
         } else {
-            (
-                self.transactions
-                    .remove(&self.cur_transaction) // some instr requires transaction ownership
-                    .expect("failed to find trx"),
-                Some(&self.cur_transaction),
-            )
+            let mut trx = self
+                .transactions
+                .remove(&self.cur_transaction) // some instr requires transaction ownership
+                .expect("failed to find trx");
+            if let &TransactionState::Pending(id) = &trx {
+                let stack_item = self.stack.iter_mut().find(|s| match s.fut {
+                    Some((trx_id, ..)) => trx_id == id,
+                    _ => false,
+                });
+                if let Some(stack_item) = stack_item {
+                    if let Some((name, state)) = stack_item.await_fut().await {
+                        assert_eq!(name, self.cur_transaction);
+                        trx = state;
+                    }
+                }
+            }
+            (trx, Some(&self.cur_transaction))
         };
 
         match instr.code {
@@ -617,13 +666,12 @@ impl StackMachine {
                     Bytes::from(a.as_slice()),
                     Bytes::from(b.as_slice())
                 );
-                if let (Ok(a), Ok(b)) = (from_bytes::<Bytes>(&a), from_bytes::<Bytes>(&b)) {
+                if let (Ok(a), Ok(b)) = (unpack::<Bytes>(&a), unpack::<Bytes>(&b)) {
                     let mut bytes = Vec::new();
                     bytes.extend_from_slice(&a);
                     bytes.extend_from_slice(&b);
                     self.push_item(number, &Bytes::from(bytes));
-                } else if let (Ok(a), Ok(b)) = (from_bytes::<String>(&a), from_bytes::<String>(&b))
-                {
+                } else if let (Ok(a), Ok(b)) = (unpack::<String>(&a), unpack::<String>(&b)) {
                     self.push_item(number, &format!("{}{}", a, b));
                 } else {
                     panic!("failed to decode item {:?} {:?}", a, b);
@@ -684,15 +732,16 @@ impl StackMachine {
                 let error_code: i32 = self.pop_item().await;
                 let error = Error::from_error_code(error_code);
                 debug!("on_error {:?}", error);
+                let trx_id = self.next_trx_id();
                 let f = trx
-                    .take()
+                    .take(trx_id)
                     .on_error(&error)
                     .map_ok(|trx| StackFutResult {
                         state: trx_name.map(|n| (n, TransactionState::Transaction(trx))),
-                        data: to_bytes(&RESULT_NOT_PRESENT).unwrap(),
+                        data: pack(&RESULT_NOT_PRESENT),
                     })
                     .boxed_local();
-                self.push_fut(number, f);
+                self.push_fut(number, 0, f);
                 pending = true;
             }
 
@@ -707,13 +756,13 @@ impl StackMachine {
                     .get(&key, instr.pop_snapshot())
                     .map_ok(|v| {
                         match v {
-                            Some(v) => to_bytes(&Bytes::from(v.as_ref())).unwrap(),
-                            None => to_bytes(&RESULT_NOT_PRESENT).unwrap(),
+                            Some(v) => pack(&Bytes::from(v.as_ref())),
+                            None => pack(&RESULT_NOT_PRESENT),
                         }
                         .into()
                     })
                     .boxed_local();
-                self.push_fut(number, f);
+                self.push_fut(number, 0, f);
                 pending = true;
             }
 
@@ -735,18 +784,18 @@ impl StackMachine {
                         {
                             let key = Bytes::from(key.as_ref());
                             if key.starts_with(&prefix) {
-                                to_bytes(&key).unwrap()
+                                pack(&key)
                             } else if key < prefix {
-                                to_bytes(&prefix).unwrap()
+                                pack(&prefix)
                             } else {
                                 assert!(key > prefix);
-                                to_bytes(&strinc(prefix)).unwrap()
+                                pack(&strinc(prefix))
                             }
                         }
                         .into()
                     })
                     .boxed_local();
-                self.push_fut(number, f);
+                self.push_fut(number, 0, f);
                 pending = true;
             }
 
@@ -819,20 +868,20 @@ impl StackMachine {
                                         continue;
                                     }
                                 }
-                                into_bytes(&Bytes::from(key), &mut out).expect("failed to encode");
-                                into_bytes(&Bytes::from(value), &mut out)
-                                    .expect("failed to encode");
+                                pack_into(&Bytes::from(key), &mut out);
+                                pack_into(&Bytes::from(value), &mut out);
                             }
                             future::ok(out)
                         })
                         .await?;
                     Ok(StackFutResult {
                         state: trx_name.map(|n| (n, TransactionState::Transaction(trx))),
-                        data: to_bytes(&Bytes::from(data)).unwrap(),
+                        data: pack(&Bytes::from(data)),
                     })
                 }
-                let f = get_range(trx.take(), trx_name, prefix, opt, snapshot).boxed_local();
-                self.push_fut(number, f);
+                let trx_id = self.next_trx_id();
+                let f = get_range(trx.take(trx_id), trx_name, prefix, opt, snapshot).boxed_local();
+                self.push_fut(number, trx_id, f);
                 pending = true;
             }
 
@@ -872,9 +921,9 @@ impl StackMachine {
                 let f = trx
                     .as_mut()
                     .get_versionstamp()
-                    .map_ok(|v| to_bytes(&Bytes::from(v.as_ref())).unwrap().into())
+                    .map_ok(|v| pack(&Bytes::from(v.as_ref())).into())
                     .boxed_local();
-                self.push_fut(number, f);
+                self.push_fut(number, 0, f);
                 pending = true;
             }
 
@@ -950,15 +999,23 @@ impl StackMachine {
                 let begin: Bytes = self.pop_bytes().await;
                 let end: Bytes = self.pop_bytes().await;
                 debug!("read_conflict_range {:?} {:?}", begin, end);
-                trx.as_mut()
-                    .add_conflict_range(&begin, &end, ConflictRangeType::Read)?;
+                self.push_res(
+                    number,
+                    trx.as_mut()
+                        .add_conflict_range(&begin, &end, ConflictRangeType::Read),
+                    b"SET_CONFLICT_RANGE",
+                );
             }
             WriteConflictRange => {
                 let begin: Bytes = self.pop_bytes().await;
                 let end: Bytes = self.pop_bytes().await;
                 debug!("write_conflict_range {:?} {:?}", begin, end);
-                trx.as_mut()
-                    .add_conflict_range(&begin, &end, ConflictRangeType::Write)?;
+                self.push_res(
+                    number,
+                    trx.as_mut()
+                        .add_conflict_range(&begin, &end, ConflictRangeType::Write),
+                    b"SET_CONFLICT_RANGE",
+                );
             }
             // Pops the top item off of the stack as KEY. Adds KEY as a read conflict key
             // or write conflict key. Pushes the byte string "SET_CONFLICT_KEY" onto the
@@ -991,15 +1048,16 @@ impl StackMachine {
             Commit => {
                 debug!("commit");
                 let trx_name = trx_name.cloned();
+                let trx_id = self.next_trx_id();
                 let f = trx
-                    .take()
+                    .take(trx_id)
                     .commit()
                     .map(|r| {
                         Ok(match r {
                             Ok(c) => StackFutResult {
                                 state: trx_name
                                     .map(|n| (n, TransactionState::TransactionCommitted(c))),
-                                data: to_bytes(&RESULT_NOT_PRESENT).unwrap(),
+                                data: pack(&RESULT_NOT_PRESENT),
                             },
                             Err(c) => StackFutResult {
                                 state: trx_name
@@ -1009,7 +1067,7 @@ impl StackMachine {
                         })
                     })
                     .boxed_local();
-                self.push_fut(number, f);
+                self.push_fut(number, trx_id, f);
                 pending = true;
             }
             // Resets the current transaction.
@@ -1020,7 +1078,7 @@ impl StackMachine {
             // Cancels the current transaction.
             Cancel => {
                 debug!("cancel");
-                let cancelled = trx.take().cancel();
+                let cancelled = trx.take(0).cancel();
                 trx = TransactionState::Transaction(cancelled.reset());
             }
 
@@ -1061,7 +1119,7 @@ impl StackMachine {
                     debug!(" - {:?}", element);
                     buf.push(element);
                 }
-                let packed = to_bytes(&buf).unwrap();
+                let packed = pack(&buf);
                 self.push_item(number, &Bytes::from(packed));
             }
 
@@ -1101,7 +1159,7 @@ impl StackMachine {
                     }),
                 );
                 if i == 1 {
-                    let packed = to_bytes(&tuple).unwrap();
+                    let packed = pack(&tuple);
                     self.push_item(number, &Bytes::from(packed));
                 }
             }
@@ -1112,10 +1170,10 @@ impl StackMachine {
             TupleUnpack => {
                 let data = self.pop_bytes().await;
                 debug!("tuple_unpack {:?}", data);
-                let data: Vec<Element> = from_bytes(&data).unwrap();
+                let data: Vec<Element> = unpack(&data).unwrap();
                 for element in data {
                     debug!(" - {:?}", element);
-                    self.push_item(number, &Bytes::from(to_bytes(&element).unwrap()));
+                    self.push_item(number, &Bytes::from(pack(&element)));
                 }
             }
             // Pops the top item off of the stack as N. Pops the next N items off of the
@@ -1141,6 +1199,64 @@ impl StackMachine {
                     data.push(0xff);
                     self.push_item(number, &Bytes::from(data));
                 }
+            }
+
+            // Pops the top item off of the stack as N. Pops the next N items off of the
+            // stack as packed tuples (i.e., byte strings), unpacks them, sorts the tuples,
+            // repacks them into byte strings, and then pushes these packed tuples onto
+            // the stack so that the final top of the stack now has the greatest
+            // element. If the binding has some kind of tuple comparison function, it should
+            // use that to sort. Otherwise, it should sort them lexicographically by
+            // their byte representation. The choice of function should not affect final sort order.
+            TupleSort => {
+                let n: usize = self.pop_item().await;
+                debug!("tuple_sort {:?}", n);
+                let mut tup = Vec::new();
+                for _ in 0..n {
+                    let data = self.pop_data().await;
+                    tup.push(Bytes::from(data));
+                }
+
+                tup.sort();
+                let packed = pack(&tup);
+                self.push_item(number, &Bytes::from(packed));
+            }
+
+            // Pops the top item off of the stack. This will be a byte-string of length 4
+            // containing the IEEE 754 encoding of a float in big-endian order.
+            // This is then converted into a float and pushed onto the stack.
+            EncodeFloat => {
+                let bytes = self.pop_bytes().await;
+                let mut arr = [0; 4];
+                arr.copy_from_slice(&bytes);
+                let f = f32::from_bits(u32::from_be_bytes(arr));
+                self.push_item(number, &f);
+            }
+            // Pops the top item off of the stack. This will be a byte-string of length 8
+            // containing the IEEE 754 encoding of a double in big-endian order.
+            // This is then converted into a double and pushed onto the stack.
+            EncodeDouble => {
+                let bytes = self.pop_bytes().await;
+                let mut arr = [0; 8];
+                arr.copy_from_slice(&bytes);
+                let f = f64::from_bits(u64::from_be_bytes(arr));
+                self.push_item(number, &f);
+            }
+            // Pops the top item off of the stack. This will be a single-precision float.
+            // This is converted into a (4 byte) byte-string of its IEEE 754 representation
+            // in big-endian order, and pushed onto the stack.
+            DecodeFloat => {
+                let f: f32 = self.pop_item().await;
+                let packed = pack(&Bytes::from(f.to_bits().to_be_bytes().as_ref()));
+                self.push_item(number, &Bytes::from(packed));
+            }
+            // Pops the top item off of the stack. This will be a double-precision float.
+            // This is converted into a (8 byte) byte-string its IEEE 754 representation
+            // in big-endian order, and pushed onto the stack.
+            DecodeDouble => {
+                let f: f64 = self.pop_item().await;
+                let packed = pack(&Bytes::from(f.to_bits().to_be_bytes().as_ref()));
+                self.push_item(number, &Bytes::from(packed));
             }
 
             // Pops the top item off of the stack as PREFIX. Creates a new stack machine
@@ -1245,9 +1361,6 @@ impl StackMachine {
                 // test_locality(db)
                 // test_predicates()
             }
-            instr => {
-                unimplemented!("instr: {:?}", instr);
-            }
         }
 
         if is_db && pending {
@@ -1256,7 +1369,7 @@ impl StackMachine {
         }
 
         if is_db && mutation {
-            trx.take().commit().await?;
+            trx.take(0).commit().await?;
             self.push_item(number, &RESULT_NOT_PRESENT);
         } else if !self.transactions.contains_key(&self.cur_transaction) {
             self.transactions.insert(self.cur_transaction.clone(), trx);
@@ -1318,6 +1431,10 @@ fn main() {
 
     let api_version = args[2].parse::<i32>().expect("failed to parse api version");
 
+    info!(
+        "Starting rust bindingtester with api_version {}",
+        api_version
+    );
     let network = api::FdbApiBuilder::default()
         .set_runtime_version(api_version)
         .build()

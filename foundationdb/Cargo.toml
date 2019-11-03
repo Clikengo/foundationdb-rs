@@ -1,6 +1,6 @@
 [package]
 name = "foundationdb"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Benjamin Fry <benjaminfry@me.com>"]
 edition = "2018"
 
@@ -21,7 +21,7 @@ travis-ci = { repository = "bluejekyll/foundationdb-rs" }
 # codecov = { repository = "bluejekyll/foundationdb-rs", branch = "master", service = "github" }
 
 [features]
-default = ["fdb-6_1", "serde"]
+default = ["fdb-6_1", "uuid"]
 
 fdb-5_1 = [ "foundationdb-sys/fdb-5_1" ]
 fdb-5_2 = [ "foundationdb-sys/fdb-5_2" ]
@@ -38,8 +38,8 @@ failure_derive = "0.1"
 foundationdb-sys = { version = "0.2.0", path = "../foundationdb-sys", default-features = false }
 futures-preview = { version = "=0.3.0-alpha.19", features = ["async-await"] }
 memchr = "2.2.1"
-serde = { version = "1.0.102", optional = true }
 static_assertions = "1.0.0"
+uuid = { version = "0.8.1", optional = true }
 
 [dev-dependencies]
 byteorder = "1.2"

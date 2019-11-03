@@ -83,8 +83,6 @@
 //!
 //! *WARNING* Until the 1.0 release of this library, the API may be in constant flux.
 
-//#![deny(missing_docs)]
-
 #[macro_use]
 extern crate failure;
 
@@ -99,11 +97,8 @@ pub mod error;
 pub mod future;
 pub mod keyselector;
 /// Generated configuration types for use with the various `set_option` functions
-#[allow(missing_docs)]
 pub mod options;
 pub mod transaction;
-
-#[cfg(feature = "serde")]
 pub mod tuple;
 
 #[cfg(any(feature = "fdb-5_1", feature = "fdb-5_2", feature = "fdb-6_0"))]

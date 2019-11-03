@@ -6,8 +6,6 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
-use super::de::from_bytes;
-use super::ser::{into_bytes, to_bytes};
 use super::*;
 use crate::{KeySelector, RangeOptionBuilder, Transaction};
 use std::borrow::Cow;
@@ -28,11 +26,9 @@ pub struct Subspace {
     prefix: Vec<u8>,
 }
 
-impl<E: serde::Serialize> From<E> for Subspace {
+impl<E: TuplePack> From<E> for Subspace {
     fn from(e: E) -> Self {
-        Self {
-            prefix: to_bytes(&e).expect("serialization failed"),
-        }
+        Self { prefix: pack(&e) }
     }
 }
 
@@ -50,7 +46,7 @@ impl Subspace {
     }
 
     /// Returns a new Subspace whose prefix extends this Subspace with a given tuple encodable.
-    pub fn subspace<T: serde::Serialize>(&self, t: T) -> Self {
+    pub fn subspace<T: TuplePack>(&self, t: &T) -> Self {
         Self {
             prefix: self.pack(t),
         }
@@ -63,21 +59,21 @@ impl Subspace {
 
     /// Returns the key encoding the specified Tuple with the prefix of this Subspace
     /// prepended.
-    pub fn pack<T: serde::Serialize>(&self, t: T) -> Vec<u8> {
+    pub fn pack<T: TuplePack>(&self, t: &T) -> Vec<u8> {
         let mut out = self.prefix.clone();
-        into_bytes(&t, &mut out).expect("serialization failed");
+        pack_into(t, &mut out);
         out
     }
 
     /// `unpack` returns the Tuple encoded by the given key with the prefix of this Subspace
     /// removed.  `unpack` will return an error if the key is not in this Subspace or does not
     /// encode a well-formed Tuple.
-    pub fn unpack<'de, T: serde::Deserialize<'de>>(&self, key: &'de [u8]) -> Result<T> {
+    pub fn unpack<'de, T: TupleUnpack<'de>>(&self, key: &'de [u8]) -> Result<T> {
         if !self.is_start_of(key) {
             return Err(Error::BadPrefix);
         }
         let key = &key[self.prefix.len()..];
-        from_bytes(key)
+        unpack(key)
     }
 
     /// `is_start_of` returns true if the provided key starts with the prefix of this Subspace,
@@ -125,7 +121,7 @@ mod tests {
     #[test]
     fn sub() {
         let ss0: Subspace = 1.into();
-        let ss1 = ss0.subspace(2);
+        let ss1 = ss0.subspace(&2);
 
         let ss2: Subspace = (1, 2).into();
 
@@ -138,7 +134,7 @@ mod tests {
         let tup = (2, 3);
 
         let packed = ss0.pack(&tup);
-        let expected = to_bytes(&(1, 2, 3)).unwrap();
+        let expected = pack(&(1, 2, 3));
         assert_eq!(expected, packed);
 
         let tup_unpack: (i64, i64) = ss0.unpack(&packed).unwrap();
@@ -155,13 +151,11 @@ mod tests {
 
         assert!(ss0.is_start_of(&ss0.pack(&tup)));
         assert!(!ss1.is_start_of(&ss0.pack(&tup)));
-        assert!(Subspace::from("start").is_start_of(&to_bytes(&"start").unwrap()));
-        assert!(Subspace::from("start").is_start_of(&to_bytes(&"start".to_string()).unwrap()));
-        assert!(!Subspace::from("start").is_start_of(&to_bytes(&"starting").unwrap()));
-        assert!(Subspace::from("start").is_start_of(&to_bytes(&("start", "end")).unwrap()));
-        assert!(
-            Subspace::from(("start", 42)).is_start_of(&to_bytes(&("start", 42, "end")).unwrap())
-        );
+        assert!(Subspace::from("start").is_start_of(&pack(&"start")));
+        assert!(Subspace::from("start").is_start_of(&pack(&"start".to_string())));
+        assert!(!Subspace::from("start").is_start_of(&pack(&"starting")));
+        assert!(Subspace::from("start").is_start_of(&pack(&("start", "end"))));
+        assert!(Subspace::from(("start", 42)).is_start_of(&pack(&("start", 42, "end"))));
     }
 
     #[test]

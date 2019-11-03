@@ -1,6 +1,5 @@
-pub mod de;
 mod element;
-pub mod ser;
+mod pack;
 mod subspace;
 mod versionstamp;
 
@@ -11,6 +10,7 @@ use std::ops::Deref;
 use std::result;
 
 pub use element::Element;
+pub use pack::{TuplePack, TupleUnpack};
 pub use subspace::Subspace;
 pub use versionstamp::Versionstamp;
 
@@ -18,9 +18,9 @@ const NIL: u8 = 0x00;
 const BYTES: u8 = 0x01;
 const STRING: u8 = 0x02;
 const NESTED: u8 = 0x05;
+// const NEGINTSTART: u8 = 0x0b;
 const INTZERO: u8 = 0x14;
-// TODO const POSINTEND: u8 = 0x1d;
-// TODO const NEGINTSTART: u8 = 0x0b;
+// const POSINTEND: u8 = 0x1d;
 const FLOAT: u8 = 0x20;
 const DOUBLE: u8 = 0x21;
 const FALSE: u8 = 0x26;
@@ -31,9 +31,45 @@ const UUID: u8 = 0x30;
 // const VERSIONSTAMP_88: u8 = 0x32;
 const VERSIONSTAMP: u8 = 0x33;
 
-const ENUM: u8 = 0x40;
-
 const ESCAPE: u8 = 0xff;
+
+/// Tracks the depth of a Tuple decoding chain
+#[derive(Copy, Clone)]
+pub struct TupleDepth(usize);
+
+impl TupleDepth {
+    fn new() -> Self {
+        TupleDepth(0)
+    }
+
+    /// Increment the depth by one, this be called when calling into `Tuple::{encode, decode}` of tuple-like datastructures
+    pub fn increment(&self) -> Self {
+        TupleDepth(self.0 + 1)
+    }
+
+    /// Returns the current depth in any recursive tuple processing, 0 representing there having been no recursion
+    pub fn depth(&self) -> usize {
+        self.0
+    }
+}
+
+enum SerDeState {
+    Default,
+    Versionstamp,
+    #[cfg(feature = "uuid")]
+    Uuid,
+}
+
+impl<'a> From<&'a str> for SerDeState {
+    fn from(name: &'a str) -> Self {
+        match name {
+            "Versionstamp" => SerDeState::Versionstamp,
+            #[cfg(feature = "uuid")]
+            "Uuid" => SerDeState::Uuid,
+            _ => SerDeState::Default,
+        }
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Error {
@@ -45,26 +81,19 @@ pub enum Error {
     BadStringFormat,
     BadSeqFormat,
     BadCharValue(u32),
-    BadCode { found: u8, expected: Option<u8> },
+    BadCode {
+        found: u8,
+        expected: Option<u8>,
+    },
     BadPrefix,
     BadVersionstamp,
+    #[cfg(feature = "uuid")]
+    BadUuid,
 }
 
 impl From<io::Error> for Error {
     fn from(_: io::Error) -> Self {
         Error::IoError
-    }
-}
-
-impl serde::ser::Error for Error {
-    fn custom<T: Display>(msg: T) -> Self {
-        Error::Message(msg.to_string())
-    }
-}
-
-impl serde::de::Error for Error {
-    fn custom<T: Display>(msg: T) -> Self {
-        Error::Message(msg.to_string())
     }
 }
 
@@ -130,68 +159,29 @@ impl From<String> for Bytes<'static> {
     }
 }
 
-impl<'a> serde::Serialize for Bytes<'a> {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_bytes(&self.0)
-    }
+pub fn pack<T: TuplePack>(v: &T) -> Vec<u8> {
+    v.pack_to_vec()
 }
-
-struct BytesVisitor;
-
-impl<'a> serde::de::Visitor<'a> for BytesVisitor {
-    type Value = Bytes<'a>;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("a borrowed byte array")
-    }
-
-    fn visit_bytes<E>(self, v: &[u8]) -> std::result::Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        Ok(Bytes(Cow::Owned(v.to_owned())))
-    }
-
-    fn visit_borrowed_bytes<E>(self, v: &'a [u8]) -> std::result::Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        Ok(Bytes(Cow::Borrowed(v)))
-    }
-
-    fn visit_byte_buf<E>(self, v: Vec<u8>) -> std::result::Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        Ok(Bytes(Cow::Owned(v)))
-    }
+pub fn pack_into<T: TuplePack>(v: &T, output: &mut Vec<u8>) {
+    v.pack_root(output)
+        .expect("tuple encoding should never fail");
 }
-
-impl<'de: 'a, 'a> serde::Deserialize<'de> for Bytes<'a> {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Bytes<'a>, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        deserializer.deserialize_bytes(BytesVisitor)
-    }
+pub fn unpack<'de, T: TupleUnpack<'de>>(input: &'de [u8]) -> Result<T> {
+    T::unpack_root(input)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde::{Deserialize, Serialize};
 
     const NIL_VAL: Option<()> = None;
 
     fn test_serde<'de, T>(val: T, buf: &'de [u8])
     where
-        T: Serialize + Deserialize<'de> + std::fmt::Debug + PartialEq,
+        T: TuplePack + TupleUnpack<'de> + std::fmt::Debug + PartialEq,
     {
-        assert_eq!(ser::to_bytes(&val).unwrap(), buf);
-        assert_eq!(de::from_bytes::<'de, T>(buf).unwrap(), val);
+        assert_eq!(unpack::<'de, T>(buf).unwrap(), val);
+        assert_eq!(pack(&val), buf);
     }
 
     #[test]
@@ -242,6 +232,48 @@ mod tests {
             Versionstamp::complete(b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a".clone(), 657),
             b"\x33\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x02\x91",
         );
+
+        test_serde(0, b"\x14");
+        test_serde(1, b"\x15\x01");
+        test_serde(-1, b"\x13\xfe");
+        test_serde(255, b"\x15\xff");
+        test_serde(-255, b"\x13\x00");
+        test_serde(256, b"\x16\x01\x00");
+        test_serde(-256, b"\x12\xfe\xff");
+        test_serde(65536, b"\x17\x01\x00\x00");
+        test_serde(-65536, b"\x11\xfe\xff\xff");
+        test_serde(i64::max_value(), b"\x1C\x7f\xff\xff\xff\xff\xff\xff\xff");
+        test_serde(
+            i64::max_value() as u64 + 1,
+            b"\x1C\x80\x00\x00\x00\x00\x00\x00\x00",
+        );
+        test_serde(u64::max_value(), b"\x1C\xff\xff\xff\xff\xff\xff\xff\xff");
+        test_serde(-4294967295i64, b"\x10\x00\x00\x00\x00");
+        test_serde(
+            i64::min_value() + 2,
+            b"\x0C\x80\x00\x00\x00\x00\x00\x00\x01",
+        );
+        test_serde(
+            i64::min_value() + 1,
+            b"\x0C\x80\x00\x00\x00\x00\x00\x00\x00",
+        );
+        test_serde(i64::min_value(), b"\x0C\x7f\xff\xff\xff\xff\xff\xff\xff");
+    }
+
+    #[cfg(feature = "uuid")]
+    #[test]
+    fn test_uuid() {
+        use uuid::Uuid;
+
+        test_serde(
+            Element::Uuid(
+                Uuid::from_slice(
+                    b"\xba\xff\xff\xff\xff\x5e\xba\x11\x00\x00\x00\x00\x5c\xa1\xab\x1e",
+                )
+                .unwrap(),
+            ),
+            b"\x30\xba\xff\xff\xff\xff\x5e\xba\x11\x00\x00\x00\x00\x5c\xa1\xab\x1e",
+        );
     }
 
     #[test]
@@ -250,6 +282,42 @@ mod tests {
         test_serde(
             vec!["NEW_TRANSACTION".to_string()],
             b"\x02NEW_TRANSACTION\x00",
+        );
+        test_serde(
+            vec![
+                Element::String(Cow::Borrowed("PUSH")),
+                Element::Bytes(Bytes::from(
+                    b"\x01tester_output\x00\x01results\x00\x14".as_ref(),
+                )),
+            ],
+            b"\x02PUSH\x00\x01\x01tester_output\x00\xff\x01results\x00\xff\x14\x00",
+        );
+        test_serde(
+            vec![Element::String(Cow::Borrowed("PUSH")), Element::Nil],
+            b"\x02PUSH\x00\x00",
+        );
+        test_serde(
+            vec![
+                Element::String(Cow::Borrowed("PUSH")),
+                Element::Tuple(vec![
+                    Element::Nil,
+                    Element::Float(3299069000000.0),
+                    Element::Float(-0.000000000000000000000000000000000000011883096),
+                ]),
+            ],
+            b"\x02PUSH\x00\x05\x00\xff \xd4@\x07\xf5 \x7f~\x9a\xc2\x00",
+        );
+        test_serde(
+            vec![
+                Element::String(Cow::Borrowed("PUSH")),
+                Element::Int(-133525682914243904),
+            ],
+            b"\x02PUSH\x00\x0c\xfe%\x9f\x19M\x81J\xbf",
+        );
+
+        test_serde(
+            Element::Tuple(vec![Element::Nil, Element::Nil]),
+            b"\x00\x00",
         );
     }
 
@@ -290,5 +358,7 @@ mod tests {
             ])],
             &[NESTED, TRUE, FALSE, NIL],
         );
+        test_serde(Vec::<Element>::new(), &[]);
+        test_serde(Element::Tuple(vec![]), &[]);
     }
 }

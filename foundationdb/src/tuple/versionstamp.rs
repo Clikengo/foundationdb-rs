@@ -40,7 +40,7 @@ impl Versionstamp {
         self.bytes[0..10] != [0xff; 10]
     }
 
-    pub fn bytes(&self) -> &[u8; 12] {
+    pub fn as_bytes(&self) -> &[u8; 12] {
         &self.bytes
     }
 }
@@ -56,15 +56,6 @@ impl Into<[u8; 12]> for Versionstamp {
     }
 }
 
-impl<'a> serde::Serialize for Versionstamp {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_newtype_struct("Versionstamp", &Bytes::from(&self.bytes()[..]))
-    }
-}
-
 impl<'a> Element<'a> {
     pub fn count_incomplete_versionstamp(&self) -> usize {
         match self {
@@ -72,47 +63,5 @@ impl<'a> Element<'a> {
             Element::Tuple(v) => v.iter().map(Element::count_incomplete_versionstamp).sum(),
             _ => 0,
         }
-    }
-}
-
-pub(super) struct VersionstampVisitor;
-
-impl<'de> serde::de::Visitor<'de> for VersionstampVisitor {
-    type Value = Versionstamp;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("a versionstamp")
-    }
-
-    fn visit_bytes<E>(self, v: &[u8]) -> std::result::Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        if v.len() != 12 {
-            return Err(E::custom(format!(
-                "versionstamp bytes len is not 12: {}",
-                v.len()
-            )));
-        }
-
-        let mut bytes = [0xff; 12];
-        bytes.copy_from_slice(v);
-        Ok(Versionstamp::from(bytes))
-    }
-
-    fn visit_newtype_struct<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-    where
-        D: serde::de::Deserializer<'de>,
-    {
-        deserializer.deserialize_bytes(self)
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for Versionstamp {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Versionstamp, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        deserializer.deserialize_newtype_struct("Versionstamp", VersionstampVisitor)
     }
 }
