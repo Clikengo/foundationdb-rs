@@ -1124,6 +1124,8 @@ impl StackMachine {
                     self.push_item(number, &Bytes::from(b"GOT_COMMITTED_VERSION".as_ref()));
                 } else {
                     warn!("committed_version() called on a non commited transaction");
+                    self.last_version = -1;
+                    self.push_item(number, &Bytes::from(b"GOT_COMMITTED_VERSION".as_ref()));
                 }
             }
 
