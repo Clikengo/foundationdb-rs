@@ -81,6 +81,9 @@ impl futures::Future for FdbFuture {
     }
 }
 
+unsafe impl Send for FdbFuture {}
+unsafe impl Sync for FdbFuture {}
+
 // The callback from fdb C API can be called from multiple threads. so this callback should be
 // thread-safe.
 extern "C" fn fdb_future_callback(

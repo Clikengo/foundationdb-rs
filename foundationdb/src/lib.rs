@@ -121,6 +121,8 @@ extern crate futures;
 extern crate core;
 extern crate lazy_static;
 extern crate rand;
+#[macro_use]
+extern crate static_assertions;
 #[cfg(feature = "uuid")]
 extern crate uuid;
 
