@@ -36,7 +36,7 @@ foundationdb-gen = { path = "../foundationdb-gen" }
 failure = "0.1"
 failure_derive = "0.1"
 foundationdb-sys = { version = "0.2.0", path = "../foundationdb-sys", default-features = false }
-futures-preview = { version = "=0.3.0-alpha.19", features = ["async-await"] }
+futures = "0.3.0"
 memchr = "2.2.1"
 static_assertions = "1.0.0"
 uuid = { version = "0.8.1", optional = true }
