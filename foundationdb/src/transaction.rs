@@ -161,7 +161,7 @@ pub struct RangeOption<'a> {
 }
 
 impl<'a> RangeOption<'a> {
-    fn next_range(mut self, kvs: &FdbFutureValues) -> Option<Self> {
+    pub fn next_range(mut self, kvs: &FdbFutureValues) -> Option<Self> {
         if !kvs.more {
             return None;
         }
