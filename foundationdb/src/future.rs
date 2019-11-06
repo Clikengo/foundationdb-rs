@@ -392,7 +392,16 @@ impl TryFrom<FdbFutureHandle> for i64 {
 
     fn try_from(f: FdbFutureHandle) -> Result<Self> {
         let mut version: i64 = 0;
-        error::eval(unsafe { fdb_sys::fdb_future_get_version(f.as_ptr(), &mut version) })?;
+        error::eval(unsafe {
+            #[cfg(feature = "fdb-6_2")]
+            {
+                fdb_sys::fdb_future_get_int64(f.as_ptr(), &mut version)
+            }
+            #[cfg(not(feature = "fdb-6_2"))]
+            {
+                fdb_sys::fdb_future_get_version(f.as_ptr(), &mut version)
+            }
+        })?;
         Ok(version)
     }
 }
