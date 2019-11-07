@@ -50,10 +50,6 @@ pub struct TransactionCommitError {
 }
 
 impl TransactionCommitError {
-    pub fn is_maybe_committed(&self) -> bool {
-        self.err.is_maybe_committed()
-    }
-
     pub fn on_error(self) -> impl Future<Output = FdbResult<Transaction>> {
         FdbFuture::<()>::new(unsafe {
             fdb_sys::fdb_transaction_on_error(self.tr.inner.as_ptr(), self.err.code())
