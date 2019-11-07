@@ -26,7 +26,7 @@ use error::{self, Error, Result};
 /// An opaque type that represents a Future in the FoundationDB C API.
 pub(crate) struct FdbFuture {
     f: Option<*mut fdb::FDBFuture>,
-    task: Option<Box<futures::task::Task>>,
+    cb_active: bool,
 }
 
 impl FdbFuture {
@@ -34,7 +34,7 @@ impl FdbFuture {
     pub(crate) unsafe fn new(f: *mut fdb::FDBFuture) -> Self {
         Self {
             f: Some(f),
-            task: None,
+            cb_active: false,
         }
     }
 }
@@ -56,14 +56,14 @@ impl futures::Future for FdbFuture {
     fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
         let f = self.f.expect("cannot poll after resolve");
 
-        if self.task.is_none() {
+        if !self.cb_active {
             let task = futures::task::current();
             let task = Box::new(task);
-            let task_ptr = task.as_ref() as *const _;
+            let task_ptr = Box::into_raw(task);
             unsafe {
                 fdb::fdb_future_set_callback(f, Some(fdb_future_callback), task_ptr as *mut _);
             }
-            self.task = Some(task);
+            self.cb_active = true;
 
             return Ok(Async::NotReady);
         }
@@ -87,8 +87,7 @@ extern "C" fn fdb_future_callback(
     _f: *mut fdb::FDBFuture,
     callback_parameter: *mut ::std::os::raw::c_void,
 ) {
-    let task: *const futures::task::Task = callback_parameter as *const _;
-    let task: &futures::task::Task = unsafe { &*task };
+    let task = unsafe { Box::from_raw(callback_parameter as *mut futures::task::Task) };
     task.notify();
 }
 
