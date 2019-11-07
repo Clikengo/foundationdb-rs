@@ -242,7 +242,7 @@ impl<'a> RangeOption<'a> {
         let last_key = last.key();
 
         if let Some(limit) = self.limit.as_mut() {
-            *limit -= kvs.len();
+            *limit = limit.saturating_sub(kvs.len());
             if *limit == 0 {
                 return None;
             }
