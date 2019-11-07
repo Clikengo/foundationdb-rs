@@ -93,6 +93,7 @@ impl Display for Error {
             Error::BadStringFormat => write!(f, "not an utf8 string"),
             Error::BadCode { found, .. } => write!(f, "bad code, found {}", found),
             Error::BadPrefix => write!(f, "bad prefix"),
+            #[cfg(feature = "uuid")]
             Error::BadUuid => write!(f, "bad uuid"),
         }
     }
