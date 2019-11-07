@@ -32,4 +32,4 @@ fdb-6_2 = [ ]
 [dependencies]
 
 [build-dependencies]
-bindgen = "0.47"
+bindgen = "0.51.1"
