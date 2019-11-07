@@ -10,7 +10,7 @@ use futures::future::*;
 
 mod common;
 
-async fn atomic_add(db: &Database, key: &[u8], value: i64) -> error::Result<()> {
+async fn atomic_add(db: &Database, key: &[u8], value: i64) -> FdbResult<()> {
     let trx = db.create_trx()?;
 
     let val = {
@@ -24,7 +24,7 @@ async fn atomic_add(db: &Database, key: &[u8], value: i64) -> error::Result<()> 
     Ok(())
 }
 
-async fn test_atomic_async() -> error::Result<()> {
+async fn test_atomic_async() -> FdbResult<()> {
     const KEY: &[u8] = b"test-atomic";
 
     let db = common::database().await?;

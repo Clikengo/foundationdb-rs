@@ -13,7 +13,7 @@ use std::borrow::Cow;
 
 mod common;
 
-async fn test_get_range_async() -> error::Result<()> {
+async fn test_get_range_async() -> FdbResult<()> {
     const N: usize = 10000;
 
     let db = common::database().await?;

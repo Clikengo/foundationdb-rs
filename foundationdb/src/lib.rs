@@ -55,7 +55,7 @@
 //! use futures::prelude::*;
 //! use std::ops::Deref;
 //!
-//! async fn async_main() -> foundationdb::error::Result<()> {
+//! async fn async_main() -> foundationdb::FdbResult<()> {
 //!     let db = foundationdb::Database::default()?;
 //!     
 //!     // write a value
