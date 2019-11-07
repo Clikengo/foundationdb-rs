@@ -24,5 +24,4 @@ travis-ci = { repository = "bluejekyll/foundationdb-rs" }
 
 [dependencies]
 failure = "0.1"
-Inflector = "0.11"
 xml-rs = "0.8"
