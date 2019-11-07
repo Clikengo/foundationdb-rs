@@ -162,8 +162,8 @@ pub struct RangeOption<'a> {
 }
 
 impl<'a> RangeOption<'a> {
-    pub fn next_range(mut self, kvs: &FdbFutureValues) -> Option<Self> {
-        if !kvs.more {
+    pub fn next_range(mut self, kvs: &FdbValues) -> Option<Self> {
+        if !kvs.more() {
             return None;
         }
 
@@ -320,7 +320,7 @@ impl Transaction {
     /// * `key_name` - the name of the key to be looked up in the database
     ///
     /// TODO: implement: snapshot Non-zero if this is a snapshot read.
-    pub fn get(&self, key: &[u8], snapshot: bool) -> FdbFuture<Option<FdbFutureSlice>> {
+    pub fn get(&self, key: &[u8], snapshot: bool) -> FdbFuture<Option<FdbSlice>> {
         FdbFuture::new(unsafe {
             fdb_sys::fdb_transaction_get(
                 self.inner.as_ptr(),
@@ -369,7 +369,7 @@ impl Transaction {
     /// selector. You must first wait for the FDBFuture to be ready, check for errors, call
     /// fdb_future_get_key() to extract the key, and then destroy the FDBFuture with
     /// fdb_future_destroy().
-    pub fn get_key(&self, selector: &KeySelector, snapshot: bool) -> FdbFuture<FdbFutureSlice> {
+    pub fn get_key(&self, selector: &KeySelector, snapshot: bool) -> FdbFuture<FdbSlice> {
         let key = selector.key();
         FdbFuture::new(unsafe {
             fdb_sys::fdb_transaction_get_key(
@@ -388,7 +388,7 @@ impl Transaction {
         &'a self,
         opt: RangeOption<'a>,
         snapshot: bool,
-    ) -> impl TryStream<Ok = FdbFutureValues, Error = FdbError> + 'a {
+    ) -> impl TryStream<Ok = FdbValues, Error = FdbError> + 'a {
         stream::unfold((1, Some(opt)), move |(iteration, maybe_opt)| {
             if let Some(opt) = maybe_opt {
                 Either::Left(self.get_range(&opt, iteration as usize, snapshot).map(
@@ -410,7 +410,7 @@ impl Transaction {
         &'a self,
         opt: RangeOption<'a>,
         snapshot: bool,
-    ) -> impl TryStream<Ok = FdbFutureValue, Error = FdbError> + 'a {
+    ) -> impl TryStream<Ok = FdbValue, Error = FdbError> + 'a {
         self.get_ranges(opt, snapshot)
             .map_ok(|values| stream::iter(values.into_iter().map(Ok)))
             .try_flatten()
@@ -424,7 +424,7 @@ impl Transaction {
         opt: &RangeOption,
         iteration: usize,
         snapshot: bool,
-    ) -> FdbFuture<FdbFutureValues> {
+    ) -> FdbFuture<FdbValues> {
         let begin = &opt.begin;
         let end = &opt.end;
         let key_begin = begin.key();
@@ -523,7 +523,7 @@ impl Transaction {
     /// Returns an FDBFuture which will be set to an array of strings. You must first wait for the
     /// FDBFuture to be ready, check for errors, call fdb_future_get_string_array() to extract the
     /// string array, and then destroy the FDBFuture with fdb_future_destroy().
-    pub fn get_addresses_for_key(&self, key: &[u8]) -> FdbFuture<FdbFutureAddresses> {
+    pub fn get_addresses_for_key(&self, key: &[u8]) -> FdbFuture<FdbAddresses> {
         FdbFuture::new(unsafe {
             fdb_sys::fdb_transaction_get_addresses_for_key(
                 self.inner.as_ptr(),
@@ -595,7 +595,7 @@ impl Transaction {
     /// optimized to a read-only transaction.
     ///
     /// Most applications will not call this function.
-    pub fn get_versionstamp(&self) -> FdbFuture<FdbFutureSlice> {
+    pub fn get_versionstamp(&self) -> FdbFuture<FdbSlice> {
         FdbFuture::new(unsafe { fdb_sys::fdb_transaction_get_versionstamp(self.inner.as_ptr()) })
     }
 

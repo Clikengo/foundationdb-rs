@@ -23,10 +23,11 @@ use crate::{error, FdbError, FdbResult};
 
 use futures::prelude::*;
 
-/// Represents a FoundationDB database — a mutable, lexicographically ordered mapping from binary keys to binary values.
+/// Represents a FoundationDB database
+///
+/// A mutable, lexicographically ordered mapping from binary keys to binary values.
 ///
 /// Modifications to a database are performed via transactions.
-///
 pub struct Database {
     pub(crate) inner: NonNull<fdb_sys::FDBDatabase>,
 }
@@ -42,6 +43,7 @@ impl Drop for Database {
 
 #[cfg(not(any(feature = "fdb-5_1", feature = "fdb-5_2", feature = "fdb-6_0")))]
 impl Database {
+    /// Create a database for the given configuration path if any, or the default one.
     pub fn new(path: Option<&str>) -> FdbResult<Database> {
         let path_str = path.map(|path| std::ffi::CString::new(path).unwrap());
         let path_ptr = path_str
@@ -56,16 +58,22 @@ impl Database {
         })
     }
 
+    /// Create a database for the given configuration path
     pub fn from_path(path: &str) -> FdbResult<Database> {
         Self::new(Some(path))
     }
 
+    /// Create a database for the default configuration path
     pub fn default() -> FdbResult<Database> {
         Self::new(None)
     }
 }
 
 impl Database {
+    /// Create a database for the given configuration path
+    ///
+    /// This is a compatibility api. If you only use API version ≥ 610 you should
+    /// use `Database::new`, `Database::from_path` or  `Database::default`.
     pub async fn new_compat(path: Option<&str>) -> FdbResult<Database> {
         #[cfg(any(feature = "fdb-5_1", feature = "fdb-5_2", feature = "fdb-6_0"))]
         {
@@ -179,7 +187,7 @@ impl TransactError for FdbError {
 
 #[derive(Default, Clone)]
 pub struct TransactOption {
-    retry_limit: Option<u32>,
-    time_out: Option<Duration>,
-    is_idempotent: bool,
+    pub retry_limit: Option<u32>,
+    pub time_out: Option<Duration>,
+    pub is_idempotent: bool,
 }

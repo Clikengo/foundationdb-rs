@@ -38,6 +38,7 @@ use futures::task::{AtomicWaker, Context, Poll};
 
 use crate::{error, FdbError, FdbResult};
 
+/// An opaque type that represents a Future in the FoundationDB C API.
 pub struct FdbFutureHandle(NonNull<fdb_sys::FDBFuture>);
 
 impl FdbFutureHandle {
@@ -53,7 +54,10 @@ impl Drop for FdbFutureHandle {
     }
 }
 
-/// An opaque type that represents a Future in the FoundationDB C API.
+/// An opaque type that represents a pending Future that will be converted to a
+/// predefined result type.
+///
+/// Non owned result type (Fdb
 pub struct FdbFuture<T> {
     f: Option<FdbFutureHandle>,
     waker: Option<Arc<AtomicWaker>>,
@@ -124,20 +128,26 @@ extern "C" fn fdb_future_callback(
     network_waker.wake();
 }
 
-pub struct FdbFutureSlice {
+/// A slice of bytes owned by a foundationDB future
+pub struct FdbSlice {
     _f: FdbFutureHandle,
     value: *const u8,
     len: i32,
 }
 
-impl Deref for FdbFutureSlice {
+impl Deref for FdbSlice {
     type Target = [u8];
     fn deref(&self) -> &Self::Target {
         unsafe { std::slice::from_raw_parts(self.value, self.len as usize) }
     }
 }
+impl AsRef<[u8]> for FdbSlice {
+    fn as_ref(&self) -> &[u8] {
+        self.deref()
+    }
+}
 
-impl TryFrom<FdbFutureHandle> for FdbFutureSlice {
+impl TryFrom<FdbFutureHandle> for FdbSlice {
     type Error = FdbError;
 
     fn try_from(f: FdbFutureHandle) -> FdbResult<Self> {
@@ -146,11 +156,11 @@ impl TryFrom<FdbFutureHandle> for FdbFutureSlice {
 
         error::eval(unsafe { fdb_sys::fdb_future_get_key(f.as_ptr(), &mut value, &mut len) })?;
 
-        Ok(FdbFutureSlice { _f: f, value, len })
+        Ok(FdbSlice { _f: f, value, len })
     }
 }
 
-impl TryFrom<FdbFutureHandle> for Option<FdbFutureSlice> {
+impl TryFrom<FdbFutureHandle> for Option<FdbSlice> {
     type Error = FdbError;
 
     fn try_from(f: FdbFutureHandle) -> FdbResult<Self> {
@@ -165,18 +175,19 @@ impl TryFrom<FdbFutureHandle> for Option<FdbFutureSlice> {
         Ok(if present == 0 {
             None
         } else {
-            Some(FdbFutureSlice { _f: f, value, len })
+            Some(FdbSlice { _f: f, value, len })
         })
     }
 }
 
-pub struct FdbFutureAddresses {
+/// A slice of addresses owned by a foundationDB future
+pub struct FdbAddresses {
     _f: FdbFutureHandle,
     strings: *const *const c_char,
     len: i32,
 }
 
-impl TryFrom<FdbFutureHandle> for FdbFutureAddresses {
+impl TryFrom<FdbFutureHandle> for FdbAddresses {
     type Error = FdbError;
 
     fn try_from(f: FdbFutureHandle) -> FdbResult<Self> {
@@ -187,7 +198,7 @@ impl TryFrom<FdbFutureHandle> for FdbFutureAddresses {
             fdb_sys::fdb_future_get_string_array(f.as_ptr(), &mut strings, &mut len)
         })?;
 
-        Ok(FdbFutureAddresses {
+        Ok(FdbAddresses {
             _f: f,
             strings,
             len,
@@ -195,39 +206,63 @@ impl TryFrom<FdbFutureHandle> for FdbFutureAddresses {
     }
 }
 
-impl Deref for FdbFutureAddresses {
-    type Target = [FdbFutureAddress];
+impl Deref for FdbAddresses {
+    type Target = [FdbAddress];
 
     fn deref(&self) -> &Self::Target {
-        assert_eq_size!(FdbFutureAddress, *const c_char);
-        assert_eq_align!(FdbFutureAddress, *const c_char);
+        assert_eq_size!(FdbAddress, *const c_char);
+        assert_eq_align!(FdbAddress, *const c_char);
         unsafe {
             &*(std::slice::from_raw_parts(self.strings, self.len as usize)
-                as *const [*const c_char] as *const [FdbFutureAddress])
+                as *const [*const c_char] as *const [FdbAddress])
         }
     }
 }
+impl AsRef<[FdbAddress]> for FdbAddresses {
+    fn as_ref(&self) -> &[FdbAddress] {
+        self.deref()
+    }
+}
 
-pub struct FdbFutureAddress {
+/// An address owned by a foundationDB future
+///
+/// Because the data it represent is owned by the future in FdbAddresses, you
+/// can never own a FdbAddress directly, you can only have references to it.
+/// This way, you can never obtain a lifetime greater than the lifetime of the
+/// slice that gave you access to it.
+pub struct FdbAddress {
     c_str: *const c_char,
 }
 
-impl Deref for FdbFutureAddress {
+impl Deref for FdbAddress {
     type Target = CStr;
 
     fn deref(&self) -> &CStr {
         unsafe { std::ffi::CStr::from_ptr(self.c_str) }
     }
 }
+impl AsRef<CStr> for FdbAddress {
+    fn as_ref(&self) -> &CStr {
+        self.deref()
+    }
+}
 
-pub struct FdbFutureValues {
+/// An slice of keyvalues owned by a foundationDB future
+pub struct FdbValues {
     _f: FdbFutureHandle,
     keyvalues: *const fdb_sys::FDBKeyValue,
     len: i32,
-    pub(crate) more: bool,
+    more: bool,
 }
 
-impl TryFrom<FdbFutureHandle> for FdbFutureValues {
+impl FdbValues {
+    /// `true` if there is another range after this one
+    pub fn more(&self) -> bool {
+        self.more
+    }
+}
+
+impl TryFrom<FdbFutureHandle> for FdbValues {
     type Error = FdbError;
     fn try_from(f: FdbFutureHandle) -> FdbResult<Self> {
         let mut keyvalues = std::ptr::null();
@@ -243,7 +278,7 @@ impl TryFrom<FdbFutureHandle> for FdbFutureValues {
             ))?
         }
 
-        Ok(FdbFutureValues {
+        Ok(FdbValues {
             _f: f,
             keyvalues,
             len,
@@ -252,32 +287,37 @@ impl TryFrom<FdbFutureHandle> for FdbFutureValues {
     }
 }
 
-impl Deref for FdbFutureValues {
-    type Target = [KeyValue];
+impl Deref for FdbValues {
+    type Target = [FdbKeyValue];
     fn deref(&self) -> &Self::Target {
-        assert_eq_size!(KeyValue, fdb_sys::FDBKeyValue);
-        assert_eq_align!(KeyValue, fdb_sys::FDBKeyValue);
+        assert_eq_size!(FdbKeyValue, fdb_sys::FDBKeyValue);
+        assert_eq_align!(FdbKeyValue, fdb_sys::FDBKeyValue);
         unsafe {
             &*(std::slice::from_raw_parts(self.keyvalues, self.len as usize)
-                as *const [fdb_sys::FDBKeyValue] as *const [KeyValue])
+                as *const [fdb_sys::FDBKeyValue] as *const [FdbKeyValue])
         }
     }
 }
+impl AsRef<[FdbKeyValue]> for FdbValues {
+    fn as_ref(&self) -> &[FdbKeyValue] {
+        self.deref()
+    }
+}
 
-impl<'a> IntoIterator for &'a FdbFutureValues {
-    type Item = &'a KeyValue;
-    type IntoIter = std::slice::Iter<'a, KeyValue>;
+impl<'a> IntoIterator for &'a FdbValues {
+    type Item = &'a FdbKeyValue;
+    type IntoIter = std::slice::Iter<'a, FdbKeyValue>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.deref().iter()
     }
 }
-impl IntoIterator for FdbFutureValues {
-    type Item = FdbFutureValue;
-    type IntoIter = FdbFutureValuesIter;
+impl IntoIterator for FdbValues {
+    type Item = FdbValue;
+    type IntoIter = FdbValuesIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        FdbFutureValuesIter {
+        FdbValuesIter {
             f: Rc::new(self._f),
             keyvalues: self.keyvalues,
             len: self.len,
@@ -286,14 +326,15 @@ impl IntoIterator for FdbFutureValues {
     }
 }
 
-pub struct FdbFutureValuesIter {
+/// An iterator of keyvalues owned by a foundationDB future
+pub struct FdbValuesIter {
     f: Rc<FdbFutureHandle>,
     keyvalues: *const fdb_sys::FDBKeyValue,
     len: i32,
     pos: i32,
 }
-impl Iterator for FdbFutureValuesIter {
-    type Item = FdbFutureValue;
+impl Iterator for FdbValuesIter {
+    type Item = FdbValue;
     fn next(&mut self) -> Option<Self::Item> {
         self.nth(0)
     }
@@ -306,7 +347,7 @@ impl Iterator for FdbFutureValuesIter {
                 let keyvalue = unsafe { self.keyvalues.add(pos) };
                 self.pos = pos as i32 + 1;
 
-                Some(FdbFutureValue {
+                Some(FdbValue {
                     _f: self.f.clone(),
                     keyvalue,
                 })
@@ -323,8 +364,8 @@ impl Iterator for FdbFutureValuesIter {
         (rem, Some(rem))
     }
 }
-impl ExactSizeIterator for FdbFutureValuesIter {}
-impl DoubleEndedIterator for FdbFutureValuesIter {
+impl ExactSizeIterator for FdbValuesIter {}
+impl DoubleEndedIterator for FdbValuesIter {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.nth_back(0)
     }
@@ -335,7 +376,7 @@ impl DoubleEndedIterator for FdbFutureValuesIter {
             self.pos -= 1 + n as i32;
             let keyvalue = unsafe { self.keyvalues.add(self.pos as usize) };
 
-            Some(FdbFutureValue {
+            Some(FdbValue {
                 _f: self.f.clone(),
                 keyvalue,
             })
@@ -346,37 +387,46 @@ impl DoubleEndedIterator for FdbFutureValuesIter {
     }
 }
 
-pub struct FdbFutureValue {
+/// A keyvalue you can own
+///
+/// Until dropped, this might prevent multiple key/values from beeing freed.
+/// (i.e. the future that own the data is dropped once all data it provided is dropped)
+pub struct FdbValue {
     _f: Rc<FdbFutureHandle>,
     keyvalue: *const fdb_sys::FDBKeyValue,
 }
-impl Deref for FdbFutureValue {
-    type Target = KeyValue;
+impl Deref for FdbValue {
+    type Target = FdbKeyValue;
     fn deref(&self) -> &Self::Target {
-        assert_eq_size!(KeyValue, fdb_sys::FDBKeyValue);
-        assert_eq_align!(KeyValue, fdb_sys::FDBKeyValue);
-        unsafe { &*(self.keyvalue as *const KeyValue) }
+        assert_eq_size!(FdbKeyValue, fdb_sys::FDBKeyValue);
+        assert_eq_align!(FdbKeyValue, fdb_sys::FDBKeyValue);
+        unsafe { &*(self.keyvalue as *const FdbKeyValue) }
+    }
+}
+impl AsRef<FdbKeyValue> for FdbValue {
+    fn as_ref(&self) -> &FdbKeyValue {
+        self.deref()
     }
 }
 
-/// Represents a single key-value pair in the output of fdb_future_get_keyvalue_array().
+/// A keyvalue owned by a foundationDB future
 ///
-/// Internal info:
+/// # Internal info:
 ///
 /// Uses repr(C, packed(4)) because c API uses 4-byte alignment for this struct
 ///
-/// Because the data it represent is owned by the future in FdbFutureValues, you
-/// can never own a KeyValue directly, you can only have references to it.
+/// Because the data it represent is owned by the future in FdbValues, you
+/// can never own a FdbKeyValue directly, you can only have references to it.
 /// This way, you can never obtain a lifetime greater than the lifetime of the
 /// slice that gave you access to it.
 #[repr(C, packed(4))]
-pub struct KeyValue {
+pub struct FdbKeyValue {
     key: *const u8,
     key_len: i32,
     value: *const u8,
     value_len: i32,
 }
-impl KeyValue {
+impl FdbKeyValue {
     /// key
     pub fn key(&self) -> &[u8] {
         unsafe { std::slice::from_raw_parts(self.key, self.key_len as usize) }

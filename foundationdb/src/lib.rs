@@ -18,31 +18,29 @@
 //! - Ubuntu Linux (this may work on the Linux subsystem for Windows as well)
 //!
 //! ```console
-//! $> curl -O https://www.foundationdb.org/downloads/5.1.5/ubuntu/installers/foundationdb-clients_5.1.5-1_amd64.deb
-//! $> curl -O https://www.foundationdb.org/downloads/5.1.5/ubuntu/installers/foundationdb-server_5.1.5-1_amd64.deb
-//! $> sudo dpkg -i foundationdb-clients_5.1.5-1_amd64.deb
-//! $> sudo dpkg -i foundationdb-server_5.1.5-1_amd64.deb
+//! $> curl -O https://www.foundationdb.org/downloads/6.1.12/ubuntu/installers/foundationdb-clients_6.1.12-1_amd64.deb
+//! $> curl -O https://www.foundationdb.org/downloads/6.1.12/ubuntu/installers/foundationdb-server_6.1.12-1_amd64.deb
+//! $> sudo dpkg -i foundationdb-clients_6.1.12-1_amd64.deb
+//! $> sudo dpkg -i foundationdb-server_6.1.12-1_amd64.deb
 //! ```
 //!
 //! - macOS
 //!
 //! ```console
-//! $> curl -O https://www.foundationdb.org/downloads/5.1.5/macOS/installers/FoundationDB-5.1.5.pkg
-//! $> sudo installer -pkg FoundationDB-5.1.5.pkg -target /
+//! $> curl -O https://www.foundationdb.org/downloads/6.1.12/macOS/installers/FoundationDB-6.1.12.pkg
+//! $> sudo installer -pkg FoundationDB-6.1.12.pkg -target /
 //! ```
+//!
+//! - Windows
+//!
+//! Install [foundationdb-6.1.12-x64.msi](https://www.foundationdb.org/downloads/6.1.12/windows/installers/foundationdb-6.1.12-x64.msi)
 //!
 //! ## Add dependencies on foundationdb-rs
 //!
 //! ```toml
 //! [dependencies]
-//! foundationdb = "*"
-//! futures = "0.1"
-//! ```
-//!
-//! ## Extern the crate in `bin.rs` or `lib.rs`
-//!
-//! ```rust
-//! extern crate foundationdb;
+//! foundationdb = "0.4"
+//! futures = "0.3"
 //! ```
 //!
 //! ## Initialization
@@ -53,7 +51,6 @@
 //!
 //! ```rust
 //! use futures::prelude::*;
-//! use std::ops::Deref;
 //!
 //! async fn async_main() -> foundationdb::FdbResult<()> {
 //!     let db = foundationdb::Database::default()?;
@@ -68,7 +65,7 @@
 //!     let maybe_value = trx.get(b"hello", false).await?;
 //!     let value = maybe_value.unwrap(); // unwrap the option
 //!
-//!     assert_eq!(b"world", value.deref());
+//!     assert_eq!(b"world", &value.as_ref());
 //!
 //!     Ok(())
 //! }
@@ -89,8 +86,8 @@ extern crate static_assertions;
 pub mod api;
 #[cfg(any(feature = "fdb-5_1", feature = "fdb-5_2", feature = "fdb-6_0"))]
 pub mod cluster;
-pub mod database;
-pub mod error;
+mod database;
+mod error;
 pub mod future;
 pub mod keyselector;
 /// Generated configuration types for use with the various `set_option` functions

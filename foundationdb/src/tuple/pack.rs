@@ -3,6 +3,7 @@ use memchr::memchr_iter;
 use std::io;
 use std::mem;
 
+/// A type that can be packed
 pub trait TuplePack {
     fn pack<W: io::Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> io::Result<()>;
 
@@ -18,13 +19,13 @@ pub trait TuplePack {
     }
 }
 
+/// A type that can be unpacked
 pub trait TupleUnpack<'de>: Sized {
     fn unpack(input: &'de [u8], tuple_depth: TupleDepth) -> Result<(&'de [u8], Self)>;
 
     fn unpack_root(input: &'de [u8]) -> Result<Self> {
         let (input, this) = Self::unpack(input, TupleDepth::new())?;
         if !input.is_empty() {
-            dbg!(input);
             return Err(Error::TrailingBytes);
         }
         Ok(this)
@@ -338,13 +339,13 @@ macro_rules! impl_fx {
     };
 }
 
-impl_ux!(u8);
+//impl_ux!(u8);
 impl_ux!(u16);
 impl_ux!(u32);
 impl_ux!(u64);
 impl_ux!(usize);
 
-impl_ix!(i8, u8);
+//impl_ix!(i8, u8);
 impl_ix!(i16, u16);
 impl_ix!(i32, u32);
 impl_ix!(i64, u64);
@@ -445,6 +446,25 @@ impl<'de> TupleUnpack<'de> for Bytes<'de> {
         let input = parse_code(input, BYTES)?;
         let (input, v) = parse_slice(input)?;
         Ok((input, Bytes(v)))
+    }
+}
+
+impl<'a> TuplePack for &'a [u8] {
+    fn pack<W: io::Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> io::Result<()> {
+        Bytes::from(*self).pack(w, tuple_depth)
+    }
+}
+
+impl TuplePack for Vec<u8> {
+    fn pack<W: io::Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> std::io::Result<()> {
+        Bytes::from(self.as_slice()).pack(w, tuple_depth)
+    }
+}
+
+impl<'de> TupleUnpack<'de> for Vec<u8> {
+    fn unpack(input: &'de [u8], tuple_depth: TupleDepth) -> Result<(&'de [u8], Self)> {
+        let (input, bytes) = Bytes::unpack(input, tuple_depth)?;
+        Ok((input, bytes.into_owned()))
     }
 }
 

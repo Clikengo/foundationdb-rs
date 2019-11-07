@@ -32,7 +32,7 @@ pub struct FdbError {
 }
 
 impl FdbError {
-    /// Converts from the raw Fdb error code into an `Error`
+    /// Converts from a raw foundationDB error code
     pub fn from_code(error_code: fdb_sys::fdb_error_t) -> Self {
         Self { error_code }
     }
@@ -67,7 +67,7 @@ impl FdbError {
         self.is_error_predicate(options::ErrorPredicate::RetryableNotCommitted)
     }
 
-    /// Error code
+    /// Raw foundationdb error code
     pub fn code(self) -> i32 {
         self.error_code
     }
@@ -79,5 +79,5 @@ impl fmt::Display for FdbError {
     }
 }
 
-/// An Fdb Result type
+/// Alias for `Result<..., FdbError>`
 pub type FdbResult<T> = Result<T, FdbError>;

@@ -6,9 +6,12 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
-//! Implementations of the Fdb API versioning C API
+//! Configuration of foundationDB API and Network
 //!
-//! https://apple.github.io/foundationdb/api-c.html#api-versioning
+//! Provides a safe wrapper around the following C API calls:
+//!
+//! - [API versioning](https://apple.github.io/foundationdb/api-c.html#api-versioning)
+//! - [Network](https://apple.github.io/foundationdb/api-c.html#network)
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
@@ -25,17 +28,24 @@ pub fn get_max_api_version() -> i32 {
 
 static VERSION_SELECTED: AtomicBool = AtomicBool::new(false);
 
-/// A type which represents the successful innitialization of an Fdb API Version
-pub struct FdbApi {
-    _private: (),
-}
 /// A Builder with which different versions of the Fdb C API can be initialized
+///
+/// The foundationDB C API can only be initialized once.
+///
+/// ```
+/// foundationdb::api::FdbApiBuilder::default().build().expect("fdb api initialized");
+/// ```
 pub struct FdbApiBuilder {
     runtime_version: i32,
 }
 
 impl FdbApiBuilder {
     /// The version of run-time behavior the API is requested to provide.
+    pub fn runtime_version(&self) -> i32 {
+        self.runtime_version
+    }
+
+    /// Set the version of run-time behavior the API is requested to provide.
     ///
     /// Must be less than or equal to header_version, `foundationdb_sys::FDB_API_VERSION`, and should almost always be equal.
     /// Language bindings which themselves expose API versioning will usually pass the version requested by the application.
@@ -44,12 +54,15 @@ impl FdbApiBuilder {
         self
     }
 
-    /// The API version can only be initialized once in the lifetime of a process
+    /// Initialize the foundationDB API and returns a `NetworkBuilder`
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if called more than once
     pub fn build(self) -> FdbResult<NetworkBuilder> {
         if VERSION_SELECTED.compare_and_swap(false, true, Ordering::AcqRel) {
             panic!("the fdb select api version can only be run once per process");
         }
-
         error::eval(unsafe {
             fdb_sys::fdb_select_api_version_impl(
                 self.runtime_version,
@@ -68,19 +81,50 @@ impl Default for FdbApiBuilder {
     }
 }
 
-/// Allow `NetworkOption`s to be associated with the Fdb Network
+/// A Builder with which the foundationDB network event loop can be created
+///
+/// The foundationDB Network event loop can only be run once.
+///
+/// ```
+/// use foundationdb::api::FdbApiBuilder;
+///
+/// let network_builder = FdbApiBuilder::default().build().expect("fdb api initialized");
+/// let network_stop_if_dropped = network_builder.boot().expect("fdb network to run");
+///
+/// // do some work with foundationDB
+///
+/// drop(network_stop_if_dropped);
+/// ```
 pub struct NetworkBuilder {
     _private: (),
 }
 
 impl NetworkBuilder {
-    /// Called to set network options.
+    /// Set network options.
     pub fn set_option(self, option: NetworkOption) -> FdbResult<Self> {
         unsafe { option.apply()? };
         Ok(self)
     }
 
-    /// Finalizes the construction of the Network
+    /// Finalizes the initialization of the Network
+    ///
+    /// ```
+    /// use foundationdb::api::FdbApiBuilder;
+    ///
+    /// let network_builder = FdbApiBuilder::default().build().expect("fdb api initialized");
+    /// let (runner, cond) = network_builder.build().expect("fdb network runners");
+    ///
+    /// let net_thread = std::thread::spawn(move || {
+    ///     runner.run().expect("failed to run");
+    /// });
+    ///
+    /// // Wait for the foundationDB network thread to start
+    /// let fdb_network = cond.wait();
+    ///
+    /// // do some work with foundationDB
+    /// fdb_network.stop().expect("failed to stop network");
+    /// net_thread.join().expect("failed to join fdb thread");
+    /// ```
     #[allow(clippy::mutex_atomic)]
     pub fn build(self) -> FdbResult<(NetworkRunner, NetworkWait)> {
         unsafe { error::eval(fdb_sys::fdb_setup_network())? }
@@ -89,6 +133,7 @@ impl NetworkBuilder {
         Ok((NetworkRunner { cond: cond.clone() }, NetworkWait { cond }))
     }
 
+    /// Finalizes the initialization of the Network and starts it in a new thread
     pub fn boot(self) -> FdbResult<NetworkAutoStop> {
         let (runner, cond) = self.build()?;
 
@@ -103,11 +148,16 @@ impl NetworkBuilder {
     }
 }
 
+/// A foundationDB network event loop runner
 pub struct NetworkRunner {
     cond: Arc<(Mutex<bool>, Condvar)>,
 }
 
 impl NetworkRunner {
+    /// Start the foundationDB network event loop in the current thread.
+    ///
+    /// This will only returns once the `stop` method on the associated `NetworkStop`
+    /// object is called or if the foundationDB event loop return an error.
     pub fn run(self) -> FdbResult<()> {
         {
             let (lock, cvar) = &*self.cond;
@@ -121,11 +171,13 @@ impl NetworkRunner {
     }
 }
 
+/// A condition object that can wait for the associated `NetworkRunner` to actually run.
 pub struct NetworkWait {
     cond: Arc<(Mutex<bool>, Condvar)>,
 }
 
 impl NetworkWait {
+    /// Wait for the associated `NetworkRunner` to actually run.
     pub fn wait(self) -> NetworkStop {
         // Wait for the thread to start up.
         {
@@ -140,41 +192,19 @@ impl NetworkWait {
     }
 }
 
+/// Allow to stop the associated and running `NetworkRunner`.
 pub struct NetworkStop {
     _private: (),
 }
 
 impl NetworkStop {
     /// Signals the event loop invoked by `Network::run` to terminate.
-    ///
-    /// You must call this function and wait for fdb_run_network() to return before allowing your program to exit, or else the behavior is undefined.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// let (runner, cond) = foundationdb::api::FdbApiBuilder::default()
-    ///     .build()
-    ///     .expect("failed to init api")
-    ///     .build()
-    ///     .expect("failed to init network");
-    ///
-    /// let network_thread = std::thread::spawn(move || {
-    ///     runner.run().expect("failed to run");
-    /// });
-    ///
-    /// // wait for the network to be running
-    /// let network_stop = cond.wait();
-    ///
-    /// // do whatever you want with foundationdb
-    ///
-    /// network_stop.stop().expect("failed to stop network");
-    /// network_thread.join().expect("failed to join fdb thread");
-    /// ```
     pub fn stop(self) -> FdbResult<()> {
         error::eval(unsafe { fdb_sys::fdb_stop_network() })
     }
 }
 
+/// Stop the associated `NetworkRunner` and thread if dropped
 pub struct NetworkAutoStop {
     network: Option<NetworkStop>,
     handle: Option<std::thread::JoinHandle<()>>,

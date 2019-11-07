@@ -1,3 +1,7 @@
+//! Implementation of the official tuple layer typecodes
+//!
+//! The official specification can be found [here](https://github.com/apple/foundationdb/blob/master/design/tuple.md).
+
 mod element;
 mod pack;
 mod subspace;
@@ -8,6 +12,9 @@ use std::fmt::{self, Display};
 use std::io;
 use std::ops::Deref;
 use std::result;
+
+#[cfg(feature = "uuid")]
+pub use uuid::Uuid;
 
 pub use element::Element;
 pub use pack::{TuplePack, TupleUnpack};
@@ -53,65 +60,61 @@ impl TupleDepth {
     }
 }
 
-enum SerDeState {
-    Default,
-    Versionstamp,
-    #[cfg(feature = "uuid")]
-    Uuid,
-}
-
-impl<'a> From<&'a str> for SerDeState {
-    fn from(name: &'a str) -> Self {
-        match name {
-            "Versionstamp" => SerDeState::Versionstamp,
-            #[cfg(feature = "uuid")]
-            "Uuid" => SerDeState::Uuid,
-            _ => SerDeState::Default,
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
+/// A packing/unpacking error
+#[derive(Debug)]
 pub enum Error {
     Message(String),
-    NotSupported(&'static str),
-    IoError,
+    IoError(io::Error),
     TrailingBytes,
     MissingBytes,
     BadStringFormat,
-    BadSeqFormat,
-    BadCharValue(u32),
     BadCode {
         found: u8,
         expected: Option<u8>,
     },
     BadPrefix,
-    BadVersionstamp,
     #[cfg(feature = "uuid")]
     BadUuid,
 }
 
 impl From<io::Error> for Error {
-    fn from(_: io::Error) -> Self {
-        Error::IoError
+    fn from(err: io::Error) -> Self {
+        Error::IoError(err)
     }
 }
 
 impl Display for Error {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str(std::error::Error::description(self))
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Error::Message(s) => s.fmt(f),
+            Error::IoError(err) => err.fmt(f),
+            Error::TrailingBytes => write!(f, "trailing bytes"),
+            Error::MissingBytes => write!(f, "missing bytes"),
+            Error::BadStringFormat => write!(f, "not an utf8 string"),
+            Error::BadCode { found, .. } => write!(f, "bad code, found {}", found),
+            Error::BadPrefix => write!(f, "bad prefix"),
+            Error::BadUuid => write!(f, "bad uuid"),
+        }
     }
 }
 
-impl std::error::Error for Error {}
-
+/// Alias for `Result<..., tuple::Error>`
 pub type Result<T> = result::Result<T, Error>;
 
+/// Represent a sequence of bytes (i.e. &[u8])
+///
+/// This sequence can be either owned or borrowed.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Bytes<'a>(pub Cow<'a, [u8]>);
 
-impl<'a> std::fmt::Debug for Bytes<'a> {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl<'a> fmt::Debug for Bytes<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(self, f)
+    }
+}
+
+impl<'a> fmt::Display for Bytes<'a> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "b\"")?;
         for &byte in self.0.iter() {
             if byte.is_ascii_alphanumeric() || byte.is_ascii_punctuation() || byte == b' ' {
@@ -133,6 +136,11 @@ impl<'a> Bytes<'a> {
 impl<'a> Deref for Bytes<'a> {
     type Target = [u8];
     fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl<'a> AsRef<[u8]> for Bytes<'a> {
+    fn as_ref(&self) -> &[u8] {
         &self.0
     }
 }
@@ -159,13 +167,18 @@ impl From<String> for Bytes<'static> {
     }
 }
 
+/// Pack value and returns the packed buffer
 pub fn pack<T: TuplePack>(v: &T) -> Vec<u8> {
     v.pack_to_vec()
 }
+
+/// Pack value into the given buffer
 pub fn pack_into<T: TuplePack>(v: &T, output: &mut Vec<u8>) {
     v.pack_root(output)
         .expect("tuple encoding should never fail");
 }
+
+/// Unpack input
 pub fn unpack<'de, T: TupleUnpack<'de>>(input: &'de [u8]) -> Result<T> {
     T::unpack_root(input)
 }
@@ -178,7 +191,7 @@ mod tests {
 
     fn test_serde<'de, T>(val: T, buf: &'de [u8])
     where
-        T: TuplePack + TupleUnpack<'de> + std::fmt::Debug + PartialEq,
+        T: TuplePack + TupleUnpack<'de> + fmt::Debug + PartialEq,
     {
         assert_eq!(unpack::<'de, T>(buf).unwrap(), val);
         assert_eq!(pack(&val), buf);

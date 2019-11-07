@@ -16,7 +16,6 @@ use rand::rngs::mock::StepRng;
 use stopwatch::Stopwatch;
 use structopt::StructOpt;
 
-use crate::fdb::error::*;
 use crate::fdb::*;
 
 #[derive(Clone)]
