@@ -1,4 +1,4 @@
-os: Visual Studio 2017
+os: Visual Studio 2019
 
 environment:
   matrix:
@@ -23,6 +23,6 @@ build_script:
   - cargo test --manifest-path foundationdb-sys/Cargo.toml
   - cargo test --manifest-path foundationdb-gen/Cargo.toml
   - cargo test --manifest-path foundationdb/Cargo.toml
-  - cargo test --manifest-path foundationdb/Cargo.toml --no-default-features --features fdb-6_0
+  - cargo test --manifest-path foundationdb/Cargo.toml --no-default-features --features fdb-6_0 --tests
   - cargo test --manifest-path foundationdb-bench/Cargo.toml
   - cargo run --manifest-path foundationdb/Cargo.toml --example class-scheduling
