@@ -1,4 +1,4 @@
-$Version="6.0.15"
+$Version="6.1.12"
 $BaseUrl="https://www.foundationdb.org/downloads/${Version}"
 
 Invoke-WebRequest "${BaseUrl}/windows/installers/foundationdb-${Version}-x64.msi" -OutFile "foundationdb-${Version}-x64.msi"
