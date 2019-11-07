@@ -13,9 +13,15 @@ use std::borrow::Cow;
 
 /// A `KeySelector` identifies a particular key in the database.
 ///
-/// FoundationDB's lexicographically ordered data model permits finding keys based on their order (for example, finding the first key in the database greater than a given key). Key selectors represent a description of a key in the database that could be resolved to an actual key by `Transaction::get_key` or used directly as the beginning or end of a range in `Transaction::getRange`.
+/// FoundationDB's lexicographically ordered data model permits finding keys based on their order
+/// (for example, finding the first key in the database greater than a given key). Key selectors
+/// represent a description of a key in the database that could be resolved to an actual key by
+/// `Transaction::get_key` or used directly as the beginning or end of a range in
+/// `Transaction::getRange`.
 ///
-/// Note that the way the key selectors are resolved is somewhat non-intuitive, so users who wish to use a key selector other than the default ones described below should probably consult that documentation before proceeding.
+/// Note that the way the key selectors are resolved is somewhat non-intuitive, so users who wish
+/// to use a key selector other than the default ones described below should probably consult that
+/// documentation before proceeding.
 ///
 /// Generally one of the following static methods should be used to construct a KeySelector:
 ///
@@ -32,7 +38,7 @@ pub struct KeySelector<'a> {
 
 impl<'a> KeySelector<'a> {
     /// Constructs a new KeySelector from the given parameters.
-    pub fn new(key: Cow<'a, [u8]>, or_equal: bool, offset: i32) -> Self {
+    pub const fn new(key: Cow<'a, [u8]>, or_equal: bool, offset: i32) -> Self {
         Self {
             key: Bytes(key),
             or_equal,
@@ -56,23 +62,23 @@ impl<'a> KeySelector<'a> {
     }
 
     /// Creates a `KeySelector` that picks the last key less than the parameter
-    pub fn last_less_than(key: Cow<'a, [u8]>) -> Self {
-        Self::new(key, false, 0)
+    pub fn last_less_than<K: Into<Cow<'a, [u8]>>>(key: K) -> Self {
+        Self::new(key.into(), false, 0)
     }
 
     /// Creates a `KeySelector` that picks the last key less than or equal to the parameter
-    pub fn last_less_or_equal(key: Cow<'a, [u8]>) -> Self {
-        Self::new(key, true, 0)
+    pub fn last_less_or_equal<K: Into<Cow<'a, [u8]>>>(key: K) -> Self {
+        Self::new(key.into(), true, 0)
     }
 
     /// Creates a `KeySelector` that picks the first key greater than or equal to the parameter
-    pub fn first_greater_than(key: Cow<'a, [u8]>) -> Self {
-        Self::new(key, true, 1)
+    pub fn first_greater_than<K: Into<Cow<'a, [u8]>>>(key: K) -> Self {
+        Self::new(key.into(), true, 1)
     }
 
     /// Creates a `KeySelector` that picks the first key greater than the parameter
-    pub fn first_greater_or_equal(key: Cow<'a, [u8]>) -> Self {
-        Self::new(key, false, 1)
+    pub fn first_greater_or_equal<K: Into<Cow<'a, [u8]>>>(key: K) -> Self {
+        Self::new(key.into(), false, 1)
     }
 
     fn make_key(&mut self, key: &[u8]) {

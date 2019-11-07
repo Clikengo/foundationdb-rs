@@ -11,9 +11,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::thread;
 
-use fdb::keyselector::KeySelector;
 use fdb::options::{ConflictRangeType, DatabaseOption, TransactionOption};
-use fdb::transaction::RangeOption;
 use fdb::tuple::{pack, pack_into, unpack, Bytes, Element, Subspace, TuplePack, TupleUnpack};
 use fdb::*;
 use futures::future;
@@ -477,7 +475,7 @@ impl StackMachine {
     }
 
     async fn fetch_instr(&self, trx: &Transaction) -> FdbResult<Vec<Instr>> {
-        let opt = RangeOptionBuilder::from(&Subspace::from(&self.prefix)).build();
+        let opt = RangeOption::from(&Subspace::from(&self.prefix));
         debug!("opt = {:?}", opt);
         let instrs = Vec::new();
         trx.get_ranges(opt, false)
@@ -880,16 +878,19 @@ impl StackMachine {
                 } else {
                     None
                 };
-                let opt = transaction::RangeOptionBuilder::new(begin, end)
-                    .mode(mode)
-                    .limit(limit as usize)
-                    .reverse(reverse != 0)
-                    .build();
+                let opt = RangeOption {
+                    begin,
+                    end,
+                    mode,
+                    limit: Some(limit as usize),
+                    reverse: reverse != 0,
+                    ..RangeOption::default()
+                };
                 async fn get_range(
                     trx: Transaction,
                     trx_name: Option<Bytes<'static>>,
                     prefix: Option<Bytes<'static>>,
-                    opt: transaction::RangeOption<'static>,
+                    opt: RangeOption<'static>,
                     snapshot: bool,
                 ) -> StackResult {
                     let res = trx

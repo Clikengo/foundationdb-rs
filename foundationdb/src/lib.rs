@@ -89,24 +89,21 @@ pub mod cluster;
 mod database;
 mod error;
 pub mod future;
-pub mod keyselector;
+mod keyselector;
 /// Generated configuration types for use with the various `set_option` functions
 #[allow(clippy::all)]
 pub mod options;
-pub mod transaction;
+mod transaction;
 pub mod tuple;
 
 #[cfg(any(feature = "fdb-5_1", feature = "fdb-5_2", feature = "fdb-6_0"))]
 pub use crate::cluster::Cluster;
 
-pub use crate::database::{Database, TransactError, TransactOption};
+pub use crate::database::*;
 pub use crate::error::FdbError;
 pub use crate::error::FdbResult;
-pub use crate::keyselector::KeySelector;
-pub use crate::transaction::{
-    RangeOptionBuilder, Transaction, TransactionCancelled, TransactionCommitError,
-    TransactionCommitted,
-};
+pub use crate::keyselector::*;
+pub use crate::transaction::*;
 
 /// Initialize the FoundationDB Client API, this can only be called once per process.
 ///

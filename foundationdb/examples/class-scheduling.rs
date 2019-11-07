@@ -18,9 +18,7 @@ use rand::{rngs::ThreadRng, seq::SliceRandom};
 
 use foundationdb as fdb;
 use foundationdb::tuple::{pack, unpack, Subspace};
-use foundationdb::{
-    Database, FdbError, RangeOptionBuilder, TransactError, TransactOption, Transaction,
-};
+use foundationdb::{Database, FdbError, RangeOption, TransactError, TransactOption, Transaction};
 
 type Result<T> = std::result::Result<T, Error>;
 enum Error {
@@ -107,10 +105,10 @@ async fn init(db: &Database, all_classes: &[String]) {
 async fn get_available_classes(db: &Database) -> Vec<String> {
     let trx = db.create_trx().expect("could not create transaction");
 
-    let range = RangeOptionBuilder::from(&Subspace::from("class"));
+    let range = RangeOption::from(&Subspace::from("class"));
 
     let got_range = trx
-        .get_range(&range.build(), 1_024, false)
+        .get_range(&range, 1_024, false)
         .await
         .expect("failed to get classes");
     let mut available_classes = Vec::<String>::new();
@@ -188,7 +186,7 @@ async fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<()>
         return Err(Error::NoRemainingSeats);
     }
 
-    let attends_range = RangeOptionBuilder::from(&("attends", &student).into()).build();
+    let attends_range = RangeOption::from(&("attends", &student).into());
     if trx
         .get_range(&attends_range, 1_024, false)
         .await
@@ -345,7 +343,7 @@ async fn run_sim(db: &Database, students: usize, ops_per_student: usize) {
         thread.join().expect("failed to join thread");
 
         let student_id = format!("s{}", id);
-        let attends_range = RangeOptionBuilder::from(&("attends", &student_id).into()).build();
+        let attends_range = RangeOption::from(&("attends", &student_id).into());
 
         for key_value in db
             .create_trx()

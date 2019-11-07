@@ -116,8 +116,8 @@ impl Database {
     /// if the task need to be guaranteed to finish.
     ///
     /// Once [Generic Associated Types](https://github.com/rust-lang/rfcs/blob/master/text/1598-generic_associated_types.md)
-    /// lands in stable rust, the returned future of f won't need to be boxed anymore,
-    /// also the lifetime limitations around f might be lowered
+    /// lands in stable rust, the returned future of f won't need to be boxed anymore, also the
+    /// lifetime limitations around f might be lowered.
     pub async fn transact<F, D, Item, Error>(
         &self,
         data: D,
@@ -168,6 +168,7 @@ impl Database {
     }
 }
 
+/// A trait that must be implemented to use `Database::transact` this application error types.
 pub trait TransactError: From<FdbError> {
     fn try_into_fdb_error(self) -> Result<FdbError, Self>;
 }
@@ -185,9 +186,20 @@ impl TransactError for FdbError {
     }
 }
 
+/// A set of options that controls the behavior of `Database::transact`.
 #[derive(Default, Clone)]
 pub struct TransactOption {
     pub retry_limit: Option<u32>,
     pub time_out: Option<Duration>,
     pub is_idempotent: bool,
+}
+
+impl TransactOption {
+    /// An idempotent TransactOption
+    pub fn idempotent() -> Self {
+        Self {
+            is_idempotent: true,
+            ..TransactOption::default()
+        }
+    }
 }

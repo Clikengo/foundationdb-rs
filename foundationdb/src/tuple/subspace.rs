@@ -7,7 +7,7 @@
 // copied, modified, or distributed except according to those terms.
 
 use super::*;
-use crate::{KeySelector, RangeOptionBuilder, Transaction};
+use crate::{KeySelector, RangeOption, Transaction};
 use std::borrow::Cow;
 
 /// Represents a well-defined region of keyspace in a FoundationDB database
@@ -96,14 +96,15 @@ impl Subspace {
     }
 }
 
-impl<'a> From<&'a Subspace> for RangeOptionBuilder<'static> {
+impl<'a> From<&'a Subspace> for RangeOption<'static> {
     fn from(subspace: &Subspace) -> Self {
         let (begin, end) = subspace.range();
 
-        Self::new(
-            KeySelector::first_greater_or_equal(Cow::Owned(begin)),
-            KeySelector::first_greater_or_equal(Cow::Owned(end)),
-        )
+        Self {
+            begin: KeySelector::first_greater_or_equal(Cow::Owned(begin)),
+            end: KeySelector::first_greater_or_equal(Cow::Owned(end)),
+            ..Self::default()
+        }
     }
 }
 

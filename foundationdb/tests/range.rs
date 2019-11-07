@@ -5,7 +5,6 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
-use foundationdb::keyselector::KeySelector;
 use foundationdb::*;
 use futures::future;
 use futures::prelude::*;
@@ -36,7 +35,7 @@ async fn test_get_range_async() -> FdbResult<()> {
         eprintln!("counting...");
         let begin = KeySelector::first_greater_or_equal(Cow::Borrowed(key_begin.as_bytes()));
         let end = KeySelector::first_greater_than(Cow::Borrowed(key_end.as_bytes()));
-        let opt = transaction::RangeOptionBuilder::new(begin, end).build();
+        let opt = RangeOption::from((begin, end));
 
         let count = trx
             .get_ranges(opt, false)
