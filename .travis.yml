@@ -33,7 +33,7 @@ matrix:
            CLIPPY=true
       script:
         - rustup component add clippy
-        - cargo clippy --all --all-features
+        - cargo clippy
 
     - rust: stable
       env: NAME=rustfmt
