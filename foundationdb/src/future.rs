@@ -46,6 +46,8 @@ impl FdbFutureHandle {
         self.0.as_ptr()
     }
 }
+unsafe impl Sync for FdbFutureHandle {}
+unsafe impl Send for FdbFutureHandle {}
 impl Drop for FdbFutureHandle {
     fn drop(&mut self) {
         // `fdb_future_destroy` cancels the future, so we don't need to call
@@ -134,6 +136,8 @@ pub struct FdbSlice {
     value: *const u8,
     len: i32,
 }
+unsafe impl Sync for FdbSlice {}
+unsafe impl Send for FdbSlice {}
 
 impl Deref for FdbSlice {
     type Target = [u8];
@@ -186,6 +190,8 @@ pub struct FdbAddresses {
     strings: *const *const c_char,
     len: i32,
 }
+unsafe impl Sync for FdbAddresses {}
+unsafe impl Send for FdbAddresses {}
 
 impl TryFrom<FdbFutureHandle> for FdbAddresses {
     type Error = FdbError;
@@ -254,6 +260,8 @@ pub struct FdbValues {
     len: i32,
     more: bool,
 }
+unsafe impl Sync for FdbValues {}
+unsafe impl Send for FdbValues {}
 
 impl FdbValues {
     /// `true` if there is another range after this one
