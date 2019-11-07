@@ -362,7 +362,11 @@ impl Transaction {
     ///
     /// * `key` - the name of the key to be looked up in the database
     /// * `snapshot` - `true` if this is a [snapshot read](https://apple.github.io/foundationdb/api-c.html#snapshots)
-    pub fn get(&self, key: &[u8], snapshot: bool) -> FdbFuture<Option<FdbSlice>> {
+    pub fn get(
+        &self,
+        key: &[u8],
+        snapshot: bool,
+    ) -> impl Future<Output = FdbResult<Option<FdbSlice>>> + Send + Sync {
         FdbFuture::new(unsafe {
             fdb_sys::fdb_transaction_get(
                 self.inner.as_ptr(),
@@ -420,7 +424,11 @@ impl Transaction {
     ///
     /// * `selector`: the key selector
     /// * `snapshot`: `true` if this is a [snapshot read](https://apple.github.io/foundationdb/api-c.html#snapshots)
-    pub fn get_key(&self, selector: &KeySelector, snapshot: bool) -> FdbFuture<FdbSlice> {
+    pub fn get_key(
+        &self,
+        selector: &KeySelector,
+        snapshot: bool,
+    ) -> impl Future<Output = FdbResult<FdbSlice>> + Send + Sync {
         let key = selector.key();
         FdbFuture::new(unsafe {
             fdb_sys::fdb_transaction_get_key(
@@ -507,7 +515,7 @@ impl Transaction {
         opt: &RangeOption,
         iteration: usize,
         snapshot: bool,
-    ) -> FdbFuture<FdbValues> {
+    ) -> impl Future<Output = FdbResult<FdbValues>> + Send + Sync {
         let begin = &opt.begin;
         let end = &opt.end;
         let key_begin = begin.key();
@@ -611,7 +619,10 @@ impl Transaction {
 
     /// Returns a list of public network addresses as strings, one for each of the storage servers
     /// responsible for storing key_name and its associated value.
-    pub fn get_addresses_for_key(&self, key: &[u8]) -> FdbFuture<FdbAddresses> {
+    pub fn get_addresses_for_key(
+        &self,
+        key: &[u8],
+    ) -> impl Future<Output = FdbResult<FdbAddresses>> + Send + Sync {
         FdbFuture::new(unsafe {
             fdb_sys::fdb_transaction_get_addresses_for_key(
                 self.inner.as_ptr(),
@@ -646,7 +657,7 @@ impl Transaction {
     /// too_many_watches error. This limit can be changed using the MAX_WATCHES database option.
     /// Because a watch outlives the transaction that creates it, any watch that is no longer
     /// needed should be cancelled by dropping its future.
-    pub fn watch(&self, key: &[u8]) -> FdbFuture<()> {
+    pub fn watch(&self, key: &[u8]) -> impl Future<Output = FdbResult<()>> + Send + Sync {
         FdbFuture::new(unsafe {
             fdb_sys::fdb_transaction_watch(
                 self.inner.as_ptr(),
@@ -662,7 +673,7 @@ impl Transaction {
     ///
     /// This can be called multiple times before the transaction is committed.
     #[cfg(feature = "fdb-6_2")]
-    pub fn get_approximate_size(&self) -> FdbFuture<i64> {
+    pub fn get_approximate_size(&self) -> impl Future<Output = FdbResult<i64>> + Send + Sync {
         FdbFuture::new(unsafe {
             fdb_sys::fdb_transaction_get_approximate_size(self.inner.as_ptr())
         })
@@ -677,7 +688,7 @@ impl Transaction {
     /// keys and then sets them to their current values may be optimized to a read-only transaction.
     ///
     /// Most applications will not call this function.
-    pub fn get_versionstamp(&self) -> FdbFuture<FdbSlice> {
+    pub fn get_versionstamp(&self) -> impl Future<Output = FdbResult<FdbSlice>> + Send + Sync {
         FdbFuture::new(unsafe { fdb_sys::fdb_transaction_get_versionstamp(self.inner.as_ptr()) })
     }
 
@@ -685,7 +696,7 @@ impl Transaction {
     /// to `get_*()` (including this one) and (unless causal consistency has been deliberately
     /// compromised by transaction options) is guaranteed to represent all transactions which were
     /// reported committed before that call.
-    pub fn get_read_version(&self) -> FdbFuture<i64> {
+    pub fn get_read_version(&self) -> impl Future<Output = FdbResult<i64>> + Send + Sync {
         FdbFuture::new(unsafe { fdb_sys::fdb_transaction_get_read_version(self.inner.as_ptr()) })
     }
 

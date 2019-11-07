@@ -39,7 +39,7 @@ use futures::task::{AtomicWaker, Context, Poll};
 use crate::{error, FdbError, FdbResult};
 
 /// An opaque type that represents a Future in the FoundationDB C API.
-pub struct FdbFutureHandle(NonNull<fdb_sys::FDBFuture>);
+pub(crate) struct FdbFutureHandle(NonNull<fdb_sys::FDBFuture>);
 
 impl FdbFutureHandle {
     pub const fn as_ptr(&self) -> *mut fdb_sys::FDBFuture {
@@ -60,12 +60,11 @@ impl Drop for FdbFutureHandle {
 /// predefined result type.
 ///
 /// Non owned result type (Fdb
-pub struct FdbFuture<T> {
+pub(crate) struct FdbFuture<T> {
     f: Option<FdbFutureHandle>,
     waker: Option<Arc<AtomicWaker>>,
     phantom: std::marker::PhantomData<T>,
 }
-unsafe impl<T> Send for FdbFuture<T> {}
 
 impl<T> FdbFuture<T>
 where
