@@ -82,7 +82,8 @@ impl Error {
     fn is_error_predicate(&self, predicate: options::ErrorPredicate) -> bool {
         match *self.kind.get_context() {
             ErrorKind::Fdb { error_code, .. } => {
-                let check = unsafe { fdb_sys::fdb_error_predicate(predicate.code(), error_code) };
+                let check =
+                    unsafe { fdb_sys::fdb_error_predicate(predicate.code() as i32, error_code) };
 
                 check != 0
             }

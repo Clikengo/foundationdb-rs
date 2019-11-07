@@ -58,7 +58,7 @@ impl Cluster {
     /// Returns an `FdbFuture` which will be set to an `Database` object.
     pub fn create_database(&self) -> FdbFuture<Database> {
         FdbFuture::new(unsafe {
-            fdb_sys::fdb_cluster_create_database(self.inner.as_ptr(), b"DB", 2)
+            fdb_sys::fdb_cluster_create_database(self.inner.as_ptr(), b"DB" as *const _, 2)
         })
     }
 }
