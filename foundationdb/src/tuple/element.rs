@@ -34,15 +34,15 @@ impl<'a> Element<'a> {
     }
 
     pub fn as_bool(&self) -> Option<bool> {
-        match self {
-            &Element::Bool(v) => Some(v),
+        match *self {
+            Element::Bool(v) => Some(v),
             _ => None,
         }
     }
 
     pub fn as_i64(&self) -> Option<i64> {
-        match self {
-            &Element::Int(v) => Some(v),
+        match *self {
+            Element::Int(v) => Some(v),
             _ => None,
         }
     }

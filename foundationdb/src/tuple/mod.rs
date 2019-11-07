@@ -43,12 +43,12 @@ impl TupleDepth {
     }
 
     /// Increment the depth by one, this be called when calling into `Tuple::{encode, decode}` of tuple-like datastructures
-    pub fn increment(&self) -> Self {
+    pub fn increment(self) -> Self {
         TupleDepth(self.0 + 1)
     }
 
     /// Returns the current depth in any recursive tuple processing, 0 representing there having been no recursion
-    pub fn depth(&self) -> usize {
+    pub fn depth(self) -> usize {
         self.0
     }
 }

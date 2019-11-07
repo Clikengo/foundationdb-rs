@@ -201,7 +201,10 @@ impl Deref for FdbFutureAddresses {
     fn deref(&self) -> &Self::Target {
         assert_eq_size!(FdbFutureAddress, *const c_char);
         assert_eq_align!(FdbFutureAddress, *const c_char);
-        unsafe { std::mem::transmute(std::slice::from_raw_parts(self.strings, self.len as usize)) }
+        unsafe {
+            &*(std::slice::from_raw_parts(self.strings, self.len as usize)
+                as *const [*const c_char] as *const [FdbFutureAddress])
+        }
     }
 }
 
@@ -255,10 +258,8 @@ impl Deref for FdbFutureValues {
         assert_eq_size!(KeyValue, fdb_sys::FDBKeyValue);
         assert_eq_align!(KeyValue, fdb_sys::FDBKeyValue);
         unsafe {
-            std::mem::transmute(std::slice::from_raw_parts(
-                self.keyvalues,
-                self.len as usize,
-            ))
+            &*(std::slice::from_raw_parts(self.keyvalues, self.len as usize)
+                as *const [fdb_sys::FDBKeyValue] as *const [KeyValue])
         }
     }
 }
@@ -354,7 +355,7 @@ impl Deref for FdbFutureValue {
     fn deref(&self) -> &Self::Target {
         assert_eq_size!(KeyValue, fdb_sys::FDBKeyValue);
         assert_eq_align!(KeyValue, fdb_sys::FDBKeyValue);
-        unsafe { std::mem::transmute(self.keyvalue) }
+        unsafe { &*(self.keyvalue as *const KeyValue) }
     }
 }
 

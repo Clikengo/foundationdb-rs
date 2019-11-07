@@ -123,13 +123,11 @@ impl Database {
         ) -> Pin<Box<dyn Future<Output = Result<Item, Error>> + 'a>>,
         Error: TransactError,
     {
-        let db = self.clone();
-
         let is_idempotent = options.is_idempotent;
         let time_out = options.time_out.map(|d| Instant::now() + d);
         let retry_limit = options.retry_limit;
         let mut tries: u32 = 0;
-        let mut trx = db.create_trx()?;
+        let mut trx = self.create_trx()?;
         let mut can_retry = move || {
             tries += 1;
             retry_limit.filter(|&limit| tries < limit).is_none()

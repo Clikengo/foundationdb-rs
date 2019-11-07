@@ -94,6 +94,7 @@ pub mod error;
 pub mod future;
 pub mod keyselector;
 /// Generated configuration types for use with the various `set_option` functions
+#[allow(clippy::all)]
 pub mod options;
 pub mod transaction;
 pub mod tuple;

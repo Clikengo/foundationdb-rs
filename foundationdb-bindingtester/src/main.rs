@@ -589,6 +589,7 @@ impl StackMachine {
         self.push_item(number, &Bytes::from(packed));
     }
 
+    #[allow(clippy::cognitive_complexity)]
     async fn run_step(
         &mut self,
         db: Arc<Database>,
@@ -607,7 +608,7 @@ impl StackMachine {
                 .transactions
                 .remove(&self.cur_transaction) // some instr requires transaction ownership
                 .expect("failed to find trx");
-            if let &TransactionState::Pending(id) = &trx {
+            if let TransactionState::Pending(id) = trx {
                 let stack_item = self.stack.iter_mut().find(|s| match s.fut {
                     Some((trx_id, ..)) => trx_id == id,
                     _ => false,
@@ -1351,11 +1352,11 @@ impl StackMachine {
             }
 
             UnitTests => {
-                db.set_option(DatabaseOption::LocationCacheSize(100001))?;
-                db.set_option(DatabaseOption::MaxWatches(100001))?;
+                db.set_option(DatabaseOption::LocationCacheSize(100_001))?;
+                db.set_option(DatabaseOption::MaxWatches(100_001))?;
                 db.set_option(DatabaseOption::DatacenterId("dc_id".to_string()))?;
                 db.set_option(DatabaseOption::MachineId("machine_id".to_string()))?;
-                db.set_option(DatabaseOption::TransactionTimeout(100000))?;
+                db.set_option(DatabaseOption::TransactionTimeout(100_000))?;
                 db.set_option(DatabaseOption::TransactionTimeout(0))?;
                 db.set_option(DatabaseOption::TransactionTimeout(0))?;
                 db.set_option(DatabaseOption::TransactionMaxRetryDelay(100))?;
@@ -1458,10 +1459,11 @@ fn main() {
     let args = std::env::args().collect::<Vec<_>>();
     let prefix = &args[1];
 
-    let mut cluster_path = None;
-    if args.len() > 3 {
-        cluster_path = Some(args[3].as_str());
-    }
+    let cluster_path = if args.len() > 3 {
+        Some(args[3].as_str())
+    } else {
+        None
+    };
 
     let api_version = args[2].parse::<i32>().expect("failed to parse api version");
 

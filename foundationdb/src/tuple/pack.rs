@@ -51,7 +51,7 @@ fn parse_bytes(input: &[u8], num: usize) -> Result<(&[u8], &[u8])> {
 
 #[inline]
 fn parse_byte(input: &[u8]) -> Result<(&[u8], u8)> {
-    if input.len() < 1 {
+    if input.is_empty() {
         Err(Error::MissingBytes)
     } else {
         Ok((&input[1..], input[0]))
@@ -522,17 +522,17 @@ where
 impl<'a> TuplePack for Element<'a> {
     fn pack<W: io::Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> std::io::Result<()> {
         match self {
-            &Element::Nil => Option::<()>::None.pack(w, tuple_depth),
-            &Element::Bool(b) => b.pack(w, tuple_depth),
-            &Element::Int(i) => i.pack(w, tuple_depth),
-            &Element::Float(f) => f.pack(w, tuple_depth),
-            &Element::Double(f) => f.pack(w, tuple_depth),
-            &Element::String(ref c) => c.pack(w, tuple_depth),
-            &Element::Bytes(ref b) => b.pack(w, tuple_depth),
-            &Element::Versionstamp(ref b) => b.pack(w, tuple_depth),
-            &Element::Tuple(ref v) => v.pack(w, tuple_depth),
+            Element::Nil => Option::<()>::None.pack(w, tuple_depth),
+            Element::Bool(b) => b.pack(w, tuple_depth),
+            Element::Int(i) => i.pack(w, tuple_depth),
+            Element::Float(f) => f.pack(w, tuple_depth),
+            Element::Double(f) => f.pack(w, tuple_depth),
+            Element::String(ref c) => c.pack(w, tuple_depth),
+            Element::Bytes(ref b) => b.pack(w, tuple_depth),
+            Element::Versionstamp(ref b) => b.pack(w, tuple_depth),
+            Element::Tuple(ref v) => v.pack(w, tuple_depth),
             #[cfg(feature = "uuid")]
-            &Element::Uuid(v) => v.pack(w, tuple_depth),
+            Element::Uuid(v) => v.pack(w, tuple_depth),
         }
     }
 }

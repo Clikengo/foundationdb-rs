@@ -37,7 +37,7 @@ impl FdbError {
         Self { error_code }
     }
 
-    pub fn message(&self) -> &str {
+    pub fn message(self) -> &'static str {
         let error_str =
             unsafe { CStr::from_ptr::<'static>(fdb_sys::fdb_get_error(self.error_code)) };
         error_str
@@ -45,7 +45,7 @@ impl FdbError {
             .expect("bad error string from FoundationDB")
     }
 
-    fn is_error_predicate(&self, predicate: options::ErrorPredicate) -> bool {
+    fn is_error_predicate(self, predicate: options::ErrorPredicate) -> bool {
         let check =
             unsafe { fdb_sys::fdb_error_predicate(predicate.code() as i32, self.error_code) };
 
@@ -53,22 +53,22 @@ impl FdbError {
     }
 
     /// Indicates the transaction may have succeeded, though not in a way the system can verify.
-    pub fn is_maybe_committed(&self) -> bool {
+    pub fn is_maybe_committed(self) -> bool {
         self.is_error_predicate(options::ErrorPredicate::MaybeCommitted)
     }
 
     /// Indicates the operations in the transactions should be retried because of transient error.
-    pub fn is_retryable(&self) -> bool {
+    pub fn is_retryable(self) -> bool {
         self.is_error_predicate(options::ErrorPredicate::Retryable)
     }
 
     /// Indicates the transaction has not committed, though in a way that can be retried.
-    pub fn is_retryable_not_committed(&self) -> bool {
+    pub fn is_retryable_not_committed(self) -> bool {
         self.is_error_predicate(options::ErrorPredicate::RetryableNotCommitted)
     }
 
     /// Error code
-    pub fn code(&self) -> i32 {
+    pub fn code(self) -> i32 {
         self.error_code
     }
 }

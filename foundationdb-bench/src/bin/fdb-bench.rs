@@ -97,11 +97,9 @@ impl Bench {
     }
 
     async fn run_bench(&self, mut rng: StepRng, counter: Counter) -> FdbResult<()> {
-        let mut key_buf = Vec::with_capacity(self.opt.key_len);
-        key_buf.resize(self.opt.key_len, 0u8);
+        let mut key_buf = vec![0; self.opt.key_len];
 
-        let mut val_buf = Vec::with_capacity(self.opt.val_len);
-        val_buf.resize(self.opt.val_len, 0u8);
+        let mut val_buf = vec![0; self.opt.val_len];
 
         let trx_batch_size = self.opt.trx_batch_size;
         let mut trx = self.db.create_trx()?;

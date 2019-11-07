@@ -81,6 +81,7 @@ impl NetworkBuilder {
     }
 
     /// Finalizes the construction of the Network
+    #[allow(clippy::mutex_atomic)]
     pub fn build(self) -> FdbResult<(NetworkRunner, NetworkWait)> {
         unsafe { error::eval(fdb_sys::fdb_setup_network())? }
 
