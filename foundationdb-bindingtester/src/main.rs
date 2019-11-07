@@ -11,7 +11,6 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::thread;
 
-use fdb::error::Error;
 use fdb::keyselector::KeySelector;
 use fdb::options::{ConflictRangeType, DatabaseOption, TransactionOption};
 use fdb::transaction::RangeOption;
@@ -266,8 +265,8 @@ struct StackResult {
     state: Option<(Bytes<'static>, TransactionState)>,
     data: FdbResult<Vec<u8>>,
 }
-impl From<Error> for StackResult {
-    fn from(err: Error) -> Self {
+impl From<FdbError> for StackResult {
+    fn from(err: FdbError) -> Self {
         StackResult {
             state: None,
             data: Err(err),
@@ -306,7 +305,7 @@ impl StackItem {
                 trace!("{:?} = {:?}", name, state);
                 match state {
                     TransactionState::TransactionCommitError(e) => {
-                        let err = FdbError::from_error_code(e.code());
+                        let err = FdbError::from_code(e.code());
                         ret = Some((name, TransactionState::TransactionCommitError(e)));
                         data = Err(err);
                     }
@@ -477,7 +476,7 @@ impl StackMachine {
         self.trx_counter
     }
 
-    async fn fetch_instr(&self, trx: &Transaction) -> Result<Vec<Instr>, Error> {
+    async fn fetch_instr(&self, trx: &Transaction) -> FdbResult<Vec<Instr>> {
         let opt = RangeOptionBuilder::from(&Subspace::from(&self.prefix)).build();
         debug!("opt = {:?}", opt);
         let instrs = Vec::new();
@@ -581,7 +580,7 @@ impl StackMachine {
         }
     }
 
-    fn push_err(&mut self, number: usize, err: Error) {
+    fn push_err(&mut self, number: usize, err: FdbError) {
         trace!("ERROR {:?}", err);
         let packed = pack(&(
             Bytes::from(b"ERROR".as_ref()),
@@ -751,12 +750,12 @@ impl StackMachine {
             OnError => {
                 let trx_name = trx_name.cloned();
                 let error_code: i32 = self.pop_item().await;
-                let error = Error::from_error_code(error_code);
+                let error = FdbError::from_code(error_code);
                 debug!("on_error {:?}", error);
                 let trx_id = self.next_trx_id();
                 let f = trx
                     .take(trx_id)
-                    .on_error(&error)
+                    .on_error(error)
                     .map(|res| match res {
                         Ok(trx) => StackResult {
                             state: trx_name.map(|n| (n, TransactionState::Transaction(trx))),
@@ -1087,7 +1086,7 @@ impl StackMachine {
                             data: Ok(pack(&RESULT_NOT_PRESENT)),
                         },
                         Err(c) => {
-                            let err = Error::from_error_code(c.code());
+                            let err = FdbError::from_code(c.code());
                             StackResult {
                                 state: trx_name
                                     .map(|n| (n, TransactionState::TransactionCommitError(c))),
@@ -1338,7 +1337,7 @@ impl StackMachine {
 
                     debug!("wait_empty {:?} range {}", Bytes::from(begin), range.len());
                     if range.len() != 0 {
-                        return Err(Error::from_error_code(1020));
+                        return Err(FdbError::from_code(1020));
                     }
                     Ok(())
                 }

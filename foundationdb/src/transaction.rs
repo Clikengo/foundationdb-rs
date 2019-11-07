@@ -16,10 +16,10 @@ use std::fmt;
 use std::ops::Deref;
 use std::ptr::NonNull;
 
-use crate::error::{self, *};
 use crate::future::*;
 use crate::keyselector::*;
 use crate::options;
+use crate::{error, FdbError, FdbResult};
 
 use futures::{
     future, future::Either, stream, Future, FutureExt, TryFutureExt, TryStream, TryStreamExt,
@@ -30,7 +30,7 @@ pub struct TransactionCommitted {
 }
 
 impl TransactionCommitted {
-    pub fn committed_version(&self) -> Result<i64> {
+    pub fn committed_version(&self) -> FdbResult<i64> {
         let mut version: i64 = 0;
         error::eval(unsafe {
             fdb_sys::fdb_transaction_get_committed_version(self.tr.inner.as_ptr(), &mut version)
@@ -46,7 +46,7 @@ impl TransactionCommitted {
 
 pub struct TransactionCommitError {
     tr: Transaction,
-    err: Error,
+    err: FdbError,
 }
 
 impl TransactionCommitError {
@@ -54,7 +54,7 @@ impl TransactionCommitError {
         self.err.is_maybe_committed()
     }
 
-    pub fn on_error(self) -> impl Future<Output = Result<Transaction>> {
+    pub fn on_error(self) -> impl Future<Output = FdbResult<Transaction>> {
         FdbFuture::<()>::new(unsafe {
             fdb_sys::fdb_transaction_on_error(self.tr.inner.as_ptr(), self.err.code())
         })
@@ -68,17 +68,18 @@ impl TransactionCommitError {
 }
 
 impl Deref for TransactionCommitError {
-    type Target = Error;
-    fn deref(&self) -> &Error {
+    type Target = FdbError;
+    fn deref(&self) -> &FdbError {
         &self.err
     }
 }
 
-impl From<TransactionCommitError> for Error {
-    fn from(tce: TransactionCommitError) -> Error {
+impl From<TransactionCommitError> for FdbError {
+    fn from(tce: TransactionCommitError) -> FdbError {
         tce.err
     }
 }
+
 pub struct TransactionCancelled {
     tr: Transaction,
 }
@@ -95,7 +96,7 @@ impl fmt::Debug for TransactionCommitError {
     }
 }
 
-type TransactionResult = std::result::Result<TransactionCommitted, TransactionCommitError>;
+type TransactionResult = Result<TransactionCommitted, TransactionCommitError>;
 
 /// In FoundationDB, a transaction is a mutable snapshot of a database.
 ///
@@ -268,7 +269,7 @@ impl Transaction {
     }
 
     /// Called to set an option on an FDBTransaction.
-    pub fn set_option(&self, opt: options::TransactionOption) -> Result<()> {
+    pub fn set_option(&self, opt: options::TransactionOption) -> FdbResult<()> {
         unsafe { opt.apply(self.inner.as_ptr()) }
     }
 
@@ -387,7 +388,7 @@ impl Transaction {
         &'a self,
         opt: RangeOption<'a>,
         snapshot: bool,
-    ) -> impl TryStream<Ok = FdbFutureValues, Error = Error> + 'a {
+    ) -> impl TryStream<Ok = FdbFutureValues, Error = FdbError> + 'a {
         stream::unfold((1, Some(opt)), move |(iteration, maybe_opt)| {
             if let Some(opt) = maybe_opt {
                 Either::Left(self.get_range(&opt, iteration as usize, snapshot).map(
@@ -409,7 +410,7 @@ impl Transaction {
         &'a self,
         opt: RangeOption<'a>,
         snapshot: bool,
-    ) -> impl TryStream<Ok = FdbFutureValue, Error = Error> + 'a {
+    ) -> impl TryStream<Ok = FdbFutureValue, Error = FdbError> + 'a {
         self.get_ranges(opt, snapshot)
             .map_ok(|values| stream::iter(values.into_iter().map(Ok)))
             .try_flatten()
@@ -489,7 +490,7 @@ impl Transaction {
         )
     }
 
-    pub fn on_error(self, err: &Error) -> impl Future<Output = Result<Transaction>> {
+    pub fn on_error(self, err: FdbError) -> impl Future<Output = FdbResult<Transaction>> {
         FdbFuture::<()>::new(unsafe {
             fdb_sys::fdb_transaction_on_error(self.inner.as_ptr(), err.code())
         })
@@ -656,8 +657,8 @@ impl Transaction {
         begin: &[u8],
         end: &[u8],
         ty: options::ConflictRangeType,
-    ) -> Result<()> {
-        let err = unsafe {
+    ) -> FdbResult<()> {
+        error::eval(unsafe {
             fdb_sys::fdb_transaction_add_conflict_range(
                 self.inner.as_ptr(),
                 begin.as_ptr(),
@@ -666,8 +667,7 @@ impl Transaction {
                 fdb_len(end.len(), "end"),
                 ty.code(),
             )
-        };
-        eval(err)
+        })
     }
 }
 

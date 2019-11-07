@@ -7,10 +7,10 @@
 // copied, modified, or distributed except according to those terms.
 
 //! Most functions in the FoundationDB API are asynchronous, meaning that they
-//! may return to the caller before actually delivering their result.
+//! may return to the caller before actually delivering their Fdbresult.
 //!
 //! These functions always return FDBFuture*. An FDBFuture object represents a
-//! result value or error to be delivered at some future time. You can wait for
+//! Fdbresult value or error to be delivered at some future time. You can wait for
 //! a Future to be “ready” – to have a value or error delivered – by setting a
 //! callback function, or by blocking a thread, or by polling. Once a Future is
 //! ready, you can extract either an error code or a value of the appropriate
@@ -18,7 +18,7 @@
 //! fdb_future_get_*() function you should call).
 //!
 //! Futures make it easy to do multiple operations in parallel, by calling several
-//! asynchronous functions before waiting for any of the results. This can be
+//! asynchronous functions before waiting for any of the Fdbresults. This can be
 //! important for reducing the latency of transactions.
 //!
 
@@ -36,7 +36,7 @@ use foundationdb_sys as fdb_sys;
 use futures::prelude::*;
 use futures::task::{AtomicWaker, Context, Poll};
 
-use crate::error::{self, Error, Result};
+use crate::{error, FdbError, FdbResult};
 
 pub struct FdbFutureHandle(NonNull<fdb_sys::FDBFuture>);
 
@@ -63,7 +63,7 @@ unsafe impl<T> Send for FdbFuture<T> {}
 
 impl<T> FdbFuture<T>
 where
-    T: TryFrom<FdbFutureHandle, Error = Error> + Unpin,
+    T: TryFrom<FdbFutureHandle, Error = FdbError> + Unpin,
 {
     pub(crate) fn new(f: *mut fdb_sys::FDBFuture) -> Self {
         Self {
@@ -78,11 +78,11 @@ where
 
 impl<T> Future for FdbFuture<T>
 where
-    T: TryFrom<FdbFutureHandle, Error = Error> + Unpin,
+    T: TryFrom<FdbFutureHandle, Error = FdbError> + Unpin,
 {
-    type Output = Result<T>;
+    type Output = FdbResult<T>;
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Result<T>> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<FdbResult<T>> {
         let f = self.f.as_ref().expect("cannot poll after resolve");
         let ready = unsafe { fdb_sys::fdb_future_is_ready(f.as_ptr()) };
         if ready == 0 {
@@ -138,9 +138,9 @@ impl Deref for FdbFutureSlice {
 }
 
 impl TryFrom<FdbFutureHandle> for FdbFutureSlice {
-    type Error = Error;
+    type Error = FdbError;
 
-    fn try_from(f: FdbFutureHandle) -> Result<Self> {
+    fn try_from(f: FdbFutureHandle) -> FdbResult<Self> {
         let mut value = std::ptr::null();
         let mut len = 0;
 
@@ -151,9 +151,9 @@ impl TryFrom<FdbFutureHandle> for FdbFutureSlice {
 }
 
 impl TryFrom<FdbFutureHandle> for Option<FdbFutureSlice> {
-    type Error = Error;
+    type Error = FdbError;
 
-    fn try_from(f: FdbFutureHandle) -> Result<Self> {
+    fn try_from(f: FdbFutureHandle) -> FdbResult<Self> {
         let mut present = 0;
         let mut value = std::ptr::null();
         let mut len = 0;
@@ -177,9 +177,9 @@ pub struct FdbFutureAddresses {
 }
 
 impl TryFrom<FdbFutureHandle> for FdbFutureAddresses {
-    type Error = Error;
+    type Error = FdbError;
 
-    fn try_from(f: FdbFutureHandle) -> Result<Self> {
+    fn try_from(f: FdbFutureHandle) -> FdbResult<Self> {
         let mut strings: *mut *const c_char = std::ptr::null_mut();
         let mut len = 0;
 
@@ -225,8 +225,8 @@ pub struct FdbFutureValues {
 }
 
 impl TryFrom<FdbFutureHandle> for FdbFutureValues {
-    type Error = Error;
-    fn try_from(f: FdbFutureHandle) -> Result<Self> {
+    type Error = FdbError;
+    fn try_from(f: FdbFutureHandle) -> FdbResult<Self> {
         let mut keyvalues = std::ptr::null();
         let mut len = 0;
         let mut more = 0;
@@ -388,9 +388,9 @@ impl KeyValue {
 }
 
 impl TryFrom<FdbFutureHandle> for i64 {
-    type Error = Error;
+    type Error = FdbError;
 
-    fn try_from(f: FdbFutureHandle) -> Result<Self> {
+    fn try_from(f: FdbFutureHandle) -> FdbResult<Self> {
         let mut version: i64 = 0;
         error::eval(unsafe {
             #[cfg(feature = "fdb-6_2")]
@@ -407,8 +407,8 @@ impl TryFrom<FdbFutureHandle> for i64 {
 }
 
 impl TryFrom<FdbFutureHandle> for () {
-    type Error = Error;
-    fn try_from(_f: FdbFutureHandle) -> Result<Self> {
+    type Error = FdbError;
+    fn try_from(_f: FdbFutureHandle) -> FdbResult<Self> {
         Ok(())
     }
 }

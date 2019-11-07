@@ -85,7 +85,7 @@ impl Bench {
         );
     }
 
-    async fn run_range(&self, r: std::ops::Range<usize>, counter: Counter) -> Result<()> {
+    async fn run_range(&self, r: std::ops::Range<usize>, counter: Counter) -> FdbResult<()> {
         try_join_all(r.map(|n| {
             // With deterministic Rng, benchmark with same parameters will overwrite same set
             // of keys again, which makes benchmark result stable.
@@ -96,7 +96,7 @@ impl Bench {
         Ok(())
     }
 
-    async fn run_bench(&self, mut rng: StepRng, counter: Counter) -> Result<()> {
+    async fn run_bench(&self, mut rng: StepRng, counter: Counter) -> FdbResult<()> {
         let mut key_buf = Vec::with_capacity(self.opt.key_len);
         key_buf.resize(self.opt.key_len, 0u8);
 

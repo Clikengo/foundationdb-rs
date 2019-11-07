@@ -10,84 +10,46 @@
 
 use std;
 use std::ffi::CStr;
-use std::fmt::{self, Display};
-
-use failure::{Backtrace, Context, Fail};
+use std::fmt;
 
 use crate::options;
 use foundationdb_sys as fdb_sys;
 
-pub(crate) fn eval(error_code: fdb_sys::fdb_error_t) -> Result<()> {
+pub(crate) fn eval(error_code: fdb_sys::fdb_error_t) -> FdbResult<()> {
     let rust_code: i32 = error_code;
     if rust_code == 0 {
         Ok(())
     } else {
-        Err(Error::from_error_code(error_code))
+        Err(FdbError::from_code(error_code))
     }
 }
 
 /// The Standard Error type of FoundationDB
-#[derive(Debug)]
-pub struct Error {
-    kind: Context<ErrorKind>,
+#[derive(Debug, Copy, Clone)]
+pub struct FdbError {
+    /// The FoundationDB error code
+    error_code: i32,
 }
 
-/// An error from Fdb with associated code and message
-#[derive(Debug, Fail)]
-pub enum ErrorKind {
-    /// Errors that originate from the FoundationDB layers
-    #[fail(display = "FoundationDB error({}): {}", error_code, error_str)]
-    Fdb {
-        /// The FoundationDB error code
-        error_code: i32,
-        /// The error string as defined by FoundationDB
-        error_str: &'static str,
-    },
-}
-
-/// An Fdb Result type
-pub type Result<T> = std::result::Result<T, Error>;
-
-impl Fail for Error {
-    fn cause(&self) -> Option<&dyn Fail> {
-        self.kind.cause()
-    }
-
-    fn backtrace(&self) -> Option<&Backtrace> {
-        self.kind.backtrace()
-    }
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        Display::fmt(&self.kind, f)
-    }
-}
-
-impl Error {
+impl FdbError {
     /// Converts from the raw Fdb error code into an `Error`
-    pub fn from_error_code(error_code: fdb_sys::fdb_error_t) -> Self {
-        let error_str = unsafe { CStr::from_ptr::<'static>(fdb_sys::fdb_get_error(error_code)) };
+    pub fn from_code(error_code: fdb_sys::fdb_error_t) -> Self {
+        Self { error_code }
+    }
 
-        Error {
-            kind: Context::new(ErrorKind::Fdb {
-                error_code,
-                error_str: error_str
-                    .to_str()
-                    .expect("bad error string from FoundationDB"),
-            }),
-        }
+    pub fn message(&self) -> &str {
+        let error_str =
+            unsafe { CStr::from_ptr::<'static>(fdb_sys::fdb_get_error(self.error_code)) };
+        error_str
+            .to_str()
+            .expect("bad error string from FoundationDB")
     }
 
     fn is_error_predicate(&self, predicate: options::ErrorPredicate) -> bool {
-        match *self.kind.get_context() {
-            ErrorKind::Fdb { error_code, .. } => {
-                let check =
-                    unsafe { fdb_sys::fdb_error_predicate(predicate.code() as i32, error_code) };
+        let check =
+            unsafe { fdb_sys::fdb_error_predicate(predicate.code() as i32, self.error_code) };
 
-                check != 0
-            }
-        }
+        check != 0
     }
 
     /// Indicates the transaction may have succeeded, though not in a way the system can verify.
@@ -107,8 +69,15 @@ impl Error {
 
     /// Error code
     pub fn code(&self) -> i32 {
-        match *self.kind.get_context() {
-            ErrorKind::Fdb { error_code, .. } => error_code,
-        }
+        self.error_code
     }
 }
+
+impl fmt::Display for FdbError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.message().fmt(f)
+    }
+}
+
+/// An Fdb Result type
+pub type FdbResult<T> = Result<T, FdbError>;

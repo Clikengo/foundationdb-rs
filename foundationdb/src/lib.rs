@@ -84,9 +84,6 @@
 //! *WARNING* Until the 1.0 release of this library, the API may be in constant flux.
 
 #[macro_use]
-extern crate failure;
-
-#[macro_use]
 extern crate static_assertions;
 
 pub mod api;
@@ -105,8 +102,8 @@ pub mod tuple;
 pub use crate::cluster::Cluster;
 
 pub use crate::database::{Database, TransactError, TransactOption};
-pub use crate::error::Error as FdbError;
-pub use crate::error::Result as FdbResult;
+pub use crate::error::FdbError;
+pub use crate::error::FdbResult;
 pub use crate::keyselector::KeySelector;
 pub use crate::transaction::{
     RangeOptionBuilder, Transaction, TransactionCancelled, TransactionCommitError,
@@ -129,7 +126,7 @@ pub use crate::transaction::{
 ///
 /// drop(network)
 /// ```
-pub fn boot() -> error::Result<api::NetworkAutoStop> {
+pub fn boot() -> FdbResult<api::NetworkAutoStop> {
     api::FdbApiBuilder::default().build()?.boot()
 }
 

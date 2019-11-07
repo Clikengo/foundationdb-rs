@@ -17,9 +17,9 @@ use std::time::{Duration, Instant};
 
 use foundationdb_sys as fdb_sys;
 
-use crate::error::{self, Error as FdbError, Result};
 use crate::options;
 use crate::transaction::*;
+use crate::{error, FdbError, FdbResult};
 
 use futures::prelude::*;
 
@@ -42,7 +42,7 @@ impl Drop for Database {
 
 #[cfg(not(any(feature = "fdb-5_1", feature = "fdb-5_2", feature = "fdb-6_0")))]
 impl Database {
-    pub fn new(path: Option<&str>) -> Result<Database> {
+    pub fn new(path: Option<&str>) -> FdbResult<Database> {
         let path_str = path.map(|path| std::ffi::CString::new(path).unwrap());
         let path_ptr = path_str
             .map(|path| path.as_ptr())
@@ -56,17 +56,17 @@ impl Database {
         })
     }
 
-    pub fn from_path(path: &str) -> Result<Database> {
+    pub fn from_path(path: &str) -> FdbResult<Database> {
         Self::new(Some(path))
     }
 
-    pub fn default() -> Result<Database> {
+    pub fn default() -> FdbResult<Database> {
         Self::new(None)
     }
 }
 
 impl Database {
-    pub async fn new_compat(path: Option<&str>) -> Result<Database> {
+    pub async fn new_compat(path: Option<&str>) -> FdbResult<Database> {
         #[cfg(any(feature = "fdb-5_1", feature = "fdb-5_2", feature = "fdb-6_0"))]
         {
             let cluster = crate::cluster::Cluster::new(path).await?;
@@ -81,12 +81,12 @@ impl Database {
     }
 
     /// Called to set an option an on `Database`.
-    pub fn set_option(&self, opt: options::DatabaseOption) -> Result<()> {
+    pub fn set_option(&self, opt: options::DatabaseOption) -> FdbResult<()> {
         unsafe { opt.apply(self.inner.as_ptr()) }
     }
 
     /// Creates a new transaction on the given database.
-    pub fn create_trx(&self) -> Result<Transaction> {
+    pub fn create_trx(&self) -> FdbResult<Transaction> {
         let mut trx: *mut fdb_sys::FDBTransaction = std::ptr::null_mut();
         let err =
             unsafe { fdb_sys::fdb_database_create_transaction(self.inner.as_ptr(), &mut trx) };
@@ -115,13 +115,12 @@ impl Database {
         data: D,
         mut f: F,
         options: TransactOption,
-    ) -> std::result::Result<Item, Error>
+    ) -> Result<Item, Error>
     where
         for<'a> F: FnMut(
             &'a Transaction,
             &'a D,
-        )
-            -> Pin<Box<dyn Future<Output = std::result::Result<Item, Error>> + 'a>>,
+        ) -> Pin<Box<dyn Future<Output = Result<Item, Error>> + 'a>>,
         Error: TransactError,
     {
         let db = self.clone();
@@ -151,7 +150,7 @@ impl Database {
                 Err(user_err) => match user_err.try_into_fdb_error() {
                     Ok(e) => {
                         if (is_idempotent || !e.is_maybe_committed()) && can_retry() {
-                            trx.on_error(&e).await?
+                            trx.on_error(e).await?
                         } else {
                             break Err(Error::from(e));
                         }
@@ -164,18 +163,18 @@ impl Database {
 }
 
 pub trait TransactError: From<FdbError> {
-    fn try_into_fdb_error(self) -> std::result::Result<FdbError, Self>;
+    fn try_into_fdb_error(self) -> Result<FdbError, Self>;
 }
 impl<T> TransactError for T
 where
     T: From<FdbError> + TryInto<FdbError, Error = T>,
 {
-    fn try_into_fdb_error(self) -> std::result::Result<FdbError, Self> {
+    fn try_into_fdb_error(self) -> Result<FdbError, Self> {
         self.try_into()
     }
 }
 impl TransactError for FdbError {
-    fn try_into_fdb_error(self) -> std::result::Result<FdbError, Self> {
+    fn try_into_fdb_error(self) -> Result<FdbError, Self> {
         Ok(self)
     }
 }

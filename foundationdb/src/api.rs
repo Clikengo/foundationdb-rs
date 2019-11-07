@@ -14,8 +14,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 
-use crate::error::{self, Result};
 use crate::options::NetworkOption;
+use crate::{error, FdbResult};
 use foundationdb_sys as fdb_sys;
 
 /// Returns the max api version of the underlying Fdb C API Client
@@ -45,7 +45,7 @@ impl FdbApiBuilder {
     }
 
     /// The API version can only be initialized once in the lifetime of a process
-    pub fn build(self) -> Result<NetworkBuilder> {
+    pub fn build(self) -> FdbResult<NetworkBuilder> {
         if VERSION_SELECTED.compare_and_swap(false, true, Ordering::AcqRel) {
             panic!("the fdb select api version can only be run once per process");
         }
@@ -75,20 +75,20 @@ pub struct NetworkBuilder {
 
 impl NetworkBuilder {
     /// Called to set network options.
-    pub fn set_option(self, option: NetworkOption) -> Result<Self> {
+    pub fn set_option(self, option: NetworkOption) -> FdbResult<Self> {
         unsafe { option.apply()? };
         Ok(self)
     }
 
     /// Finalizes the construction of the Network
-    pub fn build(self) -> Result<(NetworkRunner, NetworkWait)> {
+    pub fn build(self) -> FdbResult<(NetworkRunner, NetworkWait)> {
         unsafe { error::eval(fdb_sys::fdb_setup_network())? }
 
         let cond = Arc::new((Mutex::new(false), Condvar::new()));
         Ok((NetworkRunner { cond: cond.clone() }, NetworkWait { cond }))
     }
 
-    pub fn boot(self) -> Result<NetworkAutoStop> {
+    pub fn boot(self) -> FdbResult<NetworkAutoStop> {
         let (runner, cond) = self.build()?;
 
         let net_thread = thread::spawn(move || {
@@ -107,7 +107,7 @@ pub struct NetworkRunner {
 }
 
 impl NetworkRunner {
-    pub fn run(self) -> Result<()> {
+    pub fn run(self) -> FdbResult<()> {
         {
             let (lock, cvar) = &*self.cond;
             let mut started = lock.lock().unwrap();
@@ -169,7 +169,7 @@ impl NetworkStop {
     /// network_stop.stop().expect("failed to stop network");
     /// network_thread.join().expect("failed to join fdb thread");
     /// ```
-    pub fn stop(self) -> Result<()> {
+    pub fn stop(self) -> FdbResult<()> {
         error::eval(unsafe { fdb_sys::fdb_stop_network() })
     }
 }

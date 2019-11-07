@@ -90,7 +90,7 @@ impl FdbScope {
 
         writeln!(
             w,
-            "{t}pub unsafe fn apply(&self{args}) -> std::result::Result<(), error::Error> {{",
+            "{t}pub unsafe fn apply(&self{args}) -> FdbResult<()> {{",
             t = TAB1,
             args = first_arg
         )?;
@@ -153,7 +153,7 @@ impl FdbScope {
         writeln!(w, "{t}}};", t = TAB2)?;
         writeln!(
             w,
-            "{t}if err != 0 {{ Err(error::Error::from_error_code(err)) }} else {{ Ok(()) }}",
+            "{t}if err != 0 {{ Err(FdbError::from_code(err)) }} else {{ Ok(()) }}",
             t = TAB2,
         )?;
         writeln!(w, "{t}}}", t = TAB1)
@@ -383,7 +383,7 @@ pub fn emit() -> Result<String> {
 
     let mut w = String::new();
     writeln!(w, "use std::convert::TryFrom;")?;
-    writeln!(w, "use crate::error;")?;
+    writeln!(w, "use crate::{{FdbError, FdbResult}};")?;
     writeln!(w, "use foundationdb_sys as fdb_sys;")?;
     for scope in scopes.iter() {
         scope.gen_ty(&mut w)?;
