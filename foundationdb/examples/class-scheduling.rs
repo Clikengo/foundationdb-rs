@@ -158,7 +158,7 @@ async fn ditch(db: &Database, student: String, class: String) -> Result<()> {
     db.transact(
         (student, class),
         move |trx, (student, class)| ditch_trx(trx, student, class).map(|_| Ok(())).boxed_local(),
-        fdb::database::TransactOption::default(),
+        fdb::TransactOption::default(),
     )
     .await
 }

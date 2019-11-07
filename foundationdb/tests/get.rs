@@ -149,7 +149,7 @@ async fn test_transact_async() -> FdbResult<()> {
         .transact(
             &db,
             |trx, db| async_body(db, trx, try_count.clone()).boxed(),
-            database::TransactOption::default(),
+            TransactOption::default(),
         )
         .await;
     assert!(res.is_err(), "should not be able to commit");
