@@ -21,12 +21,12 @@ pub trait TuplePack {
 
 /// A type that can be unpacked
 pub trait TupleUnpack<'de>: Sized {
-    fn unpack(input: &'de [u8], tuple_depth: TupleDepth) -> Result<(&'de [u8], Self)>;
+    fn unpack(input: &'de [u8], tuple_depth: TupleDepth) -> PackResult<(&'de [u8], Self)>;
 
-    fn unpack_root(input: &'de [u8]) -> Result<Self> {
+    fn unpack_root(input: &'de [u8]) -> PackResult<Self> {
         let (input, this) = Self::unpack(input, TupleDepth::new())?;
         if !input.is_empty() {
-            return Err(Error::TrailingBytes);
+            return Err(PackError::TrailingBytes);
         }
         Ok(this)
     }
@@ -42,29 +42,29 @@ where
 }
 
 #[inline]
-fn parse_bytes(input: &[u8], num: usize) -> Result<(&[u8], &[u8])> {
+fn parse_bytes(input: &[u8], num: usize) -> PackResult<(&[u8], &[u8])> {
     if input.len() < num {
-        Err(Error::MissingBytes)
+        Err(PackError::MissingBytes)
     } else {
         Ok((&input[num..], &input[..num]))
     }
 }
 
 #[inline]
-fn parse_byte(input: &[u8]) -> Result<(&[u8], u8)> {
+fn parse_byte(input: &[u8]) -> PackResult<(&[u8], u8)> {
     if input.is_empty() {
-        Err(Error::MissingBytes)
+        Err(PackError::MissingBytes)
     } else {
         Ok((&input[1..], input[0]))
     }
 }
 
-fn parse_code(input: &[u8], expected: u8) -> Result<&[u8]> {
+fn parse_code(input: &[u8], expected: u8) -> PackResult<&[u8]> {
     let (input, found) = parse_byte(input)?;
     if found == expected {
         Ok(input)
     } else {
-        Err(Error::BadCode {
+        Err(PackError::BadCode {
             found,
             expected: Some(expected),
         })
@@ -84,7 +84,7 @@ fn write_bytes<W: io::Write>(w: &mut W, v: &[u8]) -> io::Result<()> {
     Ok(())
 }
 
-fn parse_slice<'de>(input: &'de [u8]) -> Result<(&'de [u8], Cow<'de, [u8]>)> {
+fn parse_slice<'de>(input: &'de [u8]) -> PackResult<(&'de [u8], Cow<'de, [u8]>)> {
     let mut bytes = Vec::new();
     let mut pos = 0;
     for idx in memchr_iter(NIL, input) {
@@ -105,19 +105,19 @@ fn parse_slice<'de>(input: &'de [u8]) -> Result<(&'de [u8], Cow<'de, [u8]>)> {
             ));
         }
     }
-    Err(Error::MissingBytes)
+    Err(PackError::MissingBytes)
 }
 
-fn parse_string<'de>(input: &'de [u8]) -> Result<(&'de [u8], Cow<'de, str>)> {
+fn parse_string<'de>(input: &'de [u8]) -> PackResult<(&'de [u8], Cow<'de, str>)> {
     let (input, slice) = parse_slice(input)?;
     Ok((
         input,
         match slice {
             Cow::Borrowed(slice) => {
-                Cow::Borrowed(std::str::from_utf8(slice).map_err(|_| Error::BadStringFormat)?)
+                Cow::Borrowed(std::str::from_utf8(slice).map_err(|_| PackError::BadStringFormat)?)
             }
             Cow::Owned(vec) => {
-                Cow::Owned(String::from_utf8(vec).map_err(|_| Error::BadStringFormat)?)
+                Cow::Owned(String::from_utf8(vec).map_err(|_| PackError::BadStringFormat)?)
             }
         },
     ))
@@ -133,7 +133,7 @@ impl TuplePack for () {
 }
 
 impl<'de> TupleUnpack<'de> for () {
-    fn unpack(mut input: &[u8], tuple_depth: TupleDepth) -> Result<(&[u8], Self)> {
+    fn unpack(mut input: &[u8], tuple_depth: TupleDepth) -> PackResult<(&[u8], Self)> {
         if tuple_depth.depth() > 0 {
             input = parse_code(input, NESTED)?;
             input = parse_code(input, NIL)?;
@@ -169,7 +169,7 @@ macro_rules! tuple_impls {
             where
                 $($name: TupleUnpack<'de>,)+
             {
-                fn unpack(input: &'de [u8], tuple_depth: TupleDepth) -> Result<(&'de [u8], Self)> {
+                fn unpack(input: &'de [u8], tuple_depth: TupleDepth) -> PackResult<(&'de [u8], Self)> {
                     let input = if tuple_depth.depth() > 0 { parse_code(input, NESTED)? } else { input };
 
                     $(
@@ -225,7 +225,7 @@ macro_rules! impl_ux {
         }
 
         impl<'de> TupleUnpack<'de> for $ux {
-            fn unpack(input: &[u8], _tuple_depth: TupleDepth) -> Result<(&[u8], Self)> {
+            fn unpack(input: &[u8], _tuple_depth: TupleDepth) -> PackResult<(&[u8], Self)> {
                 const SZ: usize = mem::size_of::<$ux>();
                 let (input, found) = parse_byte(input)?;
                 if INTZERO <= found && found <= INTZERO + SZ as u8 {
@@ -235,7 +235,7 @@ macro_rules! impl_ux {
                     (&mut arr[(SZ - n)..]).copy_from_slice(bytes);
                     Ok((input, $ux::from_be_bytes(arr)))
                 } else {
-                    Err(Error::BadCode {
+                    Err(PackError::BadCode {
                         found,
                         expected: None,
                     })
@@ -270,7 +270,7 @@ macro_rules! impl_ix {
         }
 
         impl<'de> TupleUnpack<'de> for $ix {
-            fn unpack(input: &[u8], _tuple_depth: TupleDepth) -> Result<(&[u8], Self)> {
+            fn unpack(input: &[u8], _tuple_depth: TupleDepth) -> PackResult<(&[u8], Self)> {
                 const SZ: usize = mem::size_of::<$ix>();
                 let (input, found) = parse_byte(input)?;
                 if INTZERO <= found && found <= INTZERO + SZ as u8 {
@@ -286,7 +286,7 @@ macro_rules! impl_ix {
                     (&mut arr[(SZ - n)..]).copy_from_slice(bytes);
                     Ok((input, $ix::from_be_bytes(arr).wrapping_add(1)))
                 } else {
-                    Err(Error::BadCode {
+                    Err(PackError::BadCode {
                         found,
                         expected: None,
                     })
@@ -316,14 +316,14 @@ macro_rules! impl_fx {
             }
         }
 
-        fn $parse_ux(input: &[u8]) -> Result<(&[u8], $ux)> {
+        fn $parse_ux(input: &[u8]) -> PackResult<(&[u8], $ux)> {
             let (input, bytes) = parse_bytes(input, mem::size_of::<$ux>())?;
             let mut arr = [0u8; mem::size_of::<$ux>()];
             arr.copy_from_slice(bytes);
             Ok((input, $ux::from_be_bytes(arr)))
         }
         impl<'de> TupleUnpack<'de> for $fx {
-            fn unpack(input: &[u8], _tuple_depth: TupleDepth) -> Result<(&[u8], Self)> {
+            fn unpack(input: &[u8], _tuple_depth: TupleDepth) -> PackResult<(&[u8], Self)> {
                 let input = parse_code(input, $code)?;
                 let (input, u) = $parse_ux(input)?;
                 Ok((
@@ -361,12 +361,15 @@ impl TuplePack for bool {
 }
 
 impl<'de> TupleUnpack<'de> for bool {
-    fn unpack(input: &[u8], _tuple_depth: TupleDepth) -> Result<(&[u8], Self)> {
+    fn unpack(input: &[u8], _tuple_depth: TupleDepth) -> PackResult<(&[u8], Self)> {
         let (input, v) = parse_byte(input)?;
         match v {
             FALSE => Ok((input, false)),
             TRUE => Ok((input, true)),
-            _ => Err(Error::Message(format!("{} is not a valid bool value", v))),
+            _ => Err(PackError::Message(format!(
+                "{} is not a valid bool value",
+                v
+            ))),
         }
     }
 }
@@ -412,7 +415,7 @@ impl<'de, T> TupleUnpack<'de> for Vec<T>
 where
     T: TupleUnpack<'de>,
 {
-    fn unpack(mut input: &'de [u8], tuple_depth: TupleDepth) -> Result<(&'de [u8], Self)> {
+    fn unpack(mut input: &'de [u8], tuple_depth: TupleDepth) -> PackResult<(&'de [u8], Self)> {
         let nested = tuple_depth.depth() > 0;
         if nested {
             input = parse_code(input, NESTED)?;
@@ -442,7 +445,7 @@ impl<'a> TuplePack for Bytes<'a> {
 }
 
 impl<'de> TupleUnpack<'de> for Bytes<'de> {
-    fn unpack(input: &'de [u8], _tuple_depth: TupleDepth) -> Result<(&'de [u8], Self)> {
+    fn unpack(input: &'de [u8], _tuple_depth: TupleDepth) -> PackResult<(&'de [u8], Self)> {
         let input = parse_code(input, BYTES)?;
         let (input, v) = parse_slice(input)?;
         Ok((input, Bytes(v)))
@@ -462,7 +465,7 @@ impl TuplePack for Vec<u8> {
 }
 
 impl<'de> TupleUnpack<'de> for Vec<u8> {
-    fn unpack(input: &'de [u8], tuple_depth: TupleDepth) -> Result<(&'de [u8], Self)> {
+    fn unpack(input: &'de [u8], tuple_depth: TupleDepth) -> PackResult<(&'de [u8], Self)> {
         let (input, bytes) = Bytes::unpack(input, tuple_depth)?;
         Ok((input, bytes.into_owned()))
     }
@@ -488,7 +491,7 @@ impl<'a> TuplePack for Cow<'a, str> {
 }
 
 impl<'de> TupleUnpack<'de> for Cow<'de, str> {
-    fn unpack(input: &'de [u8], _tuple_depth: TupleDepth) -> Result<(&'de [u8], Self)> {
+    fn unpack(input: &'de [u8], _tuple_depth: TupleDepth) -> PackResult<(&'de [u8], Self)> {
         let input = parse_code(input, STRING)?;
         let (input, v) = parse_string(input)?;
         Ok((input, v))
@@ -496,7 +499,7 @@ impl<'de> TupleUnpack<'de> for Cow<'de, str> {
 }
 
 impl<'de> TupleUnpack<'de> for String {
-    fn unpack(input: &[u8], _tuple_depth: TupleDepth) -> Result<(&[u8], Self)> {
+    fn unpack(input: &[u8], _tuple_depth: TupleDepth) -> PackResult<(&[u8], Self)> {
         let input = parse_code(input, STRING)?;
         let (input, v) = parse_string(input)?;
         Ok((input, v.into_owned()))
@@ -525,7 +528,7 @@ impl<'de, T> TupleUnpack<'de> for Option<T>
 where
     T: TupleUnpack<'de>,
 {
-    fn unpack(mut input: &'de [u8], tuple_depth: TupleDepth) -> Result<(&'de [u8], Self)> {
+    fn unpack(mut input: &'de [u8], tuple_depth: TupleDepth) -> PackResult<(&'de [u8], Self)> {
         if let Some(&NIL) = input.first() {
             input = parse_code(input, NIL)?;
             if tuple_depth.depth() > 1 {
@@ -558,13 +561,13 @@ impl<'a> TuplePack for Element<'a> {
 }
 
 impl<'de> TupleUnpack<'de> for Element<'de> {
-    fn unpack(input: &'de [u8], tuple_depth: TupleDepth) -> Result<(&'de [u8], Self)> {
+    fn unpack(input: &'de [u8], tuple_depth: TupleDepth) -> PackResult<(&'de [u8], Self)> {
         const INTMIN: u8 = INTZERO - 8;
         const INTMAX: u8 = INTZERO + 8;
 
         let first = match input.first() {
             None if tuple_depth.depth() == 0 => return Ok((input, Element::Tuple(Vec::new()))),
-            None => return Err(Error::MissingBytes),
+            None => return Err(PackError::MissingBytes),
             Some(byte) => byte,
         };
         let (mut input, mut v) = match *first {
@@ -610,7 +613,7 @@ impl<'de> TupleUnpack<'de> for Element<'de> {
                 (input, Element::Uuid(v))
             }
             found => {
-                return Err(Error::BadCode {
+                return Err(PackError::BadCode {
                     found,
                     expected: None,
                 })
@@ -640,7 +643,7 @@ impl TuplePack for Versionstamp {
 }
 
 impl<'de> TupleUnpack<'de> for Versionstamp {
-    fn unpack(input: &[u8], _tuple_depth: TupleDepth) -> Result<(&[u8], Self)> {
+    fn unpack(input: &[u8], _tuple_depth: TupleDepth) -> PackResult<(&[u8], Self)> {
         let input = parse_code(input, VERSIONSTAMP)?;
         let (input, slice) = parse_bytes(input, 12)?;
         let mut bytes = [0xff; 12];
@@ -662,10 +665,10 @@ mod pack_uuid {
     }
 
     impl<'de> TupleUnpack<'de> for Uuid {
-        fn unpack(input: &[u8], _tuple_depth: TupleDepth) -> Result<(&[u8], Self)> {
+        fn unpack(input: &[u8], _tuple_depth: TupleDepth) -> PackResult<(&[u8], Self)> {
             let input = parse_code(input, UUID)?;
             let (input, slice) = parse_bytes(input, 16)?;
-            let uuid = Self::from_slice(slice).map_err(|_| Error::BadUuid)?;
+            let uuid = Self::from_slice(slice).map_err(|_| PackError::BadUuid)?;
             Ok((input, uuid))
         }
     }

@@ -68,9 +68,9 @@ impl Subspace {
     /// `unpack` returns the Tuple encoded by the given key with the prefix of this Subspace
     /// removed.  `unpack` will return an error if the key is not in this Subspace or does not
     /// encode a well-formed Tuple.
-    pub fn unpack<'de, T: TupleUnpack<'de>>(&self, key: &'de [u8]) -> Result<T> {
+    pub fn unpack<'de, T: TupleUnpack<'de>>(&self, key: &'de [u8]) -> PackResult<T> {
         if !self.is_start_of(key) {
-            return Err(Error::BadPrefix);
+            return Err(PackError::BadPrefix);
         }
         let key = &key[self.prefix.len()..];
         unpack(key)

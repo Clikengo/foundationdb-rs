@@ -62,7 +62,7 @@ impl TupleDepth {
 
 /// A packing/unpacking error
 #[derive(Debug)]
-pub enum Error {
+pub enum PackError {
     Message(String),
     IoError(io::Error),
     TrailingBytes,
@@ -77,30 +77,30 @@ pub enum Error {
     BadUuid,
 }
 
-impl From<io::Error> for Error {
+impl From<io::Error> for PackError {
     fn from(err: io::Error) -> Self {
-        Error::IoError(err)
+        PackError::IoError(err)
     }
 }
 
-impl Display for Error {
+impl Display for PackError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Error::Message(s) => s.fmt(f),
-            Error::IoError(err) => err.fmt(f),
-            Error::TrailingBytes => write!(f, "trailing bytes"),
-            Error::MissingBytes => write!(f, "missing bytes"),
-            Error::BadStringFormat => write!(f, "not an utf8 string"),
-            Error::BadCode { found, .. } => write!(f, "bad code, found {}", found),
-            Error::BadPrefix => write!(f, "bad prefix"),
+            PackError::Message(s) => s.fmt(f),
+            PackError::IoError(err) => err.fmt(f),
+            PackError::TrailingBytes => write!(f, "trailing bytes"),
+            PackError::MissingBytes => write!(f, "missing bytes"),
+            PackError::BadStringFormat => write!(f, "not an utf8 string"),
+            PackError::BadCode { found, .. } => write!(f, "bad code, found {}", found),
+            PackError::BadPrefix => write!(f, "bad prefix"),
             #[cfg(feature = "uuid")]
-            Error::BadUuid => write!(f, "bad uuid"),
+            PackError::BadUuid => write!(f, "bad uuid"),
         }
     }
 }
 
 /// Alias for `Result<..., tuple::Error>`
-pub type Result<T> = result::Result<T, Error>;
+pub type PackResult<T> = result::Result<T, PackError>;
 
 /// Represent a sequence of bytes (i.e. &[u8])
 ///
@@ -180,7 +180,7 @@ pub fn pack_into<T: TuplePack>(v: &T, output: &mut Vec<u8>) {
 }
 
 /// Unpack input
-pub fn unpack<'de, T: TupleUnpack<'de>>(input: &'de [u8]) -> Result<T> {
+pub fn unpack<'de, T: TupleUnpack<'de>>(input: &'de [u8]) -> PackResult<T> {
     T::unpack_root(input)
 }
 
