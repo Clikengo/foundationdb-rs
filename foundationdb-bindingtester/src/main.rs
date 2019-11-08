@@ -882,7 +882,11 @@ impl StackMachine {
                     begin,
                     end,
                     mode,
-                    limit: Some(limit as usize),
+                    limit: if limit > 0 {
+                        Some(limit as usize)
+                    } else {
+                        None
+                    },
                     reverse: reverse != 0,
                     ..RangeOption::default()
                 };
