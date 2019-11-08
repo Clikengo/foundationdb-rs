@@ -94,6 +94,7 @@ impl FdbScope {
             ("THREAD", "THREADS"),
             ("KEY", "KEYS"),
             ("FIT", "FITS"),
+            ("PROXY", "PROXIES"),
         ];
 
         for &(ref from, ref to) in tab.iter() {
