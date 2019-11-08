@@ -3,6 +3,7 @@
 //! The official specification can be found [here](https://github.com/apple/foundationdb/blob/master/design/tuple.md).
 
 mod element;
+pub mod hca;
 mod pack;
 mod subspace;
 mod versionstamp;
