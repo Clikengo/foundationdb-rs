@@ -39,6 +39,7 @@ byteorder = "1.2"
 log = "0.4"
 uuid = { version = "0.7", optional = true }
 rand = "0.7.0"
+static_assertions = "1.1"
 
 [dev-dependencies]
 rand = "0.7"

@@ -1038,3 +1038,8 @@ impl Future for TrxFuture {
         }
     }
 }
+
+#[allow(unused)]
+fn test_futures_are_send_sync() {
+    assert_impl_all!(TrxCommit: Send, Sync);
+}
