@@ -33,7 +33,7 @@ fdb-6_2 = [ "foundationdb-sys/fdb-6_2" ]
 foundationdb-gen = { path = "../foundationdb-gen" }
 
 [dependencies]
-foundationdb-sys = { version = "0.2.0", path = "../foundationdb-sys", default-features = false }
+foundationdb-sys = { version = "0.4.0", path = "../foundationdb-sys", default-features = false }
 futures = "0.3.0"
 memchr = "2.2.1"
 rand = "0.7.2"
