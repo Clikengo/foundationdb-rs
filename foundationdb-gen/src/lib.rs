@@ -221,6 +221,8 @@ struct FdbOption {
     param_description: String,
     description: String,
     hidden: bool,
+    default_for: Option<i32>,
+    persistent: bool,
 }
 
 impl FdbOption {
@@ -279,7 +281,7 @@ impl From<Vec<OwnedAttribute>> for FdbOption {
                     opt.c_name = v.to_uppercase();
                 }
                 "code" => {
-                    opt.code = v.parse().unwrap();
+                    opt.code = v.parse().expect("code to be a i32");
                 }
                 "paramType" => {
                     opt.param_type = match v.as_str() {
@@ -299,7 +301,15 @@ impl From<Vec<OwnedAttribute>> for FdbOption {
                 "hidden" => match v.as_str() {
                     "true" => opt.hidden = true,
                     "false" => opt.hidden = false,
-                    _ => panic!("unexpected boolean value: {}", v),
+                    _ => panic!("unexpected boolean value in 'hidden': {}", v),
+                },
+                "defaultFor" => {
+                    opt.default_for = Some(v.parse().expect("defaultFor to be a i32"));
+                }
+                "persistent" => match v.as_str() {
+                    "true" => opt.persistent = true,
+                    "false" => opt.persistent = false,
+                    _ => panic!("unexpected boolean value in 'persistent': {}", v),
                 },
                 attr => {
                     panic!("unexpected option attribute: {}", attr);
