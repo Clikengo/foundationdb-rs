@@ -34,7 +34,9 @@ impl Drop for Cluster {
 }
 
 impl Cluster {
-    pub fn new(path: Option<&str>) -> impl Future<Output = FdbResult<Cluster>> + Send + Sync {
+    pub fn new(
+        path: Option<&str>,
+    ) -> impl Future<Output = FdbResult<Cluster>> + Send + Sync + Unpin {
         let path_str = path.map(|path| std::ffi::CString::new(path).unwrap());
         let path_ptr = path_str
             .map(|path| path.as_ptr())
@@ -48,7 +50,7 @@ impl Cluster {
     ///
     /// * `path` - A string giving a local path of a cluster file (often called ‘fdb.cluster’) which contains connection information for the FoundationDB cluster. See `foundationdb::default_config_path()`
     ///
-    pub fn from_path(path: &str) -> impl Future<Output = FdbResult<Cluster>> + Send + Sync {
+    pub fn from_path(path: &str) -> impl Future<Output = FdbResult<Cluster>> + Send + Sync + Unpin {
         Self::new(Some(path))
     }
 
@@ -57,7 +59,9 @@ impl Cluster {
     }
 
     /// Returns an `FdbFuture` which will be set to an `Database` object.
-    pub fn create_database(&self) -> impl Future<Output = FdbResult<Database>> + Send + Sync {
+    pub fn create_database(
+        &self,
+    ) -> impl Future<Output = FdbResult<Database>> + Send + Sync + Unpin {
         FdbFuture::new(unsafe {
             fdb_sys::fdb_cluster_create_database(self.inner.as_ptr(), b"DB" as *const _, 2)
         })

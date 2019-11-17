@@ -21,7 +21,7 @@ use crate::options;
 use crate::{error, FdbError, FdbResult};
 
 use futures::{
-    future, future::Either, stream, Future, FutureExt, TryFutureExt, TryStream, TryStreamExt,
+    future, future::Either, stream, Future, FutureExt, Stream, TryFutureExt, TryStreamExt,
 };
 
 /// A committed transaction.
@@ -366,7 +366,7 @@ impl Transaction {
         &self,
         key: &[u8],
         snapshot: bool,
-    ) -> impl Future<Output = FdbResult<Option<FdbSlice>>> + Send + Sync {
+    ) -> impl Future<Output = FdbResult<Option<FdbSlice>>> + Send + Sync + Unpin {
         FdbFuture::new(unsafe {
             fdb_sys::fdb_transaction_get(
                 self.inner.as_ptr(),
@@ -428,7 +428,7 @@ impl Transaction {
         &self,
         selector: &KeySelector,
         snapshot: bool,
-    ) -> impl Future<Output = FdbResult<FdbSlice>> + Send + Sync {
+    ) -> impl Future<Output = FdbResult<FdbSlice>> + Send + Sync + Unpin {
         let key = selector.key();
         FdbFuture::new(unsafe {
             fdb_sys::fdb_transaction_get_key(
@@ -460,7 +460,7 @@ impl Transaction {
         &'a self,
         opt: RangeOption<'a>,
         snapshot: bool,
-    ) -> impl TryStream<Ok = FdbValues, Error = FdbError> + 'a {
+    ) -> impl Stream<Item = FdbResult<FdbValues>> + Send + Sync + Unpin + 'a {
         stream::unfold((1, Some(opt)), move |(iteration, maybe_opt)| {
             if let Some(opt) = maybe_opt {
                 Either::Left(self.get_range(&opt, iteration as usize, snapshot).map(
@@ -493,7 +493,7 @@ impl Transaction {
         &'a self,
         opt: RangeOption<'a>,
         snapshot: bool,
-    ) -> impl TryStream<Ok = FdbValue, Error = FdbError> + 'a {
+    ) -> impl Stream<Item = FdbResult<FdbValue>> + Unpin + 'a {
         self.get_ranges(opt, snapshot)
             .map_ok(|values| stream::iter(values.into_iter().map(Ok)))
             .try_flatten()
@@ -515,7 +515,7 @@ impl Transaction {
         opt: &RangeOption,
         iteration: usize,
         snapshot: bool,
-    ) -> impl Future<Output = FdbResult<FdbValues>> + Send + Sync {
+    ) -> impl Future<Output = FdbResult<FdbValues>> + Send + Sync + Unpin {
         let begin = &opt.begin;
         let end = &opt.end;
         let key_begin = begin.key();
@@ -582,7 +582,7 @@ impl Transaction {
     /// Normally, commit will wait for outstanding reads to return. However, if those reads were
     /// snapshot reads or the transaction option for disabling “read-your-writes” has been invoked,
     /// any outstanding reads will immediately return errors.
-    pub fn commit(self) -> impl Future<Output = TransactionResult> {
+    pub fn commit(self) -> impl Future<Output = TransactionResult> + Send + Sync + Unpin {
         FdbFuture::<()>::new(unsafe { fdb_sys::fdb_transaction_commit(self.inner.as_ptr()) }).map(
             move |r| match r {
                 Ok(()) => Ok(TransactionCommitted { tr: self }),
@@ -603,7 +603,10 @@ impl Transaction {
     ///
     /// You should not call this method most of the times and use `Database::transact` which
     /// implements a retry loop strategy for you.
-    pub fn on_error(self, err: FdbError) -> impl Future<Output = FdbResult<Transaction>> {
+    pub fn on_error(
+        self,
+        err: FdbError,
+    ) -> impl Future<Output = FdbResult<Transaction>> + Send + Sync + Unpin {
         FdbFuture::<()>::new(unsafe {
             fdb_sys::fdb_transaction_on_error(self.inner.as_ptr(), err.code())
         })
@@ -622,7 +625,7 @@ impl Transaction {
     pub fn get_addresses_for_key(
         &self,
         key: &[u8],
-    ) -> impl Future<Output = FdbResult<FdbAddresses>> + Send + Sync {
+    ) -> impl Future<Output = FdbResult<FdbAddresses>> + Send + Sync + Unpin {
         FdbFuture::new(unsafe {
             fdb_sys::fdb_transaction_get_addresses_for_key(
                 self.inner.as_ptr(),
@@ -657,7 +660,7 @@ impl Transaction {
     /// too_many_watches error. This limit can be changed using the MAX_WATCHES database option.
     /// Because a watch outlives the transaction that creates it, any watch that is no longer
     /// needed should be cancelled by dropping its future.
-    pub fn watch(&self, key: &[u8]) -> impl Future<Output = FdbResult<()>> + Send + Sync {
+    pub fn watch(&self, key: &[u8]) -> impl Future<Output = FdbResult<()>> + Send + Sync + Unpin {
         FdbFuture::new(unsafe {
             fdb_sys::fdb_transaction_watch(
                 self.inner.as_ptr(),
@@ -673,7 +676,9 @@ impl Transaction {
     ///
     /// This can be called multiple times before the transaction is committed.
     #[cfg(feature = "fdb-6_2")]
-    pub fn get_approximate_size(&self) -> impl Future<Output = FdbResult<i64>> + Send + Sync {
+    pub fn get_approximate_size(
+        &self,
+    ) -> impl Future<Output = FdbResult<i64>> + Send + Sync + Unpin {
         FdbFuture::new(unsafe {
             fdb_sys::fdb_transaction_get_approximate_size(self.inner.as_ptr())
         })
@@ -688,7 +693,9 @@ impl Transaction {
     /// keys and then sets them to their current values may be optimized to a read-only transaction.
     ///
     /// Most applications will not call this function.
-    pub fn get_versionstamp(&self) -> impl Future<Output = FdbResult<FdbSlice>> + Send + Sync {
+    pub fn get_versionstamp(
+        &self,
+    ) -> impl Future<Output = FdbResult<FdbSlice>> + Send + Sync + Unpin {
         FdbFuture::new(unsafe { fdb_sys::fdb_transaction_get_versionstamp(self.inner.as_ptr()) })
     }
 
@@ -696,7 +703,7 @@ impl Transaction {
     /// to `get_*()` (including this one) and (unless causal consistency has been deliberately
     /// compromised by transaction options) is guaranteed to represent all transactions which were
     /// reported committed before that call.
-    pub fn get_read_version(&self) -> impl Future<Output = FdbResult<i64>> + Send + Sync {
+    pub fn get_read_version(&self) -> impl Future<Output = FdbResult<i64>> + Send + Sync + Unpin {
         FdbFuture::new(unsafe { fdb_sys::fdb_transaction_get_read_version(self.inner.as_ptr()) })
     }
 
