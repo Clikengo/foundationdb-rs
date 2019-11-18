@@ -665,7 +665,7 @@ impl GetKeyResult {
         self.trx.clone()
     }
 
-    /// Returns the values associated with this get
+    /// Returns the key associated with the call to `Transaction::get_key`
     pub fn value(&self) -> &[u8] {
         self.inner.get_key().expect("inner should resolve into key")
     }
