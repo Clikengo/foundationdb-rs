@@ -587,20 +587,30 @@ impl StackMachine {
         self.push_item(number, &Bytes::from(packed));
     }
 
+    fn check<T>(&mut self, number: usize, r: FdbResult<T>) -> Result<T, ()> {
+        match r {
+            Ok(v) => Ok(v),
+            Err(err) => Err(self.push_err(number, err)),
+        }
+    }
+
     #[allow(clippy::cognitive_complexity)]
     async fn run_step(
         &mut self,
         db: Arc<Database>,
         number: usize,
         mut instr: Instr,
-    ) -> FdbResult<()> {
+    ) -> Result<(), ()> {
         use crate::InstrCode::*;
 
         let is_db = instr.pop_database();
         let mut mutation = false;
         let mut pending = false;
         let (mut trx, trx_name) = if is_db {
-            (TransactionState::Transaction(db.create_trx()?), None)
+            (
+                TransactionState::Transaction(self.check(number, db.create_trx())?),
+                None,
+            )
         } else {
             let mut trx = self
                 .transactions
@@ -722,8 +732,9 @@ impl StackMachine {
             NewTransaction => {
                 let name = self.cur_transaction.clone();
                 debug!("create_trx {:?}", name);
+                let trx = self.check(number, db.create_trx())?;
                 self.transactions
-                    .insert(name, TransactionState::Transaction(db.create_trx()?));
+                    .insert(name, TransactionState::Transaction(trx));
             }
 
             // Pop the top item off of the stack as TRANSACTION_NAME. Begin using the
@@ -734,10 +745,9 @@ impl StackMachine {
                 let name: Bytes = self.pop_bytes().await;
                 debug!("use_transaction {:?}", name);
                 if !self.transactions.contains_key(&name) {
-                    self.transactions.insert(
-                        name.clone(),
-                        TransactionState::Transaction(db.create_trx()?),
-                    );
+                    let trx = self.check(number, db.create_trx())?;
+                    self.transactions
+                        .insert(name.clone(), TransactionState::Transaction(trx));
                 }
                 self.cur_transaction = name;
             }
@@ -1074,8 +1084,11 @@ impl StackMachine {
             // current transaction. Does not modify the stack.
             DisableWriteConflict => {
                 debug!("disable_write_conflict");
-                trx.as_mut()
-                    .set_option(TransactionOption::NextWriteNoWriteConflictRange)?
+                self.check(
+                    number,
+                    trx.as_mut()
+                        .set_option(TransactionOption::NextWriteNoWriteConflictRange),
+                )?
             }
             // Commits the current transaction (with no retry behavior). May optionally
             // push a future onto the stack.
@@ -1347,49 +1360,56 @@ impl StackMachine {
                     }
                     Ok(())
                 }
-                db.transact(
-                    (begin, end),
-                    |trx, (begin, end)| wait_for_empty(trx, &begin, &end).boxed_local(),
-                    TransactOption::default(),
-                )
-                .await?;
+                let r = db
+                    .transact(
+                        (begin, end),
+                        |trx, (begin, end)| wait_for_empty(trx, &begin, &end).boxed_local(),
+                        TransactOption::default(),
+                    )
+                    .await;
+                self.check(number, r)?;
                 self.push_item(number, &Bytes::from(b"WAITED_FOR_EMPTY".as_ref()));
             }
 
             UnitTests => {
-                db.set_option(DatabaseOption::LocationCacheSize(100_001))?;
-                db.set_option(DatabaseOption::MaxWatches(100_001))?;
-                db.set_option(DatabaseOption::DatacenterId("dc_id".to_string()))?;
-                db.set_option(DatabaseOption::MachineId("machine_id".to_string()))?;
-                db.set_option(DatabaseOption::TransactionTimeout(100_000))?;
-                db.set_option(DatabaseOption::TransactionTimeout(0))?;
-                db.set_option(DatabaseOption::TransactionTimeout(0))?;
-                db.set_option(DatabaseOption::TransactionMaxRetryDelay(100))?;
-                db.set_option(DatabaseOption::TransactionRetryLimit(10))?;
-                db.set_option(DatabaseOption::TransactionRetryLimit(-1))?;
-                db.set_option(DatabaseOption::SnapshotRywEnable)?;
-                db.set_option(DatabaseOption::SnapshotRywDisable)?;
+                async fn unit_test(db: &fdb::Database, tr: &mut fdb::Transaction) -> FdbResult<()> {
+                    db.set_option(DatabaseOption::LocationCacheSize(100_001))?;
+                    db.set_option(DatabaseOption::MaxWatches(100_001))?;
+                    db.set_option(DatabaseOption::DatacenterId("dc_id".to_string()))?;
+                    db.set_option(DatabaseOption::MachineId("machine_id".to_string()))?;
+                    db.set_option(DatabaseOption::TransactionTimeout(100_000))?;
+                    db.set_option(DatabaseOption::TransactionTimeout(0))?;
+                    db.set_option(DatabaseOption::TransactionTimeout(0))?;
+                    db.set_option(DatabaseOption::TransactionMaxRetryDelay(100))?;
+                    db.set_option(DatabaseOption::TransactionRetryLimit(10))?;
+                    db.set_option(DatabaseOption::TransactionRetryLimit(-1))?;
+                    db.set_option(DatabaseOption::SnapshotRywEnable)?;
+                    db.set_option(DatabaseOption::SnapshotRywDisable)?;
 
-                let tr = trx.as_mut();
-                tr.set_option(TransactionOption::PrioritySystemImmediate)?;
-                tr.set_option(TransactionOption::PriorityBatch)?;
-                tr.set_option(TransactionOption::CausalReadRisky)?;
-                tr.set_option(TransactionOption::CausalWriteRisky)?;
-                tr.set_option(TransactionOption::ReadYourWritesDisable)?;
-                tr.set_option(TransactionOption::ReadSystemKeys)?;
-                tr.set_option(TransactionOption::AccessSystemKeys)?;
-                tr.set_option(TransactionOption::Timeout(60 * 1000))?;
-                tr.set_option(TransactionOption::RetryLimit(50))?;
-                tr.set_option(TransactionOption::MaxRetryDelay(100))?;
-                tr.set_option(TransactionOption::UsedDuringCommitProtectionDisable)?;
-                tr.set_option(TransactionOption::DebugTransactionIdentifier(
-                    "my_transaction".to_string(),
-                ))?;
-                tr.set_option(TransactionOption::LogTransaction)?;
-                tr.set_option(TransactionOption::ReadLockAware)?;
-                tr.set_option(TransactionOption::LockAware)?;
+                    tr.set_option(TransactionOption::PrioritySystemImmediate)?;
+                    tr.set_option(TransactionOption::PriorityBatch)?;
+                    tr.set_option(TransactionOption::CausalReadRisky)?;
+                    tr.set_option(TransactionOption::CausalWriteRisky)?;
+                    tr.set_option(TransactionOption::ReadYourWritesDisable)?;
+                    tr.set_option(TransactionOption::ReadSystemKeys)?;
+                    tr.set_option(TransactionOption::AccessSystemKeys)?;
+                    tr.set_option(TransactionOption::Timeout(60 * 1000))?;
+                    tr.set_option(TransactionOption::RetryLimit(50))?;
+                    tr.set_option(TransactionOption::MaxRetryDelay(100))?;
+                    tr.set_option(TransactionOption::UsedDuringCommitProtectionDisable)?;
+                    tr.set_option(TransactionOption::DebugTransactionIdentifier(
+                        "my_transaction".to_string(),
+                    ))?;
+                    tr.set_option(TransactionOption::LogTransaction)?;
+                    tr.set_option(TransactionOption::ReadLockAware)?;
+                    tr.set_option(TransactionOption::LockAware)?;
 
-                tr.get(b"\xff", false).await?;
+                    tr.get(b"\xff", false).await?;
+
+                    Ok(())
+                }
+                let r = unit_test(&db, trx.as_mut()).await;
+                self.check(number, r)?;
 
                 // TODO
                 // test_cancellation(db)
@@ -1409,7 +1429,8 @@ impl StackMachine {
         }
 
         if is_db && mutation {
-            trx.take(0).commit().await?;
+            let r = trx.take(0).commit().await.map_err(|e| e.into());
+            self.check(number, r)?;
             self.push_item(number, &RESULT_NOT_PRESENT);
         } else if !self.transactions.contains_key(&self.cur_transaction) {
             self.transactions.insert(self.cur_transaction.clone(), trx);
@@ -1429,7 +1450,7 @@ impl StackMachine {
 
         for (i, instr) in instrs.into_iter().enumerate() {
             trace!("{}/{}, {:?}", i, self.stack.len(), instr);
-            self.run_step(db.clone(), i, instr).await?;
+            let _ = self.run_step(db.clone(), i, instr).await;
         }
 
         Ok(())
