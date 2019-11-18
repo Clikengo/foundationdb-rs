@@ -120,14 +120,14 @@ impl Database {
     /// lifetime limitations around f might be lowered.
     pub async fn transact<F, D, Item, Error>(
         &self,
-        data: D,
+        mut data: D,
         mut f: F,
         options: TransactOption,
     ) -> Result<Item, Error>
     where
         for<'a> F: FnMut(
             &'a Transaction,
-            &'a D,
+            &'a mut D,
         ) -> Pin<Box<dyn Future<Output = Result<Item, Error>> + 'a>>,
         Error: TransactError,
     {
@@ -142,7 +142,7 @@ impl Database {
                 && time_out.filter(|&t| Instant::now() < t).is_none()
         };
         loop {
-            trx = match f(&trx, &data).await {
+            trx = match f(&trx, &mut data).await {
                 Ok(item) => match trx.commit().await {
                     Ok(_) => break Ok(item),
                     Err(e) => {

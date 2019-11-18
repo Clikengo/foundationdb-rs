@@ -1363,7 +1363,7 @@ impl StackMachine {
                 let r = db
                     .transact(
                         (begin, end),
-                        |trx, (begin, end)| wait_for_empty(trx, &begin, &end).boxed_local(),
+                        |trx, (begin, end)| wait_for_empty(trx, begin, end).boxed_local(),
                         TransactOption::default(),
                     )
                     .await;
