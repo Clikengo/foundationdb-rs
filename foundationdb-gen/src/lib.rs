@@ -94,6 +94,7 @@ impl FdbScope {
             ("THREAD", "THREADS"),
             ("KEY", "KEYS"),
             ("FIT", "FITS"),
+            ("PROXY", "PROXIES"),
         ];
 
         for &(ref from, ref to) in tab.iter() {
@@ -306,6 +307,9 @@ impl From<Vec<OwnedAttribute>> for FdbOption {
                     "false" => opt.hidden = false,
                     _ => panic!("unexpected boolean value: {}", v),
                 },
+                "defaultFor" | "persistent" => {
+                    // API 620+
+                }
                 attr => {
                     panic!("unexpected option attribute: {}", attr);
                 }
