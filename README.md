@@ -13,6 +13,9 @@ The repo consists of multiple crates
 | **foundationdb-sys** | [![](http://meritbadge.herokuapp.com/foundationdb-sys)](https://crates.io/crates/foundationdb-sys) [![foundationdb-sys](https://docs.rs/foundationdb-sys/badge.svg)](https://docs.rs/foundationdb-sys) | C API bindings for FoundationDB |
 | **foundationdb-gen** | n/a | Code generator for common options and types of FoundationDB |
 
+The current version requires rustc 1.39+ to work (async/await feature).
+The previous version (0.3) is still maintained and is available within the 0.3 branch.
+
 ## License
 
 Licensed under either of
