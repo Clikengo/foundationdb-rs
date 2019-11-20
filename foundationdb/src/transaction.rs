@@ -1042,4 +1042,21 @@ impl Future for TrxFuture {
 #[allow(unused)]
 fn test_futures_are_send_sync() {
     assert_impl_all!(TrxCommit: Send, Sync);
+    assert_impl_all!(TrxErrFuture: Send, Sync);
+    assert_impl_all!(TrxGet: Send, Sync);
+    assert_impl_all!(TrxGetAddressesForKey: Send, Sync);
+    assert_impl_all!(TrxGetKey: Send, Sync);
+    assert_impl_all!(TrxGetRange: Send, Sync);
+    assert_impl_all!(TrxReadVersion: Send, Sync);
+    assert_impl_all!(TrxVersionstamp: Send, Sync);
+    assert_impl_all!(TrxWatch: Send, Sync);
+}
+
+#[allow(unused)]
+fn test_results_are_send_sync() {
+    assert_impl_all!(GetAddressResult: Send, Sync);
+    assert_impl_all!(GetKeyResult: Send, Sync);
+    assert_impl_all!(GetRangeResult: Send, Sync);
+    assert_impl_all!(GetResult: Send, Sync);
+    assert_impl_all!(RangeStream: Send, Sync);
 }

@@ -149,6 +149,9 @@ impl Drop for FdbFutureResult {
     }
 }
 
+unsafe impl Send for FdbFutureResult {}
+unsafe impl Sync for FdbFutureResult {}
+
 impl FdbFutureResult {
     pub(crate) fn new(f: *mut fdb::FDBFuture) -> Self {
         Self { f }
