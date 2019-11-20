@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## 0.4.0
+
+- Migration to stable (rust 1.39+) async/await
+- Transaction aren't cloned anymore, they are shared by reference. Commit/cancel/reset api requires owned/mutable access to a Transaction. This protect against undefined behavior that was previously possible (cancel/reset) data races.
+- No more indirection within FdbFuture. Returned future give you direct access to the result.
+- Support for fdb api 610+
+- Option generation is now indented and the code is simpler
+- RangeOption and KeySelector can be either be Owned or Borrowed
+- KeySelector offset can be negative (there is a test of this in the binding checker, this was not found due to casting luck)
+- Some int options can be negative
+- Fix init api safety (undefined behavior was possible)
+- Simple boot process
+- Foundationdb 510, 520, 600 support with common Database::new_compat api
+- Threaded bindingtester (concurrent scripted and api tests)
+
 ## 0.3.0
 
 ### Changed
