@@ -9,8 +9,8 @@ The repo consists of multiple crates
 
 | Library | Status | Description |
 |---------|--------|-------------|
-| **foundationdb** | [![](http://meritbadge.herokuapp.com/foundationdb)](https://crates.io/crates/foundationdb) [![foundationdb](https://docs.rs/foundationdb/badge.svg)](https://docs.rs/foundationdb) | High level FoundationDB client API |
-| **foundationdb-sys** | [![](http://meritbadge.herokuapp.com/foundationdb-sys)](https://crates.io/crates/foundationdb-sys) [![foundationdb-sys](https://docs.rs/foundationdb-sys/badge.svg)](https://docs.rs/foundationdb-sys) | C API bindings for FoundationDB |
+| [**foundationdb**](foundationdb/README.md) | [![](http://meritbadge.herokuapp.com/foundationdb)](https://crates.io/crates/foundationdb) [![foundationdb](https://docs.rs/foundationdb/badge.svg)](https://docs.rs/foundationdb) | High level FoundationDB client API |
+| [**foundationdb-sys**](foundationdb-sys/README.md) | [![](http://meritbadge.herokuapp.com/foundationdb-sys)](https://crates.io/crates/foundationdb-sys) [![foundationdb-sys](https://docs.rs/foundationdb-sys/badge.svg)](https://docs.rs/foundationdb-sys) | C API bindings for FoundationDB |
 | **foundationdb-gen** | n/a | Code generator for common options and types of FoundationDB |
 
 The current version requires rustc 1.39+ to work (async/await feature).

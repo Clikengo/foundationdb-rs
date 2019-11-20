@@ -4,6 +4,8 @@ This is a wrapper library around the FoundationDB (Fdb) C API. It implements fut
 
 ## Prerequisites
 
+Rust 1.39+
+
 ### Install FoundationDB
 
 Install FoundationDB on your system, see [FoundationDB Local Development](https://apple.github.io/foundationdb/local-dev.html), or these instructions:
