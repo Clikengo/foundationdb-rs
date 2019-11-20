@@ -1,47 +1,45 @@
-// Copyright 2018 foundationdb-rs developers, https://github.com/bluejekyll/foundationdb-rs/graphs/contributors
-// Copyright 2013-2018 Apple, Inc and the FoundationDB project authors.
-//
-// Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
-// http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
-// http://opensource.org/licenses/MIT>, at your option. This file may not be
-// copied, modified, or distributed except according to those terms.
-
-//! Tuple Key type like that of other FoundationDB libraries
+//! Implementation of the official tuple layer typecodes
+//!
+//! The official specification can be found [here](https://github.com/apple/foundationdb/blob/master/design/tuple.md).
 
 mod element;
+pub mod hca;
+mod pack;
+mod subspace;
+mod versionstamp;
 
-use std::ops::{Deref, DerefMut};
-use std::{self, io::Write, string::FromUtf8Error};
+use std::borrow::Cow;
+use std::fmt::{self, Display};
+use std::io;
+use std::ops::Deref;
+use std::result;
 
 #[cfg(feature = "uuid")]
-use uuid;
+pub use uuid::Uuid;
 
-pub use self::element::Element;
-use self::element::Type;
+pub use element::Element;
+pub use pack::{TuplePack, TupleUnpack};
+pub use subspace::Subspace;
+pub use versionstamp::Versionstamp;
 
-/// Tuple encoding/decoding related errors
-#[derive(Debug, Fail)]
-pub enum Error {
-    /// Unexpected end of the byte stream
-    #[fail(display = "Unexpected end of file")]
-    EOF,
-    /// Invalid type specified
-    #[fail(display = "Invalid type: {}", value)]
-    InvalidType {
-        /// the type code as defined in FoundationDB
-        value: u8,
-    },
-    /// Data was not valid for the specified type
-    #[fail(display = "Invalid data")]
-    InvalidData,
-    /// Utf8 Conversion error of tuple data
-    #[fail(display = "UTF8 conversion error")]
-    FromUtf8Error(FromUtf8Error),
-    /// Uuid Conversion error of tuple data
-    #[cfg(feature = "uuid")]
-    #[fail(display = "UUID conversion error")]
-    FromUuidError(uuid::BytesError),
-}
+const NIL: u8 = 0x00;
+const BYTES: u8 = 0x01;
+const STRING: u8 = 0x02;
+const NESTED: u8 = 0x05;
+// const NEGINTSTART: u8 = 0x0b;
+const INTZERO: u8 = 0x14;
+// const POSINTEND: u8 = 0x1d;
+const FLOAT: u8 = 0x20;
+const DOUBLE: u8 = 0x21;
+const FALSE: u8 = 0x26;
+const TRUE: u8 = 0x27;
+#[cfg(feature = "uuid")]
+const UUID: u8 = 0x30;
+// Not a single official binding is implementing 80 Bit versionstamp...
+// const VERSIONSTAMP_88: u8 = 0x32;
+const VERSIONSTAMP: u8 = 0x33;
+
+const ESCAPE: u8 = 0xff;
 
 /// Tracks the depth of a Tuple decoding chain
 #[derive(Copy, Clone)]
@@ -53,378 +51,329 @@ impl TupleDepth {
     }
 
     /// Increment the depth by one, this be called when calling into `Tuple::{encode, decode}` of tuple-like datastructures
-    pub fn increment(&self) -> Self {
+    pub fn increment(self) -> Self {
         TupleDepth(self.0 + 1)
     }
 
     /// Returns the current depth in any recursive tuple processing, 0 representing there having been no recursion
-    pub fn depth(&self) -> usize {
+    pub fn depth(self) -> usize {
         self.0
     }
 }
 
-/// A result with tuple::Error defined
-pub type Result<T> = std::result::Result<T, Error>;
+/// A packing/unpacking error
+#[derive(Debug)]
+pub enum PackError {
+    Message(String),
+    IoError(io::Error),
+    TrailingBytes,
+    MissingBytes,
+    BadStringFormat,
+    BadCode {
+        found: u8,
+        expected: Option<u8>,
+    },
+    BadPrefix,
+    #[cfg(feature = "uuid")]
+    BadUuid,
+}
 
-/// Generic Tuple of elements
-#[derive(Clone, Debug, PartialEq)]
-pub struct Tuple(Vec<Element>);
-
-impl From<Vec<Element>> for Tuple {
-    fn from(tuple: Vec<Element>) -> Self {
-        Tuple(tuple)
+impl From<io::Error> for PackError {
+    fn from(err: io::Error) -> Self {
+        PackError::IoError(err)
     }
 }
 
-impl Deref for Tuple {
-    type Target = Vec<Element>;
+impl Display for PackError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            PackError::Message(s) => s.fmt(f),
+            PackError::IoError(err) => err.fmt(f),
+            PackError::TrailingBytes => write!(f, "trailing bytes"),
+            PackError::MissingBytes => write!(f, "missing bytes"),
+            PackError::BadStringFormat => write!(f, "not an utf8 string"),
+            PackError::BadCode { found, .. } => write!(f, "bad code, found {}", found),
+            PackError::BadPrefix => write!(f, "bad prefix"),
+            #[cfg(feature = "uuid")]
+            PackError::BadUuid => write!(f, "bad uuid"),
+        }
+    }
+}
 
+/// Alias for `Result<..., tuple::Error>`
+pub type PackResult<T> = result::Result<T, PackError>;
+
+/// Represent a sequence of bytes (i.e. &[u8])
+///
+/// This sequence can be either owned or borrowed.
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Bytes<'a>(pub Cow<'a, [u8]>);
+
+impl<'a> fmt::Debug for Bytes<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(self, f)
+    }
+}
+
+impl<'a> fmt::Display for Bytes<'a> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "b\"")?;
+        for &byte in self.0.iter() {
+            if byte.is_ascii_alphanumeric() || byte.is_ascii_punctuation() || byte == b' ' {
+                write!(fmt, "{}", byte as char)?;
+            } else {
+                write!(fmt, "\\x{:02x}", byte)?;
+            }
+        }
+        write!(fmt, "\"")
+    }
+}
+
+impl<'a> Bytes<'a> {
+    pub fn into_owned(self) -> Vec<u8> {
+        self.0.into_owned()
+    }
+}
+
+impl<'a> Deref for Bytes<'a> {
+    type Target = [u8];
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
-
-impl DerefMut for Tuple {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+impl<'a> AsRef<[u8]> for Bytes<'a> {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
     }
 }
 
-/// For types that are encodable as defined by the tuple definitions on FoundationDB
-pub trait Encode {
-    /// Encodes this tuple/element into the associated Write
-    ///
-    /// # Arguments
-    ///
-    /// * `w` - a Write to put the self as FoundationDB encoded bytes
-    /// * `tuple_depth` - the current depth in recursive tuple-like datastructures, it should be incremented only when encoding a tuple inside another object, see `encode_to` for a method which can initialize the TupleDepth.
-    fn encode<W: Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> std::io::Result<()>;
-
-    /// Encodes this tuple/element into the associated Write
-    ///
-    /// # Arguments
-    ///
-    /// * `w` - a Write to put the self as FoundationDB encoded bytes
-    fn encode_to<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
-        self.encode(w, TupleDepth::new())
+impl<'a> From<&'a [u8]> for Bytes<'a> {
+    fn from(bytes: &'a [u8]) -> Self {
+        Self(Cow::Borrowed(bytes))
     }
-
-    /// Encodes this tuple/element into a new Vec
-    fn to_vec(&self) -> Vec<u8> {
-        let mut v = Vec::new();
-        self.encode_to(&mut v)
-            .expect("tuple encoding should never fail");
-        v
+}
+impl From<Vec<u8>> for Bytes<'static> {
+    fn from(vec: Vec<u8>) -> Self {
+        Self(Cow::Owned(vec))
     }
 }
 
-/// For types that are decodable from the Tuple definitions in FoundationDB
-pub trait Decode: Sized {
-    /// Decodes Self from the byte slice
-    ///
-    /// # Arguments
-    ///
-    /// * `buf` - the buffer, starting at 0, from which to read Self, where the encoding is FoundationDB encoded bytes
-    /// * `tuple_depth` - the current depth in recursive tuple-like datastructures
-    ///
-    /// # Return
-    ///
-    /// Self and the offset of the next byte after Self in the byte slice
-    fn decode(buf: &[u8], tuple_depth: TupleDepth) -> Result<(Self, usize)>;
-
-    /// Decodes Self from the byte slice
-    ///
-    /// # Arguments
-    ///
-    /// * `buf` - the buffer, starting at 0, from which to read Self, where the encoding is FoundationDB encoded bytes
-    ///
-    /// # Return
-    ///
-    /// Self and the offset of the next byte after Self in the byte slice
-    fn decode_from(buf: &[u8]) -> Result<(Self, usize)> {
-        Self::decode(buf, TupleDepth::new())
+impl<'a> From<&'a str> for Bytes<'a> {
+    fn from(s: &'a str) -> Self {
+        s.as_bytes().into()
     }
-
-    /// Decodes returning Self only
-    fn try_from(buf: &[u8]) -> Result<Self> {
-        let (val, offset) = Self::decode_from(buf)?;
-        if offset != buf.len() {
-            return Err(Error::InvalidData);
-        }
-        Ok(val)
+}
+impl From<String> for Bytes<'static> {
+    fn from(vec: String) -> Self {
+        vec.into_bytes().into()
     }
 }
 
-macro_rules! tuple_impls {
-    ($($len:expr => ($($n:tt $name:ident)+))+) => {
-        $(
-            impl<$($name),+> Encode for ($($name,)+)
-            where
-                $($name: Encode,)+
-            {
-                #[allow(non_snake_case, unused_assignments, deprecated)]
-                fn encode<W: Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> std::io::Result<()> {
-                    if tuple_depth.depth() > 0 {
-                        element::NESTED.write(w)?;
-                    }
-
-                    $(
-                        self.$n.encode(w, tuple_depth.increment())?;
-                    )*
-
-                    if tuple_depth.depth() > 0 {
-                        element::NIL.write(w)?;
-                    }
-                    Ok(())
-                }
-            }
-
-            impl<$($name),+> Decode for ($($name,)+)
-            where
-                $($name: Decode + Default,)+
-            {
-                #[allow(non_snake_case, unused_assignments, deprecated)]
-                fn decode(buf: &[u8], tuple_depth: TupleDepth) -> Result<(Self, usize)> {
-                    let mut buf = buf;
-                    let mut out: Self = Default::default();
-                    let mut offset = 0_usize;
-
-                    if tuple_depth.depth() > 0{
-                        element::NESTED.expect(buf[0])?;
-                        offset += 1;
-                        buf = &buf[1..];
-                    }
-
-                    $(
-                        let (v0, offset0) = $name::decode(buf, tuple_depth.increment())?;
-                        out.$n = v0;
-                        offset += offset0;
-                        buf = &buf[offset0..];
-                    )*
-
-                    if tuple_depth.depth() > 0 {
-                        element::NIL.expect(buf[0])?;
-                        offset += 1;
-                        buf = &buf[1..];
-                    }
-
-                    // will not be empty if we're decoding as a tuple in a tuple
-                    //   (the outer tuple has more...)
-                    if !buf.is_empty() && tuple_depth.depth() == 0 {
-                        return Err(Error::InvalidData);
-                    }
-
-                    Ok((out, offset))
-                }
-            }
-        )+
-    }
+/// Pack value and returns the packed buffer
+pub fn pack<T: TuplePack>(v: &T) -> Vec<u8> {
+    v.pack_to_vec()
 }
 
-tuple_impls! {
-    1 => (0 T0)
-    2 => (0 T0 1 T1)
-    3 => (0 T0 1 T1 2 T2)
-    4 => (0 T0 1 T1 2 T2 3 T3)
-    5 => (0 T0 1 T1 2 T2 3 T3 4 T4)
-    6 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5)
-    7 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6)
-    8 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7)
-    9 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8)
-    10 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9)
-    11 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10)
-    12 => (0 T0 1 T1 2 T2 3 T3 4 T4 5 T5 6 T6 7 T7 8 T8 9 T9 10 T10 11 T11)
+/// Pack value into the given buffer
+pub fn pack_into<T: TuplePack>(v: &T, output: &mut Vec<u8>) {
+    v.pack_root(output)
+        .expect("tuple encoding should never fail");
 }
 
-impl Encode for Tuple {
-    fn encode<W: Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> std::io::Result<()> {
-        for element in self.0.iter() {
-            element.encode(w, tuple_depth.increment())?;
-        }
-        Ok(())
-    }
-}
-
-impl Decode for Tuple {
-    fn decode(buf: &[u8], tuple_depth: TupleDepth) -> Result<(Self, usize)> {
-        let mut data = buf;
-        let mut v = Vec::new();
-        let mut offset = 0_usize;
-        while !data.is_empty() {
-            let (s, len): (Element, _) = Element::decode(data, tuple_depth.increment())?;
-            v.push(s);
-            offset += len;
-            data = &data[len..];
-        }
-        Ok((Tuple(v), offset))
-    }
-}
-
-impl From<FromUtf8Error> for Error {
-    fn from(error: FromUtf8Error) -> Self {
-        Error::FromUtf8Error(error)
-    }
-}
-
-#[cfg(feature = "uuid")]
-impl From<uuid::BytesError> for Error {
-    fn from(error: uuid::BytesError) -> Self {
-        Error::FromUuidError(error)
-    }
+/// Unpack input
+pub fn unpack<'de, T: TupleUnpack<'de>>(input: &'de [u8]) -> PackResult<T> {
+    T::unpack_root(input)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_malformed_int() {
-        assert!(Tuple::try_from(&[21, 0]).is_ok());
-        assert!(Tuple::try_from(&[22, 0]).is_err());
-        assert!(Tuple::try_from(&[22, 0, 0]).is_ok());
+    const NIL_VAL: Option<()> = None;
 
-        assert!(Tuple::try_from(&[19, 0]).is_ok());
-        assert!(Tuple::try_from(&[18, 0]).is_err());
-        assert!(Tuple::try_from(&[18, 0, 0]).is_ok());
+    fn test_serde<'de, T>(val: T, buf: &'de [u8])
+    where
+        T: TuplePack + TupleUnpack<'de> + fmt::Debug + PartialEq,
+    {
+        assert_eq!(unpack::<'de, T>(buf).unwrap(), val);
+        assert_eq!(pack(&val), buf);
     }
 
     #[test]
-    fn test_decode_tuple() {
-        assert_eq!((0, ()), Decode::try_from(&[20, 0]).unwrap());
-    }
-
-    #[test]
-    fn test_decode_tuple_ty() {
-        let data: &[u8] = &[2, 104, 101, 108, 108, 111, 0, 1, 119, 111, 114, 108, 100, 0];
-
-        let (v1, v2): (String, Vec<u8>) = Decode::try_from(data).unwrap();
-        assert_eq!(v1, "hello");
-        assert_eq!(v2, b"world");
-    }
-
-    #[test]
-    fn test_encode_tuple_ty() {
-        let tup = ("hello", b"world".to_vec());
-
-        assert_eq!(
-            &[2, 104, 101, 108, 108, 111, 0, 1, 119, 111, 114, 108, 100, 0],
-            Encode::to_vec(&tup).as_slice()
+    fn test_spec() {
+        test_serde(NIL_VAL, &[NIL]);
+        test_serde((NIL_VAL,), &[NIL]);
+        test_serde(((NIL_VAL,),), &[NESTED, NIL, ESCAPE, NIL]);
+        // assert_eq!(to_bytes(b"foo\x00bar").unwrap(), b"\x01foo\x00\xffbar\x00");
+        test_serde("FÔO\x00bar".to_owned(), b"\x02F\xc3\x94O\x00\xffbar\x00");
+        test_serde(
+            (("foo\x00bar".to_owned(), NIL_VAL, ()),),
+            b"\x05\x02foo\x00\xffbar\x00\x00\xff\x05\x00\x00",
         );
+        test_serde(-1, b"\x13\xfe");
+        test_serde(-5551212, b"\x11\xabK\x93");
+        test_serde(-42f32, b"\x20\x3d\xd7\xff\xff");
     }
 
     #[test]
-    fn test_eq() {
-        assert_eq!("string".to_vec(), "string".to_string().to_vec());
+    fn test_simple() {
+        // bool
+        test_serde(false, &[FALSE]);
+        test_serde(true, &[TRUE]);
 
-        assert_eq!(
-            ("string", "string".to_string()).to_vec(),
-            ("string".to_string(), "string").to_vec()
+        // int
+        test_serde(0i64, &[INTZERO]);
+        test_serde(1i64, &[0x15, 1]);
+        test_serde(-1i64, &[0x13, 254]);
+        test_serde(100i64, &[21, 100]);
+
+        test_serde(10000i32, &[22, 39, 16]);
+        test_serde(-100i16, &[19, 155]);
+        test_serde(-10000i64, &[18, 216, 239]);
+        test_serde(-1000000i64, &[17, 240, 189, 191]);
+
+        // boundary condition
+        test_serde(255u16, &[0x15, 255]);
+        test_serde(256i32, &[0x16, 1, 0]);
+        test_serde(-255i16, &[0x13, 0]);
+        test_serde(-256i64, &[0x12, 254, 255]);
+
+        // versionstamp
+        test_serde(
+            Versionstamp::complete(b"\xaa\xbb\xcc\xdd\xee\xff\x00\x01\x02\x03".clone(), 0),
+            b"\x33\xaa\xbb\xcc\xdd\xee\xff\x00\x01\x02\x03\x00\x00",
         );
-
-        assert_eq!("string".to_vec(), ("string",).to_vec());
-    }
-
-    #[test]
-    fn test_encode_recursive_tuple() {
-        assert_eq!(
-            &("one", ("two", 42)).to_vec(),
-            &[2, 111, 110, 101, 0, 5, 2, 116, 119, 111, 0, 21, 42, 0]
-        );
-        assert_eq!(
-            &("one", ("two", 42, ("three", 33))).to_vec(),
-            &[
-                2, 111, 110, 101, 0, 5, 2, 116, 119, 111, 0, 21, 42, 5, 2, 116, 104, 114, 101, 101,
-                0, 21, 33, 0, 0,
-            ]
+        test_serde(
+            Versionstamp::complete(b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a".clone(), 657),
+            b"\x33\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x02\x91",
         );
 
-        //
-        // from Python impl:
-        //  >>> [ord(x) for x in fdb.tuple.pack( (None, (None, None)) )]
-        assert_eq!(
-            &(None::<i64>, (None::<i64>, None::<i64>)).to_vec(),
-            &[0, 5, 0, 255, 0, 255, 0]
-        )
+        test_serde(0, b"\x14");
+        test_serde(1, b"\x15\x01");
+        test_serde(-1, b"\x13\xfe");
+        test_serde(255, b"\x15\xff");
+        test_serde(-255, b"\x13\x00");
+        test_serde(256, b"\x16\x01\x00");
+        test_serde(-256, b"\x12\xfe\xff");
+        test_serde(65536, b"\x17\x01\x00\x00");
+        test_serde(-65536, b"\x11\xfe\xff\xff");
+        test_serde(i64::max_value(), b"\x1C\x7f\xff\xff\xff\xff\xff\xff\xff");
+        test_serde(
+            i64::max_value() as u64 + 1,
+            b"\x1C\x80\x00\x00\x00\x00\x00\x00\x00",
+        );
+        test_serde(u64::max_value(), b"\x1C\xff\xff\xff\xff\xff\xff\xff\xff");
+        test_serde(-4294967295i64, b"\x10\x00\x00\x00\x00");
+        test_serde(
+            i64::min_value() + 2,
+            b"\x0C\x80\x00\x00\x00\x00\x00\x00\x01",
+        );
+        test_serde(
+            i64::min_value() + 1,
+            b"\x0C\x80\x00\x00\x00\x00\x00\x00\x00",
+        );
+        test_serde(i64::min_value(), b"\x0C\x7f\xff\xff\xff\xff\xff\xff\xff");
     }
 
+    #[cfg(feature = "uuid")]
     #[test]
-    fn test_decode_recursive_tuple() {
-        let two_decode = <(String, (String, i64))>::try_from(&[
-            2, 111, 110, 101, 0, 5, 2, 116, 119, 111, 0, 21, 42, 0,
-        ]).expect("failed two");
+    fn test_uuid() {
+        use uuid::Uuid;
 
-        // TODO: can we get eq for borrows of the inner types?
-        assert_eq!(("one".to_string(), ("two".to_string(), 42)), two_decode);
-
-        let three_decode = <(String, (String, i64, (String, i64)))>::try_from(&[
-            2, 111, 110, 101, 0, 5, 2, 116, 119, 111, 0, 21, 42, 5, 2, 116, 104, 114, 101, 101, 0,
-            21, 33, 0, 0,
-        ]).expect("failed three");
-
-        assert_eq!(
-            &(
-                "one".to_string(),
-                ("two".to_string(), 42, ("three".to_string(), 33))
+        test_serde(
+            Element::Uuid(
+                Uuid::from_slice(
+                    b"\xba\xff\xff\xff\xff\x5e\xba\x11\x00\x00\x00\x00\x5c\xa1\xab\x1e",
+                )
+                .unwrap(),
             ),
-            &three_decode
-        );
-
-        //
-        // from Python impl:
-        //  >>> [ord(x) for x in fdb.tuple.pack( (None, (None, None)) )]
-        let option_decode =
-            <(Option<i64>, (Option<i64>, Option<i64>))>::try_from(&[0, 5, 0, 255, 0, 255, 0])
-                .expect("failed option");
-
-        assert_eq!(&(None::<i64>, (None::<i64>, None::<i64>)), &option_decode)
-    }
-
-    #[test]
-    fn test_single_tuple_encode() {
-        // derived from python impl
-        assert_eq!(&(1,).to_vec(), &1.to_vec());
-
-        // >>> [ord(x) for x in fdb.tuple.pack((1,(1,)))]
-        // [21, 1, 5, 21, 1, 0]
-        assert_eq!(&(1, (1,)).to_vec(), &[21, 1, 5, 21, 1, 0]);
-
-        // >>> [ord(x) for x in fdb.tuple.pack( (1,(1,(1,))) )]
-        // [21, 1, 5, 21, 1, 5, 21, 1, 0, 0]
-        assert_eq!(&(1, (1, (1,))).to_vec(), &[21, 1, 5, 21, 1, 5, 21, 1, 0, 0]);
-
-        // >>> [ord(x) for x in fdb.tuple.pack( (1,(1,),(1,)) )]
-        // [21, 1, 5, 21, 1, 0, 5, 21, 1, 0]
-        assert_eq!(
-            &(1, (1,), (1,)).to_vec(),
-            &[21, 1, 5, 21, 1, 0, 5, 21, 1, 0]
+            b"\x30\xba\xff\xff\xff\xff\x5e\xba\x11\x00\x00\x00\x00\x5c\xa1\xab\x1e",
         );
     }
 
     #[test]
-    fn test_single_tuple_decode() {
-        // derived from python impl
-        assert_eq!(1_i64, Decode::try_from(&[21, 1]).expect("1"));
-        assert_eq!((1_i64,), Decode::try_from(&[21, 1]).expect("(1,)"));
-
-        // >>> [ord(x) for x in fdb.tuple.pack((1,(1,)))]
-        // [21, 1, 5, 21, 1, 0]
-        assert_eq!(
-            (1_i64, (1_i64,)),
-            Decode::try_from(&[21, 1, 5, 21, 1, 0]).expect("(1, (1,))")
+    fn test_bindingtester() {
+        test_serde("NEW_TRANSACTION".to_string(), b"\x02NEW_TRANSACTION\x00");
+        test_serde(
+            vec!["NEW_TRANSACTION".to_string()],
+            b"\x02NEW_TRANSACTION\x00",
+        );
+        test_serde(
+            vec![
+                Element::String(Cow::Borrowed("PUSH")),
+                Element::Bytes(Bytes::from(
+                    b"\x01tester_output\x00\x01results\x00\x14".as_ref(),
+                )),
+            ],
+            b"\x02PUSH\x00\x01\x01tester_output\x00\xff\x01results\x00\xff\x14\x00",
+        );
+        test_serde(
+            vec![Element::String(Cow::Borrowed("PUSH")), Element::Nil],
+            b"\x02PUSH\x00\x00",
+        );
+        test_serde(
+            vec![
+                Element::String(Cow::Borrowed("PUSH")),
+                Element::Tuple(vec![
+                    Element::Nil,
+                    Element::Float(3299069000000.0),
+                    Element::Float(-0.000000000000000000000000000000000000011883096),
+                ]),
+            ],
+            b"\x02PUSH\x00\x05\x00\xff \xd4@\x07\xf5 \x7f~\x9a\xc2\x00",
+        );
+        test_serde(
+            vec![
+                Element::String(Cow::Borrowed("PUSH")),
+                Element::Int(-133525682914243904),
+            ],
+            b"\x02PUSH\x00\x0c\xfe%\x9f\x19M\x81J\xbf",
         );
 
-        // >>> [ord(x) for x in fdb.tuple.pack( (1,(1,(1,))) )]
-        // [21, 1, 5, 21, 1, 5, 21, 1, 0, 0]
-        assert_eq!(
-            (1_i64, (1_i64, (1_i64,))),
-            Decode::try_from(&[21, 1, 5, 21, 1, 5, 21, 1, 0, 0]).expect("(1, (1, (1,)))")
+        test_serde(
+            Element::Tuple(vec![Element::Nil, Element::Nil]),
+            b"\x00\x00",
         );
+    }
 
-        // >>> [ord(x) for x in fdb.tuple.pack( (1,(1,),(1,)) )]
-        // [21, 1, 5, 21, 1, 0, 5, 21, 1, 0]
-        assert_eq!(
-            (1_i64, (1_i64,), (1_i64,)),
-            Decode::try_from(&[21, 1, 5, 21, 1, 0, 5, 21, 1, 0]).expect("(1, (1,), (1,))")
+    #[test]
+    fn test_element() {
+        test_serde(Element::Bool(true), &[TRUE]);
+        test_serde(Element::Bool(false), &[FALSE]);
+        test_serde(Element::Int(-1), &[0x13, 254]);
+        test_serde(
+            Element::Versionstamp(Versionstamp::complete(
+                b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a".clone(),
+                657,
+            )),
+            b"\x33\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x02\x91",
         );
+        test_serde(
+            (Element::Versionstamp(Versionstamp::complete(
+                b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a".clone(),
+                657,
+            )),),
+            b"\x33\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x02\x91",
+        );
+        test_serde(
+            (Element::Versionstamp(Versionstamp::complete(
+                b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a".clone(),
+                657,
+            )),),
+            b"\x33\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x02\x91",
+        );
+        test_serde(
+            vec![Element::Bool(true), Element::Bool(false)],
+            &[TRUE, FALSE],
+        );
+        test_serde(
+            vec![Element::Tuple(vec![
+                Element::Bool(true),
+                Element::Bool(false),
+            ])],
+            &[NESTED, TRUE, FALSE, NIL],
+        );
+        test_serde(Vec::<Element>::new(), &[]);
+        test_serde(Element::Tuple(vec![]), &[]);
     }
 }

@@ -4,6 +4,8 @@ This is a wrapper library around the FoundationDB (Fdb) C API. It implements fut
 
 ## Prerequisites
 
+Rust 1.39+
+
 ### Install FoundationDB
 
 Install FoundationDB on your system, see [FoundationDB Local Development](https://apple.github.io/foundationdb/local-dev.html), or these instructions:
@@ -11,85 +13,62 @@ Install FoundationDB on your system, see [FoundationDB Local Development](https:
 - Ubuntu Linux (this may work on the Linux subsystem for Windows as well)
 
 ```console
-$> curl -O https://www.foundationdb.org/downloads/5.1.5/ubuntu/installers/foundationdb-clients_5.1.5-1_amd64.deb
-$> curl -O https://www.foundationdb.org/downloads/5.1.5/ubuntu/installers/foundationdb-server_5.1.5-1_amd64.deb
-$> sudo dpkg -i foundationdb-clients_5.1.5-1_amd64.deb
-$> sudo dpkg -i foundationdb-server_5.1.5-1_amd64.deb
+$> curl -O https://www.foundationdb.org/downloads/6.1.12/ubuntu/installers/foundationdb-clients_6.1.12-1_amd64.deb
+$> curl -O https://www.foundationdb.org/downloads/6.1.12/ubuntu/installers/foundationdb-server_6.1.12-1_amd64.deb
+$> sudo dpkg -i foundationdb-clients_6.1.12-1_amd64.deb
+$> sudo dpkg -i foundationdb-server_6.1.12-1_amd64.deb
 ```
 
 - macOS
 
 ```console
-$> curl -O https://www.foundationdb.org/downloads/5.1.5/macOS/installers/FoundationDB-5.1.5.pkg
-$> sudo installer -pkg FoundationDB-5.1.5.pkg -target /
+$> curl -O https://www.foundationdb.org/downloads/6.1.12/macOS/installers/FoundationDB-6.1.12.pkg
+$> sudo installer -pkg FoundationDB-6.1.12.pkg -target /
 ```
+
+- Windows
+
+https://www.foundationdb.org/downloads/6.1.12/windows/installers/foundationdb-6.1.12-x64.msi
 
 ## Add dependencies on foundationdb-rs
 
 ```toml
 [dependencies]
-foundationdb = "*"
-futures = "0.1"
-```
-
-## Extern the crate in `bin.rs` or `lib.rs`
-
-```rust
-extern crate foundationdb;
+foundationdb = "0.4.0"
+futures = "0.3"
 ```
 
 ## Initialization
 
-Due to limitations in the C API, the Client and it's associated Network can only be initialized and run once per the life of a process. Generally the `foundationdb::init` function will be enough to initialize the Client. See `foundationdb::default_api` and `foundationdb::builder` for more configuration options of the Fdb Client.
+Due to limitations in the C API, the Client and it's associated Network can only be initialized and run once per the life of a process. Generally the `foundationdb::boot` function will be enough to initialize the Client. See `foundationdb::default_api` and `foundationdb::builder` for more configuration options of the Fdb Client.
 
 ## Example
 
 ```rust
-extern crate futures;
-extern crate foundationdb;
+use futures::prelude::*;
 
-use futures::future::*;
+async fn async_main() -> foundationdb::FdbResult<()> {
+    let db = foundationdb::Database::default()?;
+    
+    // write a value
+    let trx = db.create_trx()?;
+    trx.set(b"hello", b"world"); // errors will be returned in the future result
+    trx.commit().await?;
 
-let network = foundationdb::init().expect("failed to initialize Fdb client");
+    // read a value
+    let trx = db.create_trx()?;
+    let maybe_value = trx.get(b"hello", false).await?;
+    let value = maybe_value.unwrap(); // unwrap the option
 
-let handle = std::thread::spawn(move || {
-    let error = network.run();
+    assert_eq!(b"world", &value.as_ref());
 
-    if let Err(error) = error {
-        panic!("fdb_run_network: {}", error);
-    }
-});
+    Ok(())
+}
 
-// wait for the network thread to be started
-network.wait();
-
-// work with Fdb
-let db = Cluster::new(foundationdb::default_config_path())
-    .and_then(|cluster| cluster.create_database())
-    .wait().expect("failed to create Cluster");
-
-// set a value
-let trx = db.create_trx().expect("failed to create transaction");
-
-trx.set(b"hello", b"world"); // errors will be returned in the future result
-trx.commit()
-    .wait()
-    .expect("failed to set hello to world");
-
-// read a value
-let trx = db.create_trx().expect("failed to create transaction");
-let result = trx.get(b"hello").wait().expect("failed to read world from hello");
-
-let value: &[u8] = result.value()
-    .expect("failed to get value from result") // unwrap the error
-    .unwrap();   // unwrap the option
-
-// should print "hello world"
-println!("hello {}", String::from_utf8_lossy(value));
-
+let network = foundationdb::boot().expect("failed to initialize Fdb");
+futures::executor::block_on(async_main()).expect("failed to run");
 // cleanly shutdown the client
-network.stop().expect("failed to stop Fdb client");
-handle.join();
+drop(network);
 ```
 
 ## API stability

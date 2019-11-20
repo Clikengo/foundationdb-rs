@@ -2,7 +2,7 @@
 
 set -x
 
-VERSION=6.0.15
+VERSION=6.1.12
 BASE_URL=https://www.foundationdb.org/downloads/${VERSION}
 
 curl -O "${BASE_URL}/windows/installers/foundationdb-${VERSION}-x64.msi"

@@ -1,7 +1,8 @@
 [package]
 name = "foundationdb-sys"
-version = "0.2.0"
+version = "0.4.0"
 authors = ["Benjamin Fry <benjaminfry@me.com>"]
+edition = "2018"
 
 description = """
 Bindings to the C api for FoundationDB
@@ -21,13 +22,14 @@ travis-ci = { repository = "bluejekyll/foundationdb-rs" }
 # codecov = { repository = "bluejekyll/foundationdb-rs", branch = "master", service = "github" }
 
 [features]
-default = [ "fdb-6_0" ]
-
+default = [ "fdb-6_1" ]
 fdb-5_1 = [ ]
 fdb-5_2 = [ ]
 fdb-6_0 = [ ]
+fdb-6_1 = [ ]
+fdb-6_2 = [ ]
 
 [dependencies]
 
 [build-dependencies]
-bindgen = "0.51"
+bindgen = "0.51.1"

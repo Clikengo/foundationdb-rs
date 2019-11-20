@@ -6,9 +6,9 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
-//! Implements the FDB Subspace Layer
-
-use tuple::{Decode, Encode, Error, Result};
+use super::*;
+use crate::{KeySelector, RangeOption, Transaction};
+use std::borrow::Cow;
 
 /// Represents a well-defined region of keyspace in a FoundationDB database
 ///
@@ -26,9 +26,9 @@ pub struct Subspace {
     prefix: Vec<u8>,
 }
 
-impl<E: Encode> From<E> for Subspace {
+impl<E: TuplePack> From<E> for Subspace {
     fn from(e: E) -> Self {
-        Self { prefix: e.to_vec() }
+        Self { prefix: pack(&e) }
     }
 }
 
@@ -46,7 +46,7 @@ impl Subspace {
     }
 
     /// Returns a new Subspace whose prefix extends this Subspace with a given tuple encodable.
-    pub fn subspace<T: Encode>(&self, t: T) -> Self {
+    pub fn subspace<T: TuplePack>(&self, t: &T) -> Self {
         Self {
             prefix: self.pack(t),
         }
@@ -59,23 +59,21 @@ impl Subspace {
 
     /// Returns the key encoding the specified Tuple with the prefix of this Subspace
     /// prepended.
-    pub fn pack<T: Encode>(&self, t: T) -> Vec<u8> {
-        let mut packed = t.to_vec();
-        let mut out = Vec::with_capacity(self.prefix.len() + packed.len());
-        out.extend_from_slice(&self.prefix);
-        out.append(&mut packed);
+    pub fn pack<T: TuplePack>(&self, t: &T) -> Vec<u8> {
+        let mut out = self.prefix.clone();
+        pack_into(t, &mut out);
         out
     }
 
     /// `unpack` returns the Tuple encoded by the given key with the prefix of this Subspace
     /// removed.  `unpack` will return an error if the key is not in this Subspace or does not
     /// encode a well-formed Tuple.
-    pub fn unpack<T: Decode>(&self, key: &[u8]) -> Result<T> {
+    pub fn unpack<'de, T: TupleUnpack<'de>>(&self, key: &'de [u8]) -> PackResult<T> {
         if !self.is_start_of(key) {
-            return Err(Error::InvalidData);
+            return Err(PackError::BadPrefix);
         }
         let key = &key[self.prefix.len()..];
-        Decode::try_from(&key)
+        unpack(key)
     }
 
     /// `is_start_of` returns true if the provided key starts with the prefix of this Subspace,
@@ -87,11 +85,10 @@ impl Subspace {
     /// `range` returns first and last key of given Subspace
     pub fn range(&self) -> (Vec<u8>, Vec<u8>) {
         let mut begin = Vec::with_capacity(self.prefix.len() + 1);
-        let mut end = Vec::with_capacity(self.prefix.len() + 1);
-
         begin.extend_from_slice(&self.prefix);
         begin.push(0x00);
 
+        let mut end = Vec::with_capacity(self.prefix.len() + 1);
         end.extend_from_slice(&self.prefix);
         end.push(0xff);
 
@@ -99,16 +96,33 @@ impl Subspace {
     }
 }
 
+impl<'a> From<&'a Subspace> for RangeOption<'static> {
+    fn from(subspace: &Subspace) -> Self {
+        let (begin, end) = subspace.range();
+
+        Self {
+            begin: KeySelector::first_greater_or_equal(Cow::Owned(begin)),
+            end: KeySelector::first_greater_or_equal(Cow::Owned(end)),
+            ..Self::default()
+        }
+    }
+}
+
+impl Transaction {
+    pub fn clear_subspace_range(&self, subspace: &Subspace) {
+        let (begin, end) = subspace.range();
+        self.clear_range(&begin, &end)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use tuple::Tuple;
-
     use super::*;
 
     #[test]
     fn sub() {
         let ss0: Subspace = 1.into();
-        let ss1 = ss0.subspace(2);
+        let ss1 = ss0.subspace(&2);
 
         let ss2: Subspace = (1, 2).into();
 
@@ -121,7 +135,7 @@ mod tests {
         let tup = (2, 3);
 
         let packed = ss0.pack(&tup);
-        let expected = (1, 2, 3).to_vec();
+        let expected = pack(&(1, 2, 3));
         assert_eq!(expected, packed);
 
         let tup_unpack: (i64, i64) = ss0.unpack(&packed).unwrap();
@@ -138,24 +152,11 @@ mod tests {
 
         assert!(ss0.is_start_of(&ss0.pack(&tup)));
         assert!(!ss1.is_start_of(&ss0.pack(&tup)));
-        assert!(Subspace::from("start").is_start_of(&"start".to_vec()));
-        assert!(Subspace::from("start").is_start_of(&"start".to_string().to_vec()));
-        assert!(!Subspace::from("start").is_start_of(&"starting".to_vec()));
-        assert!(Subspace::from("start").is_start_of(&("start", "end").to_vec()));
-        assert!(Subspace::from(("start", 42)).is_start_of(&("start", 42, "end").to_vec()));
-    }
-
-    #[test]
-    fn unpack_malformed() {
-        let ss0: Subspace = ((), ()).into();
-
-        let malformed = {
-            let mut v = ss0.bytes().to_vec();
-            v.push(0xff);
-            v
-        };
-
-        assert!(ss0.unpack::<Tuple>(&malformed).is_err());
+        assert!(Subspace::from("start").is_start_of(&pack(&"start")));
+        assert!(Subspace::from("start").is_start_of(&pack(&"start".to_string())));
+        assert!(!Subspace::from("start").is_start_of(&pack(&"starting")));
+        assert!(Subspace::from("start").is_start_of(&pack(&("start", "end"))));
+        assert!(Subspace::from(("start", 42)).is_start_of(&pack(&("start", 42, "end"))));
     }
 
     #[test]

@@ -5,81 +5,56 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
-extern crate foundationdb;
-extern crate futures;
-#[macro_use]
-extern crate lazy_static;
-
 use foundationdb::*;
-use futures::future::*;
 
 mod common;
 
-#[test]
-fn test_watch() {
-    common::setup_static();
+async fn test_watch_async() -> FdbResult<()> {
     const KEY: &'static [u8] = b"test-watch";
 
-    let fut = Cluster::new(foundationdb::default_config_path())
-        .and_then(|cluster| cluster.create_database())
-        .and_then(|db| {
-            let watch = result(db.create_trx()).and_then(|trx| {
-                eprintln!("setting watch");
-                let watch = trx.watch(KEY);
-                trx.commit().map(|_| {
-                    eprintln!("watch committed");
-                    watch
-                })
-            });
+    let db = common::database().await?;
 
-            let write = result(db.create_trx()).and_then(|trx| {
-                eprintln!("writing value");
+    eprintln!("setting watch");
+    let trx = db.create_trx()?;
+    let watch = trx.watch(KEY);
+    trx.commit().await?;
+    eprintln!("watch committed");
 
-                let value = common::random_str(10);
-                trx.set(KEY, value.as_bytes());
-                trx.commit().map(|_| {
-                    eprintln!("write committed");
-                })
-            });
+    eprintln!("writing value");
+    let trx = db.create_trx()?;
+    let value = common::random_str(10);
+    trx.set(KEY, value.as_bytes());
+    trx.commit().await?;
+    eprintln!("write committed");
 
-            // 1. Setup a watch with a key
-            watch.and_then(move |watch| {
-                // 2. After the watch is installed, try to update the key.
-                write
-                    .and_then(move |_| {
-                        // 3. After updating the key, waiting for the watch
-                        watch
-                    })
-                    .map(|_| {
-                        // 4. watch fired as expected
-                        eprintln!("watch fired");
-                    })
-            })
-        });
+    watch.await?;
 
-    fut.wait().expect("failed to run")
+    Ok(())
+}
+
+#[test]
+fn test_watch() {
+    common::boot();
+    futures::executor::block_on(test_watch_async()).expect("failed to run");
+}
+
+async fn test_watch_without_commit_async() -> FdbResult<()> {
+    const KEY: &'static [u8] = b"test-watch-2";
+
+    let db = common::database().await?;
+
+    eprintln!("setting watch");
+    let trx = db.create_trx()?;
+    let watch = trx.watch(KEY);
+
+    drop(trx);
+    assert!(watch.await.is_err());
+
+    Ok(())
 }
 
 #[test]
 fn test_watch_without_commit() {
-    common::setup_static();
-    const KEY: &'static [u8] = b"test-watch-2";
-
-    let fut = Cluster::new(foundationdb::default_config_path())
-        .and_then(|cluster| cluster.create_database())
-        .and_then(|db| result(db.create_trx()))
-        .and_then(|trx| {
-            eprintln!("setting watch");
-
-            // trx will be dropped without `commit`, so a watch will be canceled
-            trx.watch(KEY)
-        })
-        .or_else(|e| {
-            // should return error_code=1025, `Operation aborted because the transaction was
-            // canceled`
-            eprintln!("error as expected: {:?}", e);
-            Ok::<(), error::Error>(())
-        });
-
-    fut.wait().expect("failed to run")
+    common::boot();
+    futures::executor::block_on(test_watch_without_commit_async()).expect("failed to run");
 }

@@ -1,7 +1,11 @@
 [package]
 name = "foundationdb-gen"
-version = "0.1.0"
-authors = ["Jihyun Yu <yjh0502@gmail.com>"]
+version = "0.4.0"
+authors = [
+    "Jihyun Yu <yjh0502@gmail.com>",
+    "Vincent Rouillé <vincent@clikengo.com>",
+]
+edition = "2018"
 
 description = """
 Binding generation helper for FoundationDB.
@@ -19,6 +23,5 @@ categories = ["database"]
 travis-ci = { repository = "bluejekyll/foundationdb-rs" }
 
 [dependencies]
-failure = "0.1"
-Inflector = "0.11"
-xml-rs = "0.8"
+failure = "0.1.6"
+xml-rs = "0.8.0"

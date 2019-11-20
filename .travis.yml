@@ -27,20 +27,21 @@ matrix:
     - rust: nightly
       env: RUST_BACKTRACE=full
 
-    - rust: nightly
+    - rust: stable
       env: NAME=clippy
            RUST_BACKTRACE=full
            CLIPPY=true
       script:
-        - cargo clippy --all --all-features
+        - rustup component add clippy
+        - cargo clippy
 
-    - rust: nightly
+    - rust: stable
       env: NAME=rustfmt
            RUST_BACKTRACE=full
            RUSTFMT=true
       script:
-        - rustup component add rustfmt-preview
-        - cargo fmt --all -- --write-mode=diff
+        - rustup component add rustfmt
+        - cargo fmt --all -- --check
 
     ## bindingtester
     - rust: stable
@@ -56,13 +57,12 @@ before_install:
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then scripts/install_foundationdb_linux.sh ; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then scripts/install_foundationdb_macos.sh ; fi
   - if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then scripts/install_foundationdb_win64.sh ; export PATH="${PATH}:/c/Program Files/foundationdb/bin" ; fi
-  - if [[ "$CLIPPY" == "true" ]]; then cargo install clippy --force ; fi
 
 script:
   - cargo test --manifest-path foundationdb-sys/Cargo.toml
   - cargo test --manifest-path foundationdb-gen/Cargo.toml
   - cargo test --manifest-path foundationdb/Cargo.toml
-  - cargo test --manifest-path foundationdb/Cargo.toml --no-default-features --features fdb-6_0
+  - cargo test --manifest-path foundationdb/Cargo.toml --no-default-features --features fdb-6_0 --tests
   - cargo test --manifest-path foundationdb-bench/Cargo.toml
   - cargo run --manifest-path foundationdb/Cargo.toml --example class-scheduling
 
