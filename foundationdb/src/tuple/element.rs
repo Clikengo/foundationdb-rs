@@ -654,7 +654,7 @@ mod tests {
                 NIL,
             ],
         );
-        
+
         test_round_trip(
             Element::Tuple(Tuple(vec![
                 Element::Bytes(vec![0]),
