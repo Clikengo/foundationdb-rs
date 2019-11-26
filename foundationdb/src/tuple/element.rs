@@ -568,7 +568,7 @@ impl Decode for Element {
                 Ok((Element::F64(v), offset))
             }
             FALSE => Ok((Element::Bool(false), 1)),
-            TRUE => Ok((Element::Bool(false), 1)),
+            TRUE => Ok((Element::Bool(true), 1)),
             #[cfg(feature = "uuid")]
             UUID => {
                 let (v, offset) = Decode::decode(buf, tuple_depth)?;
@@ -654,7 +654,7 @@ mod tests {
                 NIL,
             ],
         );
-
+        
         test_round_trip(
             Element::Tuple(Tuple(vec![
                 Element::Bytes(vec![0]),
@@ -662,6 +662,14 @@ mod tests {
                 Element::Tuple(Tuple(vec![Element::Bytes(vec![0]), Element::Empty])),
             ])),
             &[5, 1, 0, 255, 0, 0, 255, 5, 1, 0, 255, 0, 0, 255, 0, 0],
+        );
+
+        test_round_trip(
+            Element::Tuple(Tuple(vec![
+                Element::Bool(true),
+                Element::Tuple(Tuple(vec![Element::Bool(false)])),
+            ])),
+            &[NESTED, 39, NESTED, 38, NIL, NIL],
         );
     }
 
