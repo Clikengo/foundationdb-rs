@@ -238,24 +238,13 @@ tuple_impls! {
 
 impl Encode for Tuple {
     fn encode<W: Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> std::io::Result<()> {
-        for element in self.0.iter() {
-            element.encode(w, tuple_depth.increment())?;
-        }
-        Ok(())
+        self.0.encode(w, tuple_depth)
     }
 }
 
 impl Decode for Tuple {
     fn decode(buf: &[u8], tuple_depth: TupleDepth) -> Result<(Self, usize)> {
-        let mut data = buf;
-        let mut v = Vec::new();
-        let mut offset = 0_usize;
-        while !data.is_empty() {
-            let (s, len): (Element, _) = Element::decode(data, tuple_depth.increment())?;
-            v.push(s);
-            offset += len;
-            data = &data[len..];
-        }
+        let (v, offset) = Vec::<Element>::decode(buf, tuple_depth)?;
         Ok((Tuple(v), offset))
     }
 }

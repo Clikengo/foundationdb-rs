@@ -258,11 +258,13 @@ impl Decode for String {
 
 impl Encode for Vec<Element> {
     fn encode<W: Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> std::io::Result<()> {
-        // TODO: should this only write the Nested markers in the case of tuple_depth?
-        NESTED.write(w)?;
+        if tuple_depth.depth() > 0 {
+            NESTED.write(w)?;
+        }
+
         for v in self {
             match v {
-                &Element::Empty => {
+                &Element::Empty if tuple_depth.depth() > 0 => {
                     // Empty value in nested tuple is encoded with [NIL, ESCAPE] to disambiguate
                     // itself with end-of-tuple marker.
                     NIL.write(w)?;
@@ -273,29 +275,38 @@ impl Encode for Vec<Element> {
                 }
             }
         }
-        NIL.write(w)
+
+        if tuple_depth.depth() > 0 {
+            NIL.write(w)?;
+        }
+
+        Ok(())
     }
 }
 
 impl Decode for Vec<Element> {
     fn decode(mut buf: &[u8], tuple_depth: TupleDepth) -> Result<(Self, usize)> {
-        if buf.len() < 2 {
+        if tuple_depth.depth() > 0 && buf.len() < 2 {
             return Err(Error::EOF);
         }
 
-        // TODO: should this only write the Nested markers in the case of tuple_depth?
-        NESTED.expect(buf[0])?;
         let len = buf.len();
-        buf = &buf[1..];
+        let nested = buf.len() > 0 && buf[0] == NESTED;
+        if nested {
+            buf = &buf[1..];
+        }
 
         let mut tuples = Vec::new();
         loop {
             if buf.is_empty() {
-                // tuple must end with NIL byte
-                return Err(Error::EOF);
+                if nested {
+                    // tuple must end with NIL byte
+                    return Err(Error::EOF);
+                }
+                break;
             }
 
-            if buf[0] == NIL {
+            if nested && buf[0] == NIL {
                 if buf.len() > 1 && buf[1] == ESCAPE {
                     // nested Empty value, which is encoded to [NIL, ESCAPE]
                     tuples.push(Element::Empty);
@@ -310,6 +321,17 @@ impl Decode for Vec<Element> {
             let (tuple, offset) = Element::decode(buf, tuple_depth.increment())?;
             tuples.push(tuple);
             buf = &buf[offset..];
+        }
+
+        if nested && tuple_depth.depth() == 0 && buf.len() > 0 {
+            let mut root = Vec::new();
+            root.push(Element::Tuple(Tuple(tuples)));
+            while buf.len() > 0 {
+                let (tuple, offset) = Element::decode(buf, tuple_depth.increment())?;
+                root.push(tuple);
+                buf = &buf[offset..];
+            }
+            tuples = root;
         }
 
         // skip the final null
@@ -543,51 +565,65 @@ impl Encode for Element {
 }
 
 impl Decode for Element {
-    fn decode(buf: &[u8], tuple_depth: TupleDepth) -> Result<(Self, usize)> {
+    fn decode(mut buf: &[u8], tuple_depth: TupleDepth) -> Result<(Self, usize)> {
         if buf.is_empty() {
             return Err(Error::EOF);
         }
 
         let code = buf[0];
-        match code {
-            NIL => Ok((Element::Empty, 1)),
+        let (mut el, mut offset) = match code {
+            NIL => (Element::Empty, 1),
             BYTES => {
                 let (v, offset) = Decode::decode(buf, tuple_depth)?;
-                Ok((Element::Bytes(v), offset))
+                (Element::Bytes(v), offset)
             }
             STRING => {
                 let (v, offset) = Decode::decode(buf, tuple_depth)?;
-                Ok((Element::String(v), offset))
+                (Element::String(v), offset)
             }
             FLOAT => {
                 let (v, offset) = Decode::decode(buf, tuple_depth)?;
-                Ok((Element::F32(v), offset))
+                (Element::F32(v), offset)
             }
             DOUBLE => {
                 let (v, offset) = Decode::decode(buf, tuple_depth)?;
-                Ok((Element::F64(v), offset))
+                (Element::F64(v), offset)
             }
-            FALSE => Ok((Element::Bool(false), 1)),
-            TRUE => Ok((Element::Bool(true), 1)),
+            FALSE => (Element::Bool(false), 1),
+            TRUE => (Element::Bool(true), 1),
             #[cfg(feature = "uuid")]
             UUID => {
                 let (v, offset) = Decode::decode(buf, tuple_depth)?;
-                Ok((Element::Uuid(v), offset))
+                (Element::Uuid(v), offset)
             }
             NESTED => {
                 let (v, offset) = Decode::decode(buf, tuple_depth)?;
-                Ok((Element::Tuple(Tuple(v)), offset))
+                (Element::Tuple(Tuple(v)), offset)
             }
             val => {
                 if val >= NEGINTSTART && val <= POSINTEND {
                     let (v, offset) = Decode::decode(buf, tuple_depth)?;
-                    Ok((Element::I64(v), offset))
+                    (Element::I64(v), offset)
                 } else {
                     //TODO: Versionstamp, ...
-                    Err(Error::InvalidData)
+                    return Err(Error::InvalidData);
                 }
             }
+        };
+        buf = &buf[offset..];
+
+        if buf.len() > 0 && tuple_depth.depth() == 0 {
+            let mut root = vec![el];
+            while buf.len() > 0 {
+                let (sub_el, sub_offset) = Element::decode(buf, tuple_depth.increment())?;
+                root.push(sub_el);
+                offset += sub_offset;
+                buf = &buf[sub_offset..];
+            }
+            el = Element::Tuple(Tuple(root));
         }
+
+        Ok((el, offset))
     }
 }
 
@@ -649,19 +685,18 @@ mod tests {
                 Element::I64(42),
             ])),
             &[
-                NESTED, /*hello*/ 2, 104, 101, 108, 108, 111, 0, /*world*/ 2, 119, 111,
-                114, 108, 100, 0, /*42*/ 21, 42, /*end nested*/
-                NIL,
+                /*hello*/ 2, 104, 101, 108, 108, 111, 0, /*world*/ 2, 119, 111,
+                114, 108, 100, 0, /*42*/ 21, 42,
             ],
         );
-        
+
         test_round_trip(
             Element::Tuple(Tuple(vec![
                 Element::Bytes(vec![0]),
                 Element::Empty,
                 Element::Tuple(Tuple(vec![Element::Bytes(vec![0]), Element::Empty])),
             ])),
-            &[5, 1, 0, 255, 0, 0, 255, 5, 1, 0, 255, 0, 0, 255, 0, 0],
+            &[1, 0, 255, NIL, NIL, NESTED, 1, 0, 255, 0, NIL, 255, NIL],
         );
 
         test_round_trip(
@@ -669,7 +704,7 @@ mod tests {
                 Element::Bool(true),
                 Element::Tuple(Tuple(vec![Element::Bool(false)])),
             ])),
-            &[NESTED, 39, NESTED, 38, NIL, NIL],
+            &[39, NESTED, 38, NIL],
         );
     }
 
