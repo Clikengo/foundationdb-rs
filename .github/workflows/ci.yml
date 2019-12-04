@@ -1,0 +1,149 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  rust:
+    name: Rust
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    env:
+      CARGO_INCREMENTAL: 0
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v1
+
+      - name: Install FoundationDB
+        uses: ./.github/actions/foundationdb
+
+      - name: Add foundationdb to PATH
+        if: matrix.os == 'windows-latest'
+        run: echo "::add-path::C:\Program Files\foundationdb\bin"
+
+      - name: Install Clang
+        if: matrix.os == 'windows-latest'
+        run: |
+          curl -fsSL -o LLVM9.exe https://releases.llvm.org/9.0.0/LLVM-9.0.0-win64.exe
+          7z x LLVM9.exe -y -o"C:/Program Files/LLVM"
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+
+      - name: Test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+
+      - name: Test 6.0
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --manifest-path foundationdb/Cargo.toml --no-default-features --features fdb-6_0 --tests
+
+      - name: Example
+        uses: actions-rs/cargo@v1
+        with:
+          command: run
+          args: --example class-scheduling
+
+  bindingtester:
+    name: Binding Tester
+    runs-on: ubuntu-latest
+
+    env:
+      CARGO_INCREMENTAL: 0
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v1
+
+      - name: Install FoundationDB
+        uses: ./.github/actions/foundationdb
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+
+      - name: Run bindingtester
+        run: scripts/run_bindingtester.sh
+
+  lint:
+    name: Rustfmt / Clippy
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: Install FoundationDB
+        uses: ./.github/actions/foundationdb
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Fmt
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+      - name: Clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+
+  coverage:
+    name: Code coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: Install FoundationDB
+        uses: ./.github/actions/foundationdb
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --no-fail-fast
+        env:
+          CARGO_INCREMENTAL: "0"
+          RUSTFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zno-landing-pads"
+
+      - id: coverage
+        uses: actions-rs/grcov@v0.1
+
+      - name: Coveralls upload
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path-to-lcov: ${{ steps.coverage.outputs.report }}
+
+      - name: Codecov upload
+        uses: codecov/codecov-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ${{ steps.coverage.outputs.report }}

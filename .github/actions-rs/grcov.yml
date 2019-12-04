@@ -1,0 +1,5 @@
+ignore-not-existing: true
+ignore:
+  - "/*"
+  - "C:/*"
+  - "../*"
