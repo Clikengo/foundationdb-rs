@@ -1,8 +1,8 @@
 name: rustdoc
 on:
   push:
-   branches:
-     - master
+    branches:
+      - master
 
 jobs:
   rustdoc:
@@ -13,6 +13,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v1
+
+      - name: Install FoundationDB
+        uses: ./.github/actions/foundationdb
 
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
