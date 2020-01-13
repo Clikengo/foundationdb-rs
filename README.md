@@ -1,7 +1,7 @@
-[![Build Status](https://travis-ci.org/bluejekyll/foundationdb-rs.svg?branch=master)](https://travis-ci.org/bluejekyll/foundationdb-rs)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE-MIT)
-[![License: Apache 2.0](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](LICENSE-APACHE)
-[![Dependabot Status](https://api.dependabot.com/badges/status?host=github&repo=bluejekyll/foundationdb-rs)](https://dependabot.com)
+[![GitHub Workflow Status](https://img.shields.io/github/workflow/status/Clikengo/foundationdb-rs/CI)](https://github.com/Clikengo/foundationdb-rs/actions)
+[![Coveralls github](https://img.shields.io/coveralls/github/Clikengo/foundationdb-rs)](https://coveralls.io/github/Clikengo/foundationdb-rs)
+![Crates.io](https://img.shields.io/crates/l/foundationdb)
+[![Dependabot Status](https://api.dependabot.com/badges/status?host=github&repo=Clikengo/foundationdb-rs)](https://dependabot.com)
 
 # FoundationDB Rust Client
 
@@ -9,12 +9,14 @@ The repo consists of multiple crates
 
 | Library | Status | Description |
 |---------|--------|-------------|
-| [**foundationdb**](foundationdb/README.md) | [![](http://meritbadge.herokuapp.com/foundationdb)](https://crates.io/crates/foundationdb) [![foundationdb](https://docs.rs/foundationdb/badge.svg)](https://docs.rs/foundationdb) | High level FoundationDB client API |
-| [**foundationdb-sys**](foundationdb-sys/README.md) | [![](http://meritbadge.herokuapp.com/foundationdb-sys)](https://crates.io/crates/foundationdb-sys) [![foundationdb-sys](https://docs.rs/foundationdb-sys/badge.svg)](https://docs.rs/foundationdb-sys) | C API bindings for FoundationDB |
+| [**foundationdb**](foundationdb/README.md) | [![Crates.io](https://img.shields.io/crates/v/foundationdb)](https://crates.io/crates/foundationdb) [![foundationdb](https://docs.rs/foundationdb/badge.svg)](https://docs.rs/foundationdb) | High level FoundationDB client API |
+| [**foundationdb-sys**](foundationdb-sys/README.md) | [![Crates.io](https://img.shields.io/crates/v/foundationdb-sys)](https://crates.io/crates/foundationdb-sys) [![foundationdb-sys](https://docs.rs/foundationdb-sys/badge.svg)](https://docs.rs/foundationdb-sys) | C API bindings for FoundationDB |
 | **foundationdb-gen** | n/a | Code generator for common options and types of FoundationDB |
 
 The current version requires rustc 1.39+ to work (async/await feature).
 The previous version (0.3) is still maintained and is available within the 0.3 branch.
+
+You can access the `master` branch documentation [here](https://clikengo.github.io/foundationdb-rs/foundationdb/index.html).
 
 ## License
 
