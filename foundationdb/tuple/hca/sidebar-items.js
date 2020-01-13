@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["HcaError",""]],"struct":[["HighContentionAllocator","Represents a High Contention Allocator for a given subspace"]]});
