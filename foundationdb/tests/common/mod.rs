@@ -25,6 +25,7 @@ pub fn boot() {
     let _end = &*ENV;
 }
 
+#[allow(unused)]
 pub async fn database() -> fdb::FdbResult<fdb::Database> {
     fdb::Database::new_compat(None).await
 }

@@ -2,7 +2,7 @@
 name = "foundationdb"
 version = "0.4.0"
 authors = [
-    "Benjamin Fry <benjaminfry@me.com>", 
+    "Benjamin Fry <benjaminfry@me.com>",
     "Vincent Rouillé <vincent@clikengo.com>",
 ]
 edition = "2018"
@@ -47,3 +47,4 @@ uuid = { version = "0.8.1", optional = true }
 byteorder = "1.3.2"
 lazy_static = "1.4.0"
 log = "0.4.8"
+tokio = { version = "0.2.9", features = ["rt-core"] }
