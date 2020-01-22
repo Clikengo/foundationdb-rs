@@ -309,6 +309,23 @@ impl<'a> Into<RangeOption<'a>> for std::ops::Range<&'a [u8]> {
         RangeOption::from((self.start, self.end))
     }
 }
+impl Into<RangeOption<'static>> for std::ops::Range<Vec<u8>> {
+    fn into(self) -> RangeOption<'static> {
+        RangeOption::from((self.start, self.end))
+    }
+}
+impl<'a> Into<RangeOption<'a>> for std::ops::RangeInclusive<&'a [u8]> {
+    fn into(self) -> RangeOption<'a> {
+        let (start, end) = self.into_inner();
+        (KeySelector::first_greater_or_equal(start)..KeySelector::first_greater_than(end)).into()
+    }
+}
+impl Into<RangeOption<'static>> for std::ops::RangeInclusive<Vec<u8>> {
+    fn into(self) -> RangeOption<'static> {
+        let (start, end) = self.into_inner();
+        (KeySelector::first_greater_or_equal(start)..KeySelector::first_greater_than(end)).into()
+    }
+}
 
 impl Transaction {
     pub(crate) fn new(inner: NonNull<fdb_sys::FDBTransaction>) -> Self {
