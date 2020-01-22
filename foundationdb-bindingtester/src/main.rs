@@ -1362,7 +1362,7 @@ impl StackMachine {
                     Ok(())
                 }
                 let r = db
-                    .transact(
+                    .transact_boxed_local(
                         (begin, end),
                         |trx, (begin, end)| wait_for_empty(trx, begin, end).boxed_local(),
                         TransactOption::default(),

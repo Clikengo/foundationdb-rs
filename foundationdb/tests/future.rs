@@ -39,7 +39,7 @@ fn test_future_discard() {
 async fn test_future_discard_async() -> FdbResult<()> {
     let db = common::database().await?;
     for _i in 0..=1000 {
-        db.transact(
+        db.transact_boxed_local(
             (),
             |trx, ()| {
                 AbortingFuture {

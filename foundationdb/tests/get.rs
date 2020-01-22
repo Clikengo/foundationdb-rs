@@ -146,7 +146,7 @@ async fn test_transact_async() -> FdbResult<()> {
     let try_count = Arc::new(AtomicUsize::new(0));
     let db = common::database().await?;
     let res = db
-        .transact(
+        .transact_boxed(
             &db,
             |trx, db| async_body(db, trx, try_count.clone()).boxed(),
             TransactOption::default(),

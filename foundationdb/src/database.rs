@@ -11,6 +11,7 @@
 //! https://apple.github.io/foundationdb/api-c.html#database
 
 use std::convert::TryInto;
+use std::marker::PhantomData;
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::time::{Duration, Instant};
@@ -118,18 +119,9 @@ impl Database {
     /// Once [Generic Associated Types](https://github.com/rust-lang/rfcs/blob/master/text/1598-generic_associated_types.md)
     /// lands in stable rust, the returned future of f won't need to be boxed anymore, also the
     /// lifetime limitations around f might be lowered.
-    pub async fn transact<F, D, Item, Error>(
-        &self,
-        mut data: D,
-        mut f: F,
-        options: TransactOption,
-    ) -> Result<Item, Error>
+    pub async fn transact<F>(&self, mut f: F, options: TransactOption) -> Result<F::Item, F::Error>
     where
-        for<'a> F: FnMut(
-            &'a Transaction,
-            &'a mut D,
-        ) -> Pin<Box<dyn Future<Output = Result<Item, Error>> + 'a>>,
-        Error: TransactError,
+        F: DatabaseTransact,
     {
         let is_idempotent = options.is_idempotent;
         let time_out = options.time_out.map(|d| Instant::now() + d);
@@ -142,14 +134,17 @@ impl Database {
                 && time_out.filter(|&t| Instant::now() < t).is_none()
         };
         loop {
-            trx = match f(&trx, &mut data).await {
+            let r = f.transact(trx).await;
+            f = r.0;
+            trx = r.1;
+            trx = match r.2 {
                 Ok(item) => match trx.commit().await {
                     Ok(_) => break Ok(item),
                     Err(e) => {
                         if (is_idempotent || !e.is_maybe_committed()) && can_retry() {
                             e.on_error().await?
                         } else {
-                            break Err(Error::from(e.into()));
+                            break Err(F::Error::from(e.into()));
                         }
                     }
                 },
@@ -158,12 +153,168 @@ impl Database {
                         if (is_idempotent || !e.is_maybe_committed()) && can_retry() {
                             trx.on_error(e).await?
                         } else {
-                            break Err(Error::from(e));
+                            break Err(F::Error::from(e));
                         }
                     }
                     Err(user_err) => break Err(user_err),
                 },
             };
+        }
+    }
+
+    pub fn transact_boxed<'trx, F, D, T, E>(
+        &'trx self,
+        data: D,
+        f: F,
+        options: TransactOption,
+    ) -> impl Future<Output = Result<T, E>> + Send + 'trx
+    where
+        for<'a> F: FnMut(
+            &'a Transaction,
+            &'a mut D,
+        ) -> Pin<Box<dyn Future<Output = Result<T, E>> + Send + 'a>>,
+        E: TransactError,
+        F: Send + 'trx,
+        T: Send + 'trx,
+        E: Send + 'trx,
+        D: Send + 'trx,
+    {
+        self.transact(
+            boxed::FnMutBoxed {
+                f,
+                d: data,
+                m: PhantomData,
+            },
+            options,
+        )
+    }
+
+    pub fn transact_boxed_local<'trx, F, D, T, E>(
+        &'trx self,
+        data: D,
+        f: F,
+        options: TransactOption,
+    ) -> impl Future<Output = Result<T, E>> + 'trx
+    where
+        for<'a> F:
+            FnMut(&'a Transaction, &'a mut D) -> Pin<Box<dyn Future<Output = Result<T, E>> + 'a>>,
+        E: TransactError,
+        F: 'trx,
+        T: 'trx,
+        E: 'trx,
+        D: 'trx,
+    {
+        self.transact(
+            boxed_local::FnMutBoxedLocal {
+                f,
+                d: data,
+                m: PhantomData,
+            },
+            options,
+        )
+    }
+}
+pub trait DatabaseTransact: Sized {
+    type Item;
+    type Error: TransactError;
+    type Future: Future<Output = (Self, Transaction, Result<Self::Item, Self::Error>)>;
+    fn transact(self, trx: Transaction) -> Self::Future;
+}
+
+mod boxed {
+    use super::*;
+
+    async fn boxed_data_fut<'t, F, T, E, D>(
+        mut f: FnMutBoxed<'t, F, D>,
+        trx: Transaction,
+    ) -> (FnMutBoxed<'t, F, D>, Transaction, Result<T, E>)
+    where
+        F: for<'a> FnMut(
+            &'a Transaction,
+            &'a mut D,
+        ) -> Pin<Box<dyn Future<Output = Result<T, E>> + Send + 'a>>,
+        E: TransactError,
+    {
+        let r = (&mut f.f)(&trx, &mut f.d).await;
+        (f, trx, r)
+    }
+
+    pub struct FnMutBoxed<'t, F, D> {
+        pub f: F,
+        pub d: D,
+        pub m: PhantomData<&'t ()>,
+    }
+    impl<'t, F, T, E, D> DatabaseTransact for FnMutBoxed<'t, F, D>
+    where
+        F: for<'a> FnMut(
+            &'a Transaction,
+            &'a mut D,
+        ) -> Pin<Box<dyn Future<Output = Result<T, E>> + Send + 'a>>,
+        F: 't + Send,
+        T: 't,
+        E: 't,
+        D: 't + Send,
+        E: TransactError,
+    {
+        type Item = T;
+        type Error = E;
+        type Future = Pin<
+            Box<
+                dyn Future<Output = (Self, Transaction, Result<Self::Item, Self::Error>)>
+                    + Send
+                    + 't,
+            >,
+        >;
+
+        fn transact(self, trx: Transaction) -> Self::Future {
+            boxed_data_fut(self, trx).boxed()
+        }
+    }
+}
+
+mod boxed_local {
+    use super::*;
+
+    async fn boxed_local_data_fut<'t, F, T, E, D>(
+        mut f: FnMutBoxedLocal<'t, F, D>,
+        trx: Transaction,
+    ) -> (FnMutBoxedLocal<'t, F, D>, Transaction, Result<T, E>)
+    where
+        F: for<'a> FnMut(
+            &'a Transaction,
+            &'a mut D,
+        ) -> Pin<Box<dyn Future<Output = Result<T, E>> + 'a>>,
+        E: TransactError,
+    {
+        let r = (&mut f.f)(&trx, &mut f.d).await;
+        (f, trx, r)
+    }
+
+    pub struct FnMutBoxedLocal<'t, F, D> {
+        pub f: F,
+        pub d: D,
+        pub m: PhantomData<&'t ()>,
+    }
+    impl<'t, F, T, E, D> DatabaseTransact for FnMutBoxedLocal<'t, F, D>
+    where
+        F: for<'a> FnMut(
+            &'a Transaction,
+            &'a mut D,
+        ) -> Pin<Box<dyn Future<Output = Result<T, E>> + 'a>>,
+        F: 't,
+        T: 't,
+        E: 't,
+        D: 't,
+        E: TransactError,
+    {
+        type Item = T;
+        type Error = E;
+        type Future = Pin<
+            Box<dyn Future<Output = (Self, Transaction, Result<Self::Item, Self::Error>)> + 't>,
+        >;
+
+        fn transact(self, trx: Transaction) -> Self::Future {
+            boxed_local_data_fut(self, trx).boxed_local()
         }
     }
 }
