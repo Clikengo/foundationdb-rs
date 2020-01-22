@@ -2884,7 +2884,7 @@
                     <span class="prelude-val">Ok</span>(())
                 }
                 <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">db</span>
-                    .<span class="ident">transact</span>(
+                    .<span class="ident">transact_boxed_local</span>(
                         (<span class="ident">begin</span>, <span class="ident">end</span>),
                         <span class="op">|</span><span class="ident">trx</span>, (<span class="ident">begin</span>, <span class="ident">end</span>)<span class="op">|</span> <span class="ident">wait_for_empty</span>(<span class="ident">trx</span>, <span class="ident">begin</span>, <span class="ident">end</span>).<span class="ident">boxed_local</span>(),
                         <span class="ident">TransactOption</span>::<span class="ident">default</span>(),
