@@ -763,6 +763,15 @@
 <span id="763">763</span>
 <span id="764">764</span>
 <span id="765">765</span>
+<span id="766">766</span>
+<span id="767">767</span>
+<span id="768">768</span>
+<span id="769">769</span>
+<span id="770">770</span>
+<span id="771">771</span>
+<span id="772">772</span>
+<span id="773">773</span>
+<span id="774">774</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 foundationdb-rs developers, https://github.com/bluejekyll/foundationdb-rs/graphs/contributors</span>
 <span class="comment">// Copyright 2013-2018 Apple, Inc and the FoundationDB project authors.</span>
@@ -1042,6 +1051,15 @@
         <span class="self">Self</span> {
             <span class="ident">begin</span>,
             <span class="ident">end</span>,
+            ..<span class="self">Self</span>::<span class="ident">default</span>()
+        }
+    }
+}
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span>(<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>)<span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">RangeOption</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>((<span class="ident">begin</span>, <span class="ident">end</span>): (<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>)) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+        <span class="self">Self</span> {
+            <span class="ident">begin</span>: <span class="ident">KeySelector</span>::<span class="ident">first_greater_or_equal</span>(<span class="ident">begin</span>),
+            <span class="ident">end</span>: <span class="ident">KeySelector</span>::<span class="ident">first_greater_or_equal</span>(<span class="ident">end</span>),
             ..<span class="self">Self</span>::<span class="ident">default</span>()
         }
     }
