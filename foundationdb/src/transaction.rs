@@ -280,6 +280,15 @@ impl<'a> From<(KeySelector<'a>, KeySelector<'a>)> for RangeOption<'a> {
         }
     }
 }
+impl From<(Vec<u8>, Vec<u8>)> for RangeOption<'static> {
+    fn from((begin, end): (Vec<u8>, Vec<u8>)) -> Self {
+        Self {
+            begin: KeySelector::first_greater_or_equal(begin),
+            end: KeySelector::first_greater_or_equal(end),
+            ..Self::default()
+        }
+    }
+}
 impl<'a> From<(&'a [u8], &'a [u8])> for RangeOption<'a> {
     fn from((begin, end): (&'a [u8], &'a [u8])) -> Self {
         Self {
