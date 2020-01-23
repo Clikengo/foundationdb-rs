@@ -25,6 +25,7 @@ use futures::{
 };
 
 /// A committed transaction.
+#[derive(Debug)]
 pub struct TransactionCommitted {
     tr: Transaction,
 }
@@ -113,6 +114,12 @@ impl From<TransactionCommitError> for FdbError {
 
 impl fmt::Debug for TransactionCommitError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "TransactionCommitError({})", self.err)
+    }
+}
+
+impl fmt::Display for TransactionCommitError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.err.fmt(f)
     }
 }
@@ -121,6 +128,7 @@ impl fmt::Debug for TransactionCommitError {
 type TransactionResult = Result<TransactionCommitted, TransactionCommitError>;
 
 /// A cancelled transaction
+#[derive(Debug)]
 pub struct TransactionCancelled {
     tr: Transaction,
 }
@@ -148,6 +156,7 @@ impl From<TransactionCancelled> for Transaction {
 /// Transactions group operations into a unit with the properties of atomicity, isolation, and durability. Transactions also provide the ability to maintain an application’s invariants or integrity constraints, supporting the property of consistency. Together these properties are known as ACID.
 ///
 /// Transactions are also causally consistent: once a transaction has been successfully committed, all subsequently created transactions will see the modifications made by it.
+#[derive(Debug)]
 pub struct Transaction {
     // Order of fields should not be changed, because Rust drops field top-to-bottom, and
     // transaction should be dropped before cluster.

@@ -72,7 +72,21 @@ async fn test_set_conflict_async() -> FdbResult<()> {
 
     // commit seconds transaction, which will cause conflict
     trx2.set(key, common::random_str(10).as_bytes());
-    assert!(trx2.commit().await.is_err());
+    let err = trx2.commit().await.unwrap_err();
+    assert_eq!(
+        err.message(),
+        "Transaction not committed due to conflict with another transaction"
+    );
+    assert_eq!(
+        format!("{}", err),
+        "Transaction not committed due to conflict with another transaction"
+    );
+    assert_eq!(
+        format!("{:?}", err),
+        "TransactionCommitError(Transaction not committed due to conflict with another transaction)"
+    );
+    assert_eq!(err.is_retryable(), true);
+    assert_eq!(err.is_retryable_not_committed(), true);
 
     Ok(())
 }
