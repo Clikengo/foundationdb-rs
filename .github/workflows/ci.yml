@@ -39,8 +39,7 @@ jobs:
         with:
           command: build
 
-      - name: foundationdb status
-        if: matrix.os == 'windows-latest'
+      - name: FoundationDB status
         run: fdbcli --exec status
 
       - name: Test
