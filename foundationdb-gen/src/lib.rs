@@ -360,8 +360,16 @@ const OPTIONS_DATA: &[u8] = include_bytes!("/usr/local/include/foundationdb/fdb.
 const OPTIONS_DATA: &[u8] =
     include_bytes!("C:/Program Files/foundationdb/include/foundationdb/fdb.options");
 
-#[cfg(not(feature = "local-fdb-include"))]
-const OPTIONS_DATA: &[u8] = include_bytes!("../../include/fdb.options");
+#[cfg(all(not(feature = "local-fdb-include"), feature = "fdb-5_1"))]
+const OPTIONS_DATA: &[u8] = include_bytes!("../../include/510/fdb.options");
+#[cfg(all(not(feature = "local-fdb-include"), feature = "fdb-5_2"))]
+const OPTIONS_DATA: &[u8] = include_bytes!("../../include/520/fdb.options");
+#[cfg(all(not(feature = "local-fdb-include"), feature = "fdb-6_0"))]
+const OPTIONS_DATA: &[u8] = include_bytes!("../../include/600/fdb.options");
+#[cfg(all(not(feature = "local-fdb-include"), feature = "fdb-6_1"))]
+const OPTIONS_DATA: &[u8] = include_bytes!("../../include/610/fdb.options");
+#[cfg(all(not(feature = "local-fdb-include"), feature = "fdb-6_2"))]
+const OPTIONS_DATA: &[u8] = include_bytes!("../../include/620/fdb.options");
 
 pub fn emit() -> Result<String> {
     let mut reader = OPTIONS_DATA.as_ref();

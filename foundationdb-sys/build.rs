@@ -14,8 +14,16 @@ const INCLUDE_PATH: &str = "-I/usr/local/include/foundationdb/";
 #[cfg(all(feature = "local-fdb-include", target_os = "windows"))]
 const INCLUDE_PATH: &str = "-IC:/Program Files/foundationdb/include/foundationdb";
 
-#[cfg(not(feature = "local-fdb-include"))]
-const INCLUDE_PATH: &str = "-I../include";
+#[cfg(all(not(feature = "local-fdb-include"), feature = "fdb-5_1"))]
+const INCLUDE_PATH: &str = "-I../include/510";
+#[cfg(all(not(feature = "local-fdb-include"), feature = "fdb-5_2"))]
+const INCLUDE_PATH: &str = "-I../include/520";
+#[cfg(all(not(feature = "local-fdb-include"), feature = "fdb-6_0"))]
+const INCLUDE_PATH: &str = "-I../include/600";
+#[cfg(all(not(feature = "local-fdb-include"), feature = "fdb-6_1"))]
+const INCLUDE_PATH: &str = "-I../include/610";
+#[cfg(all(not(feature = "local-fdb-include"), feature = "fdb-6_2"))]
+const INCLUDE_PATH: &str = "-I../include/620";
 
 fn main() {
     // Link against fdb_c.
