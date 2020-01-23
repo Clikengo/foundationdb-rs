@@ -19,6 +19,9 @@ readme = "README.md"
 keywords = ["foundationdb", "kv"]
 categories = ["database"]
 
+[package.metadata.docs.rs]
+features = [ "embedded-fdb-include" ]
+
 [badges]
 travis-ci = { repository = "bluejekyll/foundationdb-rs" }
 # codecov = { repository = "bluejekyll/foundationdb-rs", branch = "master", service = "github" }
