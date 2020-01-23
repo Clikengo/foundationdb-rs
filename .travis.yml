@@ -19,10 +19,11 @@ matrix:
       env: NAME=macos
            RUST_BACKTRACE=full
 
-    - os: windows
-      rust: stable
-      env: NAME=windows
-           RUST_BACKTRACE=full
+    # Fail to build due to bindgen/msvc 2017/clang incompatibility
+    #- os: windows
+    #  rust: stable
+    #  env: NAME=windows
+    #       RUST_BACKTRACE=full
 
     - rust: nightly
       env: RUST_BACKTRACE=full
