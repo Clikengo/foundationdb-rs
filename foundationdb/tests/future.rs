@@ -14,19 +14,19 @@ impl<T> Future for AbortingFuture<T>
 where
     T: Future + Unpin,
 {
-    type Output = FdbResult<()>;
+    type Output = FdbResult<bool>;
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<FdbResult<()>> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<FdbResult<bool>> {
         // poll once only
         if !self.polled {
             self.polled = true;
             match Pin::new(&mut self.as_mut().inner).poll(cx) {
                 Poll::Pending => (),
-                _ => panic!("pending was expected"),
+                _ => return Poll::Ready(Ok(false)),
             }
         }
 
-        Poll::Ready(Ok(()))
+        Poll::Ready(Ok(true))
     }
 }
 
@@ -38,20 +38,25 @@ fn test_future_discard() {
 }
 async fn test_future_discard_async() -> FdbResult<()> {
     let db = common::database().await?;
+    let mut hit_pending = false;
     for _i in 0..=1000 {
-        db.transact_boxed_local(
-            (),
-            |trx, ()| {
-                AbortingFuture {
-                    inner: trx.get(b"key", false),
-                    polled: false,
-                }
-                .boxed_local()
-            },
-            TransactOption::default(),
-        )
-        .await?;
+        let hit_pending_step = db
+            .transact_boxed_local(
+                (),
+                |trx, ()| {
+                    AbortingFuture {
+                        inner: trx.get(b"key", false),
+                        polled: false,
+                    }
+                    .boxed_local()
+                },
+                TransactOption::default(),
+            )
+            .await?;
+        hit_pending = hit_pending || hit_pending_step;
     }
+
+    assert!(hit_pending);
 
     Ok(())
 }
