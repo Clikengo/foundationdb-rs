@@ -20,25 +20,7 @@ jobs:
         uses: actions/checkout@v1
 
       - name: Install FoundationDB
-        uses: ./.github/actions/foundationdb
-
-      - name: Add foundationdb to PATH
-        if: matrix.os == 'windows-latest'
-        run: echo "::add-path::C:\Program Files\foundationdb\bin"
-
-      - name: Change foundationdb dirs
-        if: matrix.os == 'windows-latest'
-        run: |
-          Stop-Service fdbmonitor
-          mkdir D:\fdblogs
-          mkdir D:\fdbdata
-          $filecontent = Get-Content C:\ProgramData\foundationdb\foundationdb.conf
-          $filecontent = $filecontent -replace '(^logdir=).*','$1D:\fdblogs'
-          $filecontent -replace '(^datadir=).*','$1D:\fdbdata\$ID' | Set-Content C:\ProgramData\foundationdb\foundationdb.conf
-          cat C:\ProgramData\foundationdb\foundationdb.conf
-          Start-Service fdbmonitor
-          sleep 5
-          fdbcli --exec 'configure new single ssd'
+        uses: Clikengo/foundationdb-actions-install@v1
 
       - name: Install Clang
         if: matrix.os == 'windows-latest'
@@ -90,7 +72,7 @@ jobs:
         uses: actions/checkout@v1
 
       - name: Install FoundationDB
-        uses: ./.github/actions/foundationdb
+        uses: Clikengo/foundationdb-actions-install@v1
 
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
@@ -109,7 +91,7 @@ jobs:
       - uses: actions/checkout@v1
 
       - name: Install FoundationDB
-        uses: ./.github/actions/foundationdb
+        uses: Clikengo/foundationdb-actions-install@v1
 
       - uses: actions-rs/toolchain@v1
         with:
@@ -136,7 +118,7 @@ jobs:
       - uses: actions/checkout@v1
 
       - name: Install FoundationDB
-        uses: ./.github/actions/foundationdb
+        uses: Clikengo/foundationdb-actions-install@v1
 
       - uses: actions-rs/toolchain@v1
         with:
