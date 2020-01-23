@@ -350,15 +350,18 @@ where
     bail!("unexpected end of token");
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "local-fdb-include", target_os = "linux"))]
 const OPTIONS_DATA: &[u8] = include_bytes!("/usr/include/foundationdb/fdb.options");
 
-#[cfg(target_os = "macos")]
+#[cfg(all(feature = "local-fdb-include", target_os = "macos"))]
 const OPTIONS_DATA: &[u8] = include_bytes!("/usr/local/include/foundationdb/fdb.options");
 
-#[cfg(target_os = "windows")]
+#[cfg(all(feature = "local-fdb-include", target_os = "windows"))]
 const OPTIONS_DATA: &[u8] =
     include_bytes!("C:/Program Files/foundationdb/include/foundationdb/fdb.options");
+
+#[cfg(not(feature = "local-fdb-include"))]
+const OPTIONS_DATA: &[u8] = include_bytes!("../../include/fdb.options");
 
 pub fn emit() -> Result<String> {
     let mut reader = OPTIONS_DATA.as_ref();

@@ -22,6 +22,10 @@ categories = ["database"]
 [badges]
 travis-ci = { repository = "bluejekyll/foundationdb-rs" }
 
+[features]
+# Use the locally installed foundationdb fdb.options file
+local-fdb-include = [ ]
+
 [dependencies]
 failure = "0.1.6"
 xml-rs = "0.8.0"
