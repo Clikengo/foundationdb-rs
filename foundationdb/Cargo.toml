@@ -34,7 +34,7 @@ fdb-6_1 = [ "foundationdb-sys/fdb-6_1", "foundationdb-gen/fdb-6_1" ]
 fdb-6_2 = [ "foundationdb-sys/fdb-6_2", "foundationdb-gen/fdb-6_2" ]
 
 [build-dependencies]
-foundationdb-gen = { version = "0.4.0", path = "../foundationdb-gen" }
+foundationdb-gen = { version = "0.4.0", path = "../foundationdb-gen", default-features = false }
 
 [dependencies]
 foundationdb-sys = { version = "0.4.0", path = "../foundationdb-sys", default-features = false }
