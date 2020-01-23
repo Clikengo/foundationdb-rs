@@ -14,6 +14,7 @@ jobs:
 
     env:
       CARGO_INCREMENTAL: 0
+      RUST_BACKTRACE: 1
 
     steps:
       - name: Checkout repository
@@ -109,6 +110,12 @@ jobs:
           toolchain: stable
           profile: minimal
 
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: -p bindingtester
+
       - name: Run bindingtester
         run: scripts/run_bindingtester.sh
 
@@ -160,7 +167,11 @@ jobs:
           args: --no-fail-fast
         env:
           CARGO_INCREMENTAL: "0"
+          RUST_BACKTRACE: 1
           RUSTFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zno-landing-pads"
+
+      - name: Run bindingtester
+        run: scripts/run_bindingtester.sh
 
       - id: coverage
         uses: actions-rs/grcov@v0.1

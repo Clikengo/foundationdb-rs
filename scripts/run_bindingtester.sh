@@ -5,7 +5,7 @@ set -x
 fdb_rs_dir=$(pwd)
 
 case $(uname) in
-  Darwin) 
+  Darwin)
     brew install mono
   ;;
   Linux)
@@ -14,12 +14,6 @@ case $(uname) in
   ;;
   *) echo "only macOS or Ubuntu is supported"
 esac
-
-## build the rust bindingtester
-(
-  cd ${fdb_rs_dir:?}
-  cargo build --manifest-path foundationdb/Cargo.toml -p bindingtester
-)
 
 ## build the python bindings
 (
@@ -34,7 +28,7 @@ esac
 
   ## need the python api bindings
   make fdb_python
-  
+
   ## Run the test
   ./bindings/bindingtester/bindingtester.py --test-name scripted ${fdb_rs_dir:?}/target/debug/bindingtester
   ./bindings/bindingtester/bindingtester.py --num-ops 1000 --test-name api --api-version 610 ${fdb_rs_dir:?}/target/debug/bindingtester
