@@ -24,8 +24,8 @@ license = "MIT/Apache-2.0"
 features = [ "embedded-fdb-include" ]
 
 [badges]
-travis-ci = { repository = "bluejekyll/foundationdb-rs" }
-# codecov = { repository = "bluejekyll/foundationdb-rs", branch = "master", service = "github" }
+coveralls = { repository = "Clikengo/foundationdb-rs", branch = "master", service = "github" }
+codecov = { repository = "Clikengo/foundationdb-rs", branch = "master", service = "github" }
 
 [features]
 default = [ "fdb-6_1" ]
