@@ -1,16 +1,19 @@
+# C API bindings for FoundationDB
 
-# Building 
+See [foundationdb](https://crates.io/crates/foundationdb), for a safe abstraction.
 
-Follow the FoundationDB installation instructions: https://apple.github.io/foundationdb/api-general.html#installing-client-binaries
+## License
 
-The bindgen output file `bindings.rs` should be checked in with updates. It is generated as part of the foundation-sys build, but off by default. The current generated file was generated on Linux, which appears to be compatible with macOS and Linux.
+Licensed under either of
 
-## Generate new bindings
+- Apache License, Version 2.0, ([LICENSE-APACHE](../LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
+- MIT license ([LICENSE-MIT](../LICENSE-MIT) or http://opensource.org/licenses/MIT)
 
-Run:
+at your option.
 
-```console
-$> BINDGEN=true cargo build
-```
+### Contribution
 
-And format the file with `cargo fmt`, and submit a new PR to the `foundationdb-sys` repo.
+Unless you explicitly state otherwise, any contribution intentionally
+submitted for inclusion in the work by you, as defined in the Apache-2.0
+license, shall be dual licensed as above, without any additional terms or
+conditions.
