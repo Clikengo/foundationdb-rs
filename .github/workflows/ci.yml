@@ -47,11 +47,11 @@ jobs:
         with:
           command: test
 
-      - name: Test locally installed include
+      - name: Test locally embedded include
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --manifest-path foundationdb/Cargo.toml --features local-fdb-include --tests
+          args: --manifest-path foundationdb/Cargo.toml --features embedded-fdb-include --tests
 
       - name: Test 6.2
         uses: actions-rs/cargo@v1

@@ -25,8 +25,8 @@ travis-ci = { repository = "bluejekyll/foundationdb-rs" }
 
 [features]
 default = ["fdb-6_1", "uuid"]
-# Use the locally installed foundationdb fdb_c.h and fdb.options files
-local-fdb-include = [ "foundationdb-sys/local-fdb-include", "foundationdb-gen/local-fdb-include" ]
+# Use the locally embedded foundationdb fdb_c.h and fdb.options files
+embedded-fdb-include = [ "foundationdb-sys/embedded-fdb-include", "foundationdb-gen/embedded-fdb-include" ]
 fdb-5_1 = [ "foundationdb-sys/fdb-5_1", "foundationdb-gen/fdb-5_1" ]
 fdb-5_2 = [ "foundationdb-sys/fdb-5_2", "foundationdb-gen/fdb-5_2" ]
 fdb-6_0 = [ "foundationdb-sys/fdb-6_0", "foundationdb-gen/fdb-6_0" ]
