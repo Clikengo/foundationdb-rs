@@ -26,6 +26,20 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: echo "::add-path::C:\Program Files\foundationdb\bin"
 
+      - name: Change foundationdb dirs
+        if: matrix.os == 'windows-latest'
+        run: |
+          Stop-Service fdbmonitor
+          mkdir D:\fdblogs
+          mkdir D:\fdbdata
+          $filecontent = Get-Content C:\ProgramData\foundationdb\foundationdb.conf
+          $filecontent = $filecontent -replace '(^logdir=).*','$1D:\fdblogs'
+          $filecontent -replace '(^datadir=).*','$1D:\fdbdata\$ID' | Set-Content C:\ProgramData\foundationdb\foundationdb.conf
+          cat C:\ProgramData\foundationdb\foundationdb.conf
+          Start-Service fdbmonitor
+          sleep 5
+          fdbcli --exec 'configure new single ssd'
+
       - name: Install Clang
         if: matrix.os == 'windows-latest'
         run: |
@@ -42,6 +56,10 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
+
+      - name: foundationdb status
+        if: matrix.os == 'windows-latest'
+        run: fdbcli --exec status
 
       - name: Test
         uses: actions-rs/cargo@v1
