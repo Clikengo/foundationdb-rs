@@ -47,11 +47,41 @@ jobs:
         with:
           command: test
 
+      - name: Test locally embedded include
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --manifest-path foundationdb/Cargo.toml --features embedded-fdb-include --tests
+
+      - name: Test 6.2
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --manifest-path foundationdb/Cargo.toml --no-default-features --features fdb-6_2 --tests
+
+      - name: Test 6.1
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --manifest-path foundationdb/Cargo.toml --no-default-features --features fdb-6_1 --tests
+
       - name: Test 6.0
         uses: actions-rs/cargo@v1
         with:
           command: test
           args: --manifest-path foundationdb/Cargo.toml --no-default-features --features fdb-6_0 --tests
+
+      - name: Test 5.2
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --manifest-path foundationdb/Cargo.toml --no-default-features --features fdb-5_2 --tests
+
+      - name: Test 5.1
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --manifest-path foundationdb/Cargo.toml --no-default-features --features fdb-5_1 --tests
 
       - name: Example
         uses: actions-rs/cargo@v1

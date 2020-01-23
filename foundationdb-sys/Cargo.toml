@@ -2,7 +2,7 @@
 name = "foundationdb-sys"
 version = "0.4.0"
 authors = [
-    "Benjamin Fry <benjaminfry@me.com>", 
+    "Benjamin Fry <benjaminfry@me.com>",
     "Vincent Rouillé <vincent@clikengo.com>",
 ]
 edition = "2018"
@@ -20,12 +20,17 @@ categories = ["database"]
 
 license = "MIT/Apache-2.0"
 
+[package.metadata.docs.rs]
+features = [ "embedded-fdb-include" ]
+
 [badges]
 travis-ci = { repository = "bluejekyll/foundationdb-rs" }
 # codecov = { repository = "bluejekyll/foundationdb-rs", branch = "master", service = "github" }
 
 [features]
 default = [ "fdb-6_1" ]
+# Use the locally embedded foundationdb fdb_c.h file
+embedded-fdb-include = [ ]
 fdb-5_1 = [ ]
 fdb-5_2 = [ ]
 fdb-6_0 = [ ]
