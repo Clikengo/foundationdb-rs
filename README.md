@@ -1,5 +1,5 @@
 [![GitHub Workflow Status](https://img.shields.io/github/workflow/status/Clikengo/foundationdb-rs/CI)](https://github.com/Clikengo/foundationdb-rs/actions)
-[![Coveralls github](https://img.shields.io/coveralls/github/Clikengo/foundationdb-rs)](https://coveralls.io/github/Clikengo/foundationdb-rs)
+[![Codecov](https://img.shields.io/codecov/c/github/Clikengo/foundationdb-rs)](https://codecov.io/gh/Clikengo/foundationdb-rs)
 ![Crates.io](https://img.shields.io/crates/l/foundationdb)
 [![Dependabot Status](https://api.dependabot.com/badges/status?host=github&repo=Clikengo/foundationdb-rs)](https://dependabot.com)
 
