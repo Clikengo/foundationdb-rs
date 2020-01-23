@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## 0.4.1
+
+- Should fix docs.rs build issues
+
 ## 0.4.0
 
 - Migration to stable (rust 1.39+) async/await
@@ -38,7 +42,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 - Transaction::watch (#25 #59, @yjh0502)
 - Transaction::atomic_op (#26, @yjh0502)
 - Transaction::get_range (#28, @yjh0502)
-- Transaction::{get, set}_read_version (#38, @yjh0502)
+- Transaction::{get, set}\_read_version (#38, @yjh0502)
 - Transaction::add_conflict_range (#50, @yjh0502)
 - Tuple interfaces (#40 #41 #42 #46 #47 #51 #60 #62 #64 #67 #74 #80 #83, @yjh0502 @rushmorem)
 - Additional tests for Transactions (#33, @yjh0502)
