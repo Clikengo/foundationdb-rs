@@ -221,3 +221,27 @@ async fn test_set_read_version_async() -> FdbResult<()> {
 
     Ok(())
 }
+
+#[test]
+fn test_get_addresses_for_key() {
+    common::boot();
+    futures::executor::block_on(test_get_addresses_for_key_async()).expect("failed to run")
+}
+async fn test_get_addresses_for_key_async() -> FdbResult<()> {
+    const KEY: &[u8] = b"test_get_addresses_for_key";
+
+    let db = common::database().await?;
+
+    let trx = db.create_trx()?;
+    trx.clear(KEY);
+    trx.commit().await?;
+
+    let trx = db.create_trx()?;
+    let addrs = trx.get_addresses_for_key(KEY).await?;
+    let mut it = addrs.iter();
+    let addr0 = it.next().unwrap();
+    eprintln!("{}", addr0.to_str().unwrap());
+    assert!(it.next().is_none());
+
+    Ok(())
+}
