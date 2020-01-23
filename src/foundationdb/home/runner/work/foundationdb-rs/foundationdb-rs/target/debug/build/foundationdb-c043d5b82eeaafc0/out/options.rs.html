@@ -613,6 +613,80 @@
 <span id="613">613</span>
 <span id="614">614</span>
 <span id="615">615</span>
+<span id="616">616</span>
+<span id="617">617</span>
+<span id="618">618</span>
+<span id="619">619</span>
+<span id="620">620</span>
+<span id="621">621</span>
+<span id="622">622</span>
+<span id="623">623</span>
+<span id="624">624</span>
+<span id="625">625</span>
+<span id="626">626</span>
+<span id="627">627</span>
+<span id="628">628</span>
+<span id="629">629</span>
+<span id="630">630</span>
+<span id="631">631</span>
+<span id="632">632</span>
+<span id="633">633</span>
+<span id="634">634</span>
+<span id="635">635</span>
+<span id="636">636</span>
+<span id="637">637</span>
+<span id="638">638</span>
+<span id="639">639</span>
+<span id="640">640</span>
+<span id="641">641</span>
+<span id="642">642</span>
+<span id="643">643</span>
+<span id="644">644</span>
+<span id="645">645</span>
+<span id="646">646</span>
+<span id="647">647</span>
+<span id="648">648</span>
+<span id="649">649</span>
+<span id="650">650</span>
+<span id="651">651</span>
+<span id="652">652</span>
+<span id="653">653</span>
+<span id="654">654</span>
+<span id="655">655</span>
+<span id="656">656</span>
+<span id="657">657</span>
+<span id="658">658</span>
+<span id="659">659</span>
+<span id="660">660</span>
+<span id="661">661</span>
+<span id="662">662</span>
+<span id="663">663</span>
+<span id="664">664</span>
+<span id="665">665</span>
+<span id="666">666</span>
+<span id="667">667</span>
+<span id="668">668</span>
+<span id="669">669</span>
+<span id="670">670</span>
+<span id="671">671</span>
+<span id="672">672</span>
+<span id="673">673</span>
+<span id="674">674</span>
+<span id="675">675</span>
+<span id="676">676</span>
+<span id="677">677</span>
+<span id="678">678</span>
+<span id="679">679</span>
+<span id="680">680</span>
+<span id="681">681</span>
+<span id="682">682</span>
+<span id="683">683</span>
+<span id="684">684</span>
+<span id="685">685</span>
+<span id="686">686</span>
+<span id="687">687</span>
+<span id="688">688</span>
+<span id="689">689</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">convert</span>::<span class="ident">TryFrom</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">FdbError</span>, <span class="ident">FdbResult</span>};
@@ -715,6 +789,18 @@
     <span class="ident">DisableClientStatisticsLogging</span>,
     <span class="doccomment">/// Enables debugging feature to perform slow task profiling. Requires trace logging to be enabled. WARNING: this feature is not recommended for use in production.</span>
     <span class="ident">EnableSlowTaskProfiling</span>,
+    <span class="doccomment">/// Enable client buggify - will make requests randomly fail (intended for client testing)</span>
+    <span class="ident">ClientBuggifyEnable</span>,
+    <span class="doccomment">/// Disable client buggify</span>
+    <span class="ident">ClientBuggifyDisable</span>,
+    <span class="doccomment">/// probability expressed as a percentage between 0 and 100</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Set the probability of a CLIENT_BUGGIFY section being active for the current execution.</span>
+    <span class="ident">ClientBuggifySectionActivatedProbability</span>(<span class="ident">i32</span>),
+    <span class="doccomment">/// probability expressed as a percentage between 0 and 100</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Set the probability of an active CLIENT_BUGGIFY section being fired. A section will only fire if it was activated</span>
+    <span class="ident">ClientBuggifySectionFiredProbability</span>(<span class="ident">i32</span>),
 }
 <span class="kw">impl</span> <span class="ident">NetworkOption</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">code</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBNetworkOption</span> {
@@ -747,6 +833,10 @@
             <span class="ident">NetworkOption</span>::<span class="ident">DisableLocalClient</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBNetworkOption_FDB_NET_OPTION_DISABLE_LOCAL_CLIENT</span>,
             <span class="ident">NetworkOption</span>::<span class="ident">DisableClientStatisticsLogging</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBNetworkOption_FDB_NET_OPTION_DISABLE_CLIENT_STATISTICS_LOGGING</span>,
             <span class="ident">NetworkOption</span>::<span class="ident">EnableSlowTaskProfiling</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBNetworkOption_FDB_NET_OPTION_ENABLE_SLOW_TASK_PROFILING</span>,
+            <span class="ident">NetworkOption</span>::<span class="ident">ClientBuggifyEnable</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBNetworkOption_FDB_NET_OPTION_CLIENT_BUGGIFY_ENABLE</span>,
+            <span class="ident">NetworkOption</span>::<span class="ident">ClientBuggifyDisable</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBNetworkOption_FDB_NET_OPTION_CLIENT_BUGGIFY_DISABLE</span>,
+            <span class="ident">NetworkOption</span>::<span class="ident">ClientBuggifySectionActivatedProbability</span>(..) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBNetworkOption_FDB_NET_OPTION_CLIENT_BUGGIFY_SECTION_ACTIVATED_PROBABILITY</span>,
+            <span class="ident">NetworkOption</span>::<span class="ident">ClientBuggifySectionFiredProbability</span>(..) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBNetworkOption_FDB_NET_OPTION_CLIENT_BUGGIFY_SECTION_FIRED_PROBABILITY</span>,
         }
     }
     <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">apply</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">FdbResult</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
@@ -843,6 +933,16 @@
             <span class="ident">NetworkOption</span>::<span class="ident">DisableLocalClient</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">fdb_network_set_option</span>(<span class="ident">code</span>, <span class="ident">std</span>::<span class="ident">ptr</span>::<span class="ident">null</span>(), <span class="number">0</span>),
             <span class="ident">NetworkOption</span>::<span class="ident">DisableClientStatisticsLogging</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">fdb_network_set_option</span>(<span class="ident">code</span>, <span class="ident">std</span>::<span class="ident">ptr</span>::<span class="ident">null</span>(), <span class="number">0</span>),
             <span class="ident">NetworkOption</span>::<span class="ident">EnableSlowTaskProfiling</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">fdb_network_set_option</span>(<span class="ident">code</span>, <span class="ident">std</span>::<span class="ident">ptr</span>::<span class="ident">null</span>(), <span class="number">0</span>),
+            <span class="ident">NetworkOption</span>::<span class="ident">ClientBuggifyEnable</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">fdb_network_set_option</span>(<span class="ident">code</span>, <span class="ident">std</span>::<span class="ident">ptr</span>::<span class="ident">null</span>(), <span class="number">0</span>),
+            <span class="ident">NetworkOption</span>::<span class="ident">ClientBuggifyDisable</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">fdb_network_set_option</span>(<span class="ident">code</span>, <span class="ident">std</span>::<span class="ident">ptr</span>::<span class="ident">null</span>(), <span class="number">0</span>),
+            <span class="ident">NetworkOption</span>::<span class="ident">ClientBuggifySectionActivatedProbability</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">let</span> <span class="ident">data</span>: [<span class="ident">u8</span>;<span class="number">8</span>] <span class="op">=</span> <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">transmute</span>(<span class="ident">v</span> <span class="kw">as</span> <span class="ident">i64</span>);
+                <span class="ident">fdb_sys</span>::<span class="ident">fdb_network_set_option</span>(<span class="ident">code</span>, <span class="ident">data</span>.<span class="ident">as_ptr</span>() <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">u8</span>, <span class="number">8</span>)
+            }
+            <span class="ident">NetworkOption</span>::<span class="ident">ClientBuggifySectionFiredProbability</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">let</span> <span class="ident">data</span>: [<span class="ident">u8</span>;<span class="number">8</span>] <span class="op">=</span> <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">transmute</span>(<span class="ident">v</span> <span class="kw">as</span> <span class="ident">i64</span>);
+                <span class="ident">fdb_sys</span>::<span class="ident">fdb_network_set_option</span>(<span class="ident">code</span>, <span class="ident">data</span>.<span class="ident">as_ptr</span>() <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">u8</span>, <span class="number">8</span>)
+            }
         };
         <span class="kw">if</span> <span class="ident">err</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> { <span class="prelude-val">Err</span>(<span class="ident">FdbError</span>::<span class="ident">from_code</span>(<span class="ident">err</span>)) } <span class="kw">else</span> { <span class="prelude-val">Ok</span>(()) }
     }
@@ -865,6 +965,14 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// Specify the datacenter ID that was passed to fdbserver processes running in the same datacenter as this client, for better location-aware load balancing.</span>
     <span class="ident">DatacenterId</span>(<span class="ident">String</span>),
+    <span class="doccomment">/// Snapshot read operations will see the results of writes done in the same transaction. This is the default behavior.</span>
+    <span class="ident">SnapshotRywEnable</span>,
+    <span class="doccomment">/// Snapshot read operations will not see the results of writes done in the same transaction. This was the default behavior prior to API version 300.</span>
+    <span class="ident">SnapshotRywDisable</span>,
+    <span class="doccomment">/// Maximum length of escaped key and value fields.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Sets the maximum escaped length of key and value fields to be logged to the trace file via the LOG_TRANSACTION option. This sets the ``transaction_logging_max_field_length`` option of each transaction created by this database. See the transaction option description for more information.</span>
+    <span class="ident">TransactionLoggingMaxFieldLength</span>(<span class="ident">i32</span>),
     <span class="doccomment">/// value in milliseconds of timeout</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Set a timeout in milliseconds which, when elapsed, will cause each transaction automatically to be cancelled. This sets the ``timeout`` option of each transaction created by this database. See the transaction option description for more information. Using this option requires that the API version is 610 or higher.</span>
@@ -877,10 +985,14 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// Set the maximum amount of backoff delay incurred in the call to ``onError`` if the error is retryable. This sets the ``max_retry_delay`` option of each transaction created by this database. See the transaction option description for more information.</span>
     <span class="ident">TransactionMaxRetryDelay</span>(<span class="ident">i32</span>),
-    <span class="doccomment">/// Snapshot read operations will see the results of writes done in the same transaction. This is the default behavior.</span>
-    <span class="ident">SnapshotRywEnable</span>,
-    <span class="doccomment">/// Snapshot read operations will not see the results of writes done in the same transaction. This was the default behavior prior to API version 300.</span>
-    <span class="ident">SnapshotRywDisable</span>,
+    <span class="doccomment">/// value in bytes</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Set the maximum transaction size in bytes. This sets the ``size_limit`` option on each transaction created by this database. See the transaction option description for more information.</span>
+    <span class="ident">TransactionSizeLimit</span>(<span class="ident">i32</span>),
+    <span class="doccomment">/// The read version will be committed, and usually will be the latest committed, but might not be the latest committed in the event of a simultaneous fault and misbehaving clock.</span>
+    <span class="ident">TransactionCausalReadRisky</span>,
+    <span class="doccomment">/// Addresses returned by get_addresses_for_key include the port when enabled. This will be enabled by default in api version 700, and this option will be deprecated.</span>
+    <span class="ident">TransactionIncludePortInAddress</span>,
 }
 <span class="kw">impl</span> <span class="ident">DatabaseOption</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">code</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBDatabaseOption</span> {
@@ -889,11 +1001,15 @@
             <span class="ident">DatabaseOption</span>::<span class="ident">MaxWatches</span>(..) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBDatabaseOption_FDB_DB_OPTION_MAX_WATCHES</span>,
             <span class="ident">DatabaseOption</span>::<span class="ident">MachineId</span>(..) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBDatabaseOption_FDB_DB_OPTION_MACHINE_ID</span>,
             <span class="ident">DatabaseOption</span>::<span class="ident">DatacenterId</span>(..) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBDatabaseOption_FDB_DB_OPTION_DATACENTER_ID</span>,
+            <span class="ident">DatabaseOption</span>::<span class="ident">SnapshotRywEnable</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBDatabaseOption_FDB_DB_OPTION_SNAPSHOT_RYW_ENABLE</span>,
+            <span class="ident">DatabaseOption</span>::<span class="ident">SnapshotRywDisable</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBDatabaseOption_FDB_DB_OPTION_SNAPSHOT_RYW_DISABLE</span>,
+            <span class="ident">DatabaseOption</span>::<span class="ident">TransactionLoggingMaxFieldLength</span>(..) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBDatabaseOption_FDB_DB_OPTION_TRANSACTION_LOGGING_MAX_FIELD_LENGTH</span>,
             <span class="ident">DatabaseOption</span>::<span class="ident">TransactionTimeout</span>(..) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBDatabaseOption_FDB_DB_OPTION_TRANSACTION_TIMEOUT</span>,
             <span class="ident">DatabaseOption</span>::<span class="ident">TransactionRetryLimit</span>(..) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBDatabaseOption_FDB_DB_OPTION_TRANSACTION_RETRY_LIMIT</span>,
             <span class="ident">DatabaseOption</span>::<span class="ident">TransactionMaxRetryDelay</span>(..) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBDatabaseOption_FDB_DB_OPTION_TRANSACTION_MAX_RETRY_DELAY</span>,
-            <span class="ident">DatabaseOption</span>::<span class="ident">SnapshotRywEnable</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBDatabaseOption_FDB_DB_OPTION_SNAPSHOT_RYW_ENABLE</span>,
-            <span class="ident">DatabaseOption</span>::<span class="ident">SnapshotRywDisable</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBDatabaseOption_FDB_DB_OPTION_SNAPSHOT_RYW_DISABLE</span>,
+            <span class="ident">DatabaseOption</span>::<span class="ident">TransactionSizeLimit</span>(..) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBDatabaseOption_FDB_DB_OPTION_TRANSACTION_SIZE_LIMIT</span>,
+            <span class="ident">DatabaseOption</span>::<span class="ident">TransactionCausalReadRisky</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBDatabaseOption_FDB_DB_OPTION_TRANSACTION_CAUSAL_READ_RISKY</span>,
+            <span class="ident">DatabaseOption</span>::<span class="ident">TransactionIncludePortInAddress</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBDatabaseOption_FDB_DB_OPTION_TRANSACTION_INCLUDE_PORT_IN_ADDRESS</span>,
         }
     }
     <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">apply</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">target</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBDatabase</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">FdbResult</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
@@ -915,6 +1031,12 @@
                 <span class="ident">fdb_sys</span>::<span class="ident">fdb_database_set_option</span>(<span class="ident">target</span>, <span class="ident">code</span>, <span class="ident">v</span>.<span class="ident">as_ptr</span>() <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">u8</span>, <span class="ident">i32</span>::<span class="ident">try_from</span>(<span class="ident">v</span>.<span class="ident">len</span>()).<span class="ident">expect</span>(<span class="string">&quot;len to fit in i32&quot;</span>))
 
             }
+            <span class="ident">DatabaseOption</span>::<span class="ident">SnapshotRywEnable</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">fdb_database_set_option</span>(<span class="ident">target</span>, <span class="ident">code</span>, <span class="ident">std</span>::<span class="ident">ptr</span>::<span class="ident">null</span>(), <span class="number">0</span>),
+            <span class="ident">DatabaseOption</span>::<span class="ident">SnapshotRywDisable</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">fdb_database_set_option</span>(<span class="ident">target</span>, <span class="ident">code</span>, <span class="ident">std</span>::<span class="ident">ptr</span>::<span class="ident">null</span>(), <span class="number">0</span>),
+            <span class="ident">DatabaseOption</span>::<span class="ident">TransactionLoggingMaxFieldLength</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">let</span> <span class="ident">data</span>: [<span class="ident">u8</span>;<span class="number">8</span>] <span class="op">=</span> <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">transmute</span>(<span class="ident">v</span> <span class="kw">as</span> <span class="ident">i64</span>);
+                <span class="ident">fdb_sys</span>::<span class="ident">fdb_database_set_option</span>(<span class="ident">target</span>, <span class="ident">code</span>, <span class="ident">data</span>.<span class="ident">as_ptr</span>() <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">u8</span>, <span class="number">8</span>)
+            }
             <span class="ident">DatabaseOption</span>::<span class="ident">TransactionTimeout</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> <span class="ident">data</span>: [<span class="ident">u8</span>;<span class="number">8</span>] <span class="op">=</span> <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">transmute</span>(<span class="ident">v</span> <span class="kw">as</span> <span class="ident">i64</span>);
                 <span class="ident">fdb_sys</span>::<span class="ident">fdb_database_set_option</span>(<span class="ident">target</span>, <span class="ident">code</span>, <span class="ident">data</span>.<span class="ident">as_ptr</span>() <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">u8</span>, <span class="number">8</span>)
@@ -927,8 +1049,12 @@
                 <span class="kw">let</span> <span class="ident">data</span>: [<span class="ident">u8</span>;<span class="number">8</span>] <span class="op">=</span> <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">transmute</span>(<span class="ident">v</span> <span class="kw">as</span> <span class="ident">i64</span>);
                 <span class="ident">fdb_sys</span>::<span class="ident">fdb_database_set_option</span>(<span class="ident">target</span>, <span class="ident">code</span>, <span class="ident">data</span>.<span class="ident">as_ptr</span>() <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">u8</span>, <span class="number">8</span>)
             }
-            <span class="ident">DatabaseOption</span>::<span class="ident">SnapshotRywEnable</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">fdb_database_set_option</span>(<span class="ident">target</span>, <span class="ident">code</span>, <span class="ident">std</span>::<span class="ident">ptr</span>::<span class="ident">null</span>(), <span class="number">0</span>),
-            <span class="ident">DatabaseOption</span>::<span class="ident">SnapshotRywDisable</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">fdb_database_set_option</span>(<span class="ident">target</span>, <span class="ident">code</span>, <span class="ident">std</span>::<span class="ident">ptr</span>::<span class="ident">null</span>(), <span class="number">0</span>),
+            <span class="ident">DatabaseOption</span>::<span class="ident">TransactionSizeLimit</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">let</span> <span class="ident">data</span>: [<span class="ident">u8</span>;<span class="number">8</span>] <span class="op">=</span> <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">transmute</span>(<span class="ident">v</span> <span class="kw">as</span> <span class="ident">i64</span>);
+                <span class="ident">fdb_sys</span>::<span class="ident">fdb_database_set_option</span>(<span class="ident">target</span>, <span class="ident">code</span>, <span class="ident">data</span>.<span class="ident">as_ptr</span>() <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">u8</span>, <span class="number">8</span>)
+            }
+            <span class="ident">DatabaseOption</span>::<span class="ident">TransactionCausalReadRisky</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">fdb_database_set_option</span>(<span class="ident">target</span>, <span class="ident">code</span>, <span class="ident">std</span>::<span class="ident">ptr</span>::<span class="ident">null</span>(), <span class="number">0</span>),
+            <span class="ident">DatabaseOption</span>::<span class="ident">TransactionIncludePortInAddress</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">fdb_database_set_option</span>(<span class="ident">target</span>, <span class="ident">code</span>, <span class="ident">std</span>::<span class="ident">ptr</span>::<span class="ident">null</span>(), <span class="number">0</span>),
         };
         <span class="kw">if</span> <span class="ident">err</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> { <span class="prelude-val">Err</span>(<span class="ident">FdbError</span>::<span class="ident">from_code</span>(<span class="ident">err</span>)) } <span class="kw">else</span> { <span class="prelude-val">Ok</span>(()) }
     }
@@ -937,9 +1063,11 @@
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">TransactionOption</span> {
     <span class="doccomment">/// The transaction, if not self-conflicting, may be committed a second time after commit succeeds, in the event of a fault</span>
     <span class="ident">CausalWriteRisky</span>,
-    <span class="doccomment">/// The read version will be committed, and usually will be the latest committed, but might not be the latest committed in the event of a fault or partition</span>
+    <span class="doccomment">/// The read version will be committed, and usually will be the latest committed, but might not be the latest committed in the event of a simultaneous fault and misbehaving clock.</span>
     <span class="ident">CausalReadRisky</span>,
     <span class="ident">CausalReadDisable</span>,
+    <span class="doccomment">/// Addresses returned by get_addresses_for_key include the port when enabled. This will be enabled by default in api version 700, and this option will be deprecated.</span>
+    <span class="ident">IncludePortInAddress</span>,
     <span class="doccomment">/// The next write performed on this transaction will not generate a write conflict range. As a result, other transactions which read the key(s) being modified by the next write will not conflict with this transaction. Care needs to be taken when using this option on a transaction that is shared between multiple threads. When setting this option, write conflict ranges will be disabled on the next write operation, regardless of what thread it is on.</span>
     <span class="ident">NextWriteNoWriteConflictRange</span>,
     <span class="doccomment">/// Reads performed by a transaction will not see any prior mutations that occured in that transaction, instead seeing the value which was in the database at the transaction&#39;s read version. This option may provide a small performance benefit for the client, but also disables a number of client-side optimizations which are beneficial for transactions which tend to read and write the same keys within a single transaction.</span>
@@ -973,6 +1101,10 @@
     <span class="ident">DebugTransactionIdentifier</span>(<span class="ident">String</span>),
     <span class="doccomment">/// Enables tracing for this transaction and logs results to the client trace logs. The DEBUG_TRANSACTION_IDENTIFIER option must be set before using this option, and client trace logging must be enabled and to get log output.</span>
     <span class="ident">LogTransaction</span>,
+    <span class="doccomment">/// Maximum length of escaped key and value fields.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Sets the maximum escaped length of key and value fields to be logged to the trace file via the LOG_TRANSACTION option, after which the field will be truncated. A negative value disables truncation.</span>
+    <span class="ident">TransactionLoggingMaxFieldLength</span>(<span class="ident">i32</span>),
     <span class="doccomment">/// value in milliseconds of timeout</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Set a timeout in milliseconds which, when elapsed, will cause the transaction automatically to be cancelled. Valid parameter values are ``[0, INT_MAX]``. If set to 0, will disable all timeouts. All pending and any future uses of the transaction will throw an exception. The transaction can be used again after it is reset. Prior to API version 610, like all other transaction options, the timeout must be reset after a call to ``onError``. If the API version is 610 or greater, the timeout is not reset after an ``onError`` call. This allows the user to specify a longer timeout on specific transactions than the default timeout specified through the ``transaction_timeout`` database option without the shorter database timeout cancelling transactions that encounter a retryable error. Note that at all API versions, it is safe and legal to set the timeout each time the transaction begins, so most code written assuming the older behavior can be upgraded to the newer behavior without requiring any modification, and the caller is not required to implement special logic in retry loops to only conditionally set this option.</span>
@@ -985,6 +1117,10 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// Set the maximum amount of backoff delay incurred in the call to ``onError`` if the error is retryable. Defaults to 1000 ms. Valid parameter values are ``[0, INT_MAX]``. If the maximum retry delay is less than the current retry delay of the transaction, then the current retry delay will be clamped to the maximum retry delay. Prior to API version 610, like all other transaction options, the maximum retry delay must be reset after a call to ``onError``. If the API version is 610 or greater, the retry limit is not reset after an ``onError`` call. Note that at all API versions, it is safe and legal to set the maximum retry delay each time the transaction begins, so most code written assuming the older behavior can be upgraded to the newer behavior without requiring any modification, and the caller is not required to implement special logic in retry loops to only conditionally set this option.</span>
     <span class="ident">MaxRetryDelay</span>(<span class="ident">i32</span>),
+    <span class="doccomment">/// value in bytes</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Set the transaction size limit in bytes. The size is calculated by combining the sizes of all keys and values written or mutated, all key ranges cleared, and all read and write conflict ranges. (In other words, it includes the total size of all data included in the request to the cluster to commit the transaction.) Large transactions can cause performance problems on FoundationDB clusters, so setting this limit to a smaller value than the default can help prevent the client from accidentally degrading the cluster&#39;s performance. This value must be at least 32 and cannot be set to higher than 10,000,000, the default transaction size limit.</span>
+    <span class="ident">SizeLimit</span>(<span class="ident">i32</span>),
     <span class="doccomment">/// Snapshot read operations will see the results of writes done in the same transaction. This is the default behavior.</span>
     <span class="ident">SnapshotRywEnable</span>,
     <span class="doccomment">/// Snapshot read operations will not see the results of writes done in the same transaction. This was the default behavior prior to API version 300.</span>
@@ -1004,6 +1140,7 @@
             <span class="ident">TransactionOption</span>::<span class="ident">CausalWriteRisky</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBTransactionOption_FDB_TR_OPTION_CAUSAL_WRITE_RISKY</span>,
             <span class="ident">TransactionOption</span>::<span class="ident">CausalReadRisky</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBTransactionOption_FDB_TR_OPTION_CAUSAL_READ_RISKY</span>,
             <span class="ident">TransactionOption</span>::<span class="ident">CausalReadDisable</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBTransactionOption_FDB_TR_OPTION_CAUSAL_READ_DISABLE</span>,
+            <span class="ident">TransactionOption</span>::<span class="ident">IncludePortInAddress</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBTransactionOption_FDB_TR_OPTION_INCLUDE_PORT_IN_ADDRESS</span>,
             <span class="ident">TransactionOption</span>::<span class="ident">NextWriteNoWriteConflictRange</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBTransactionOption_FDB_TR_OPTION_NEXT_WRITE_NO_WRITE_CONFLICT_RANGE</span>,
             <span class="ident">TransactionOption</span>::<span class="ident">ReadYourWritesDisable</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBTransactionOption_FDB_TR_OPTION_READ_YOUR_WRITES_DISABLE</span>,
             <span class="ident">TransactionOption</span>::<span class="ident">ReadAheadDisable</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBTransactionOption_FDB_TR_OPTION_READ_AHEAD_DISABLE</span>,
@@ -1019,9 +1156,11 @@
             <span class="ident">TransactionOption</span>::<span class="ident">TransactionLoggingEnable</span>(..) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBTransactionOption_FDB_TR_OPTION_TRANSACTION_LOGGING_ENABLE</span>,
             <span class="ident">TransactionOption</span>::<span class="ident">DebugTransactionIdentifier</span>(..) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBTransactionOption_FDB_TR_OPTION_DEBUG_TRANSACTION_IDENTIFIER</span>,
             <span class="ident">TransactionOption</span>::<span class="ident">LogTransaction</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBTransactionOption_FDB_TR_OPTION_LOG_TRANSACTION</span>,
+            <span class="ident">TransactionOption</span>::<span class="ident">TransactionLoggingMaxFieldLength</span>(..) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBTransactionOption_FDB_TR_OPTION_TRANSACTION_LOGGING_MAX_FIELD_LENGTH</span>,
             <span class="ident">TransactionOption</span>::<span class="ident">Timeout</span>(..) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBTransactionOption_FDB_TR_OPTION_TIMEOUT</span>,
             <span class="ident">TransactionOption</span>::<span class="ident">RetryLimit</span>(..) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBTransactionOption_FDB_TR_OPTION_RETRY_LIMIT</span>,
             <span class="ident">TransactionOption</span>::<span class="ident">MaxRetryDelay</span>(..) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBTransactionOption_FDB_TR_OPTION_MAX_RETRY_DELAY</span>,
+            <span class="ident">TransactionOption</span>::<span class="ident">SizeLimit</span>(..) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBTransactionOption_FDB_TR_OPTION_SIZE_LIMIT</span>,
             <span class="ident">TransactionOption</span>::<span class="ident">SnapshotRywEnable</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBTransactionOption_FDB_TR_OPTION_SNAPSHOT_RYW_ENABLE</span>,
             <span class="ident">TransactionOption</span>::<span class="ident">SnapshotRywDisable</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBTransactionOption_FDB_TR_OPTION_SNAPSHOT_RYW_DISABLE</span>,
             <span class="ident">TransactionOption</span>::<span class="ident">LockAware</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">FDBTransactionOption_FDB_TR_OPTION_LOCK_AWARE</span>,
@@ -1036,6 +1175,7 @@
             <span class="ident">TransactionOption</span>::<span class="ident">CausalWriteRisky</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">fdb_transaction_set_option</span>(<span class="ident">target</span>, <span class="ident">code</span>, <span class="ident">std</span>::<span class="ident">ptr</span>::<span class="ident">null</span>(), <span class="number">0</span>),
             <span class="ident">TransactionOption</span>::<span class="ident">CausalReadRisky</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">fdb_transaction_set_option</span>(<span class="ident">target</span>, <span class="ident">code</span>, <span class="ident">std</span>::<span class="ident">ptr</span>::<span class="ident">null</span>(), <span class="number">0</span>),
             <span class="ident">TransactionOption</span>::<span class="ident">CausalReadDisable</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">fdb_transaction_set_option</span>(<span class="ident">target</span>, <span class="ident">code</span>, <span class="ident">std</span>::<span class="ident">ptr</span>::<span class="ident">null</span>(), <span class="number">0</span>),
+            <span class="ident">TransactionOption</span>::<span class="ident">IncludePortInAddress</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">fdb_transaction_set_option</span>(<span class="ident">target</span>, <span class="ident">code</span>, <span class="ident">std</span>::<span class="ident">ptr</span>::<span class="ident">null</span>(), <span class="number">0</span>),
             <span class="ident">TransactionOption</span>::<span class="ident">NextWriteNoWriteConflictRange</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">fdb_transaction_set_option</span>(<span class="ident">target</span>, <span class="ident">code</span>, <span class="ident">std</span>::<span class="ident">ptr</span>::<span class="ident">null</span>(), <span class="number">0</span>),
             <span class="ident">TransactionOption</span>::<span class="ident">ReadYourWritesDisable</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">fdb_transaction_set_option</span>(<span class="ident">target</span>, <span class="ident">code</span>, <span class="ident">std</span>::<span class="ident">ptr</span>::<span class="ident">null</span>(), <span class="number">0</span>),
             <span class="ident">TransactionOption</span>::<span class="ident">ReadAheadDisable</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">fdb_transaction_set_option</span>(<span class="ident">target</span>, <span class="ident">code</span>, <span class="ident">std</span>::<span class="ident">ptr</span>::<span class="ident">null</span>(), <span class="number">0</span>),
@@ -1060,6 +1200,10 @@
 
             }
             <span class="ident">TransactionOption</span>::<span class="ident">LogTransaction</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fdb_sys</span>::<span class="ident">fdb_transaction_set_option</span>(<span class="ident">target</span>, <span class="ident">code</span>, <span class="ident">std</span>::<span class="ident">ptr</span>::<span class="ident">null</span>(), <span class="number">0</span>),
+            <span class="ident">TransactionOption</span>::<span class="ident">TransactionLoggingMaxFieldLength</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">let</span> <span class="ident">data</span>: [<span class="ident">u8</span>;<span class="number">8</span>] <span class="op">=</span> <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">transmute</span>(<span class="ident">v</span> <span class="kw">as</span> <span class="ident">i64</span>);
+                <span class="ident">fdb_sys</span>::<span class="ident">fdb_transaction_set_option</span>(<span class="ident">target</span>, <span class="ident">code</span>, <span class="ident">data</span>.<span class="ident">as_ptr</span>() <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">u8</span>, <span class="number">8</span>)
+            }
             <span class="ident">TransactionOption</span>::<span class="ident">Timeout</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> <span class="ident">data</span>: [<span class="ident">u8</span>;<span class="number">8</span>] <span class="op">=</span> <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">transmute</span>(<span class="ident">v</span> <span class="kw">as</span> <span class="ident">i64</span>);
                 <span class="ident">fdb_sys</span>::<span class="ident">fdb_transaction_set_option</span>(<span class="ident">target</span>, <span class="ident">code</span>, <span class="ident">data</span>.<span class="ident">as_ptr</span>() <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">u8</span>, <span class="number">8</span>)
@@ -1069,6 +1213,10 @@
                 <span class="ident">fdb_sys</span>::<span class="ident">fdb_transaction_set_option</span>(<span class="ident">target</span>, <span class="ident">code</span>, <span class="ident">data</span>.<span class="ident">as_ptr</span>() <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">u8</span>, <span class="number">8</span>)
             }
             <span class="ident">TransactionOption</span>::<span class="ident">MaxRetryDelay</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">let</span> <span class="ident">data</span>: [<span class="ident">u8</span>;<span class="number">8</span>] <span class="op">=</span> <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">transmute</span>(<span class="ident">v</span> <span class="kw">as</span> <span class="ident">i64</span>);
+                <span class="ident">fdb_sys</span>::<span class="ident">fdb_transaction_set_option</span>(<span class="ident">target</span>, <span class="ident">code</span>, <span class="ident">data</span>.<span class="ident">as_ptr</span>() <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">u8</span>, <span class="number">8</span>)
+            }
+            <span class="ident">TransactionOption</span>::<span class="ident">SizeLimit</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> <span class="ident">data</span>: [<span class="ident">u8</span>;<span class="number">8</span>] <span class="op">=</span> <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">transmute</span>(<span class="ident">v</span> <span class="kw">as</span> <span class="ident">i64</span>);
                 <span class="ident">fdb_sys</span>::<span class="ident">fdb_transaction_set_option</span>(<span class="ident">target</span>, <span class="ident">code</span>, <span class="ident">data</span>.<span class="ident">as_ptr</span>() <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">u8</span>, <span class="number">8</span>)
             }
