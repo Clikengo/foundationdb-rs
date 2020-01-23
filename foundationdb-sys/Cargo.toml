@@ -24,7 +24,6 @@ license = "MIT/Apache-2.0"
 features = [ "embedded-fdb-include" ]
 
 [badges]
-coveralls = { repository = "Clikengo/foundationdb-rs", branch = "master", service = "github" }
 codecov = { repository = "Clikengo/foundationdb-rs", branch = "master", service = "github" }
 
 [features]
