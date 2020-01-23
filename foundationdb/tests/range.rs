@@ -37,6 +37,64 @@ async fn test_get_range_async() -> FdbResult<()> {
         let end = KeySelector::first_greater_than(Cow::Borrowed(key_end.as_bytes()));
         let opt = RangeOption::from((begin, end));
 
+        let range = trx.get_range(&opt, 1, false).await?;
+        assert!(range.len() > 0);
+        assert_eq!(range.more(), true);
+        let len = range.len();
+        let mut i = 0;
+        for kv in &range {
+            assert!(kv.key().len() > 0);
+            assert!(kv.value().len() > 0);
+            i += 1;
+        }
+        assert_eq!(i, len);
+
+        let refs_asc = (&range).into_iter().collect::<Vec<_>>();
+        let refs_desc = (&range).into_iter().rev().collect::<Vec<_>>();
+        assert_eq!(refs_asc, refs_desc.into_iter().rev().collect::<Vec<_>>());
+
+        let owned_asc = trx
+            .get_range(&opt, 1, false)
+            .await?
+            .into_iter()
+            .collect::<Vec<_>>();
+        let owned_desc = range.into_iter().rev().collect::<Vec<_>>();
+        assert_eq!(owned_asc, owned_desc.into_iter().rev().collect::<Vec<_>>());
+    }
+
+    Ok(())
+}
+#[test]
+fn test_get_range() {
+    common::boot();
+    futures::executor::block_on(test_get_range_async()).expect("failed to run");
+}
+
+async fn test_get_ranges_async() -> FdbResult<()> {
+    const N: usize = 10000;
+
+    let db = common::database().await?;
+
+    {
+        let trx = db.create_trx()?;
+        let key_begin = "test-ranges-";
+        let key_end = "test-ranges.";
+
+        eprintln!("clearing...");
+        trx.clear_range(key_begin.as_bytes(), key_end.as_bytes());
+
+        eprintln!("inserting...");
+        for _ in 0..N {
+            let key = format!("{}-{}", key_begin, common::random_str(10));
+            let value = common::random_str(10);
+            trx.set(key.as_bytes(), value.as_bytes());
+        }
+
+        eprintln!("counting...");
+        let begin = KeySelector::first_greater_or_equal(Cow::Borrowed(key_begin.as_bytes()));
+        let end = KeySelector::first_greater_than(Cow::Borrowed(key_end.as_bytes()));
+        let opt = RangeOption::from((begin, end));
+
         let count = trx
             .get_ranges(opt, false)
             .try_fold(0usize, |count, kvs| future::ok(count + kvs.as_ref().len()))
@@ -49,9 +107,9 @@ async fn test_get_range_async() -> FdbResult<()> {
     Ok(())
 }
 #[test]
-fn test_get_range() {
+fn test_get_ranges() {
     common::boot();
-    futures::executor::block_on(test_get_range_async()).expect("failed to run");
+    futures::executor::block_on(test_get_ranges_async()).expect("failed to run");
 }
 
 async fn test_range_option_async() -> FdbResult<()> {

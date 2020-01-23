@@ -25,6 +25,7 @@
 use std;
 use std::convert::TryFrom;
 use std::ffi::CStr;
+use std::fmt;
 use std::ops::Deref;
 use std::os::raw::c_char;
 use std::pin::Pin;
@@ -371,24 +372,28 @@ impl Iterator for FdbValuesIter {
         (rem, Some(rem))
     }
 }
-impl ExactSizeIterator for FdbValuesIter {}
+impl ExactSizeIterator for FdbValuesIter {
+    #[inline]
+    fn len(&self) -> usize {
+        (self.len - self.pos) as usize
+    }
+}
 impl DoubleEndedIterator for FdbValuesIter {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.nth_back(0)
     }
 
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
-        if n < self.pos as usize {
-            // safe because n < self.pos
-            self.pos -= 1 + n as i32;
-            let keyvalue = unsafe { self.keyvalues.add(self.pos as usize) };
-
+        if n < self.len() {
+            self.len -= 1 + n as i32;
+            // safe because len < original len
+            let keyvalue = unsafe { self.keyvalues.add(self.len as usize) };
             Some(FdbValue {
                 _f: self.f.clone(),
                 keyvalue,
             })
         } else {
-            self.pos = 0;
+            self.pos = self.len;
             None
         }
     }
@@ -413,6 +418,17 @@ impl Deref for FdbValue {
 impl AsRef<FdbKeyValue> for FdbValue {
     fn as_ref(&self) -> &FdbKeyValue {
         self.deref()
+    }
+}
+impl PartialEq for FdbValue {
+    fn eq(&self, other: &Self) -> bool {
+        self.deref() == other.deref()
+    }
+}
+impl Eq for FdbValue {}
+impl fmt::Debug for FdbValue {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.deref().fmt(f)
     }
 }
 
@@ -442,6 +458,23 @@ impl FdbKeyValue {
     /// value
     pub fn value(&self) -> &[u8] {
         unsafe { std::slice::from_raw_parts(self.value, self.value_len as usize) }
+    }
+}
+
+impl PartialEq for FdbKeyValue {
+    fn eq(&self, other: &Self) -> bool {
+        (self.key(), self.value()) == (other.key(), other.value())
+    }
+}
+impl Eq for FdbKeyValue {}
+impl fmt::Debug for FdbKeyValue {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "({:?}, {:?})",
+            crate::tuple::Bytes::from(self.key()),
+            crate::tuple::Bytes::from(self.value())
+        )
     }
 }
 
