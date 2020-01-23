@@ -33,7 +33,7 @@ futures = &quot;0.3&quot;
 
 <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">async_main</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">foundationdb</span>::<span class="ident">FdbResult</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">db</span> <span class="op">=</span> <span class="ident">foundationdb</span>::<span class="ident">Database</span>::<span class="ident">default</span>()<span class="question-mark">?</span>;
-     
+
     <span class="comment">// write a value</span>
     <span class="kw">let</span> <span class="ident">trx</span> <span class="op">=</span> <span class="ident">db</span>.<span class="ident">create_trx</span>()<span class="question-mark">?</span>;
     <span class="ident">trx</span>.<span class="ident">set</span>(<span class="string">b&quot;hello&quot;</span>, <span class="string">b&quot;world&quot;</span>); <span class="comment">// errors will be returned in the future result</span>
