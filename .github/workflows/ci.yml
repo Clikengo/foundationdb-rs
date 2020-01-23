@@ -161,7 +161,17 @@ jobs:
           toolchain: nightly
           override: true
 
-      - uses: actions-rs/cargo@v1
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: -p bindingtester
+        env:
+          CARGO_INCREMENTAL: "0"
+          RUSTFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zno-landing-pads"
+
+      - name: Test
+        uses: actions-rs/cargo@v1
         with:
           command: test
           args: --no-fail-fast
