@@ -35,6 +35,7 @@ jobs:
         with:
           toolchain: ${{ matrix.toolchain }}
           profile: minimal
+          default: true
 
       - name: Build
         uses: actions-rs/cargo@v1
