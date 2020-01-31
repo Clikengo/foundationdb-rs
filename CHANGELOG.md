@@ -5,7 +5,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## 0.4.1
 
-- Should fix docs.rs build issues
+- Fix docs.rs build issues
 
 ## 0.4.0
 
