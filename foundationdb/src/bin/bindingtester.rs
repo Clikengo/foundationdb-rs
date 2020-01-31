@@ -251,7 +251,7 @@ impl Instr {
     }
 }
 
-type StackFuture = Box<Future<Item = (Transaction, Vec<u8>), Error = Error>>;
+type StackFuture = Box<dyn Future<Item = (Transaction, Vec<u8>), Error = Error>>;
 struct StackItem {
     number: usize,
     // TODO: enum
@@ -350,7 +350,7 @@ impl StackMachine {
         }
     }
 
-    fn fetch_instr(&self) -> Box<Future<Item = Vec<Instr>, Error = Error>> {
+    fn fetch_instr(&self) -> Box<dyn Future<Item = Vec<Instr>, Error = Error>> {
         let db = self.db.clone();
 
         let prefix = self.prefix.clone();
@@ -585,12 +585,11 @@ impl StackMachine {
                     .snapshot(instr.pop_snapshot())
                     .build();
 
-                let mut out = Vec::new();
                 let trx0 = trx.clone();
                 let f = trx
                     .get_ranges(opt)
                     .map_err(|(_, e)| e)
-                    .fold(out, move |mut out, res| {
+                    .fold(Vec::new(), move |mut out, res| {
                         let kvs = res.key_values();
 
                         debug!("range: len={:?}", kvs.as_ref().len());

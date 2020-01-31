@@ -72,12 +72,12 @@ impl BenchRunner {
     }
 
     //TODO: impl future
-    fn run(self) -> Box<Future<Item = (), Error = Error>> {
+    fn run(self) -> Box<dyn Future<Item = (), Error = Error>> {
         Box::new(loop_fn(self, Self::step))
     }
 
     //TODO: impl future
-    fn step(mut self) -> Box<Future<Item = Loop<(), Self>, Error = Error>> {
+    fn step(mut self) -> Box<dyn Future<Item = Loop<(), Self>, Error = Error>> {
         let trx = self.trx.take().unwrap();
 
         for _ in 0..self.trx_batch_size {
@@ -150,7 +150,7 @@ impl Bench {
         &self,
         r: std::ops::Range<usize>,
         counter: Counter,
-    ) -> Box<Future<Item = (), Error = Error>> {
+    ) -> Box<dyn Future<Item = (), Error = Error>> {
         let runners = r
             .into_iter()
             .map(|n| {
