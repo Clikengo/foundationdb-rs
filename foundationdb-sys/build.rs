@@ -15,11 +15,11 @@ const INCLUDE_PATH: &str = "-I/usr/local/include/foundationdb/";
 const INCLUDE_PATH: &str = "-IC:/Program Files/foundationdb/include/foundationdb";
 
 #[cfg(all(feature = "embedded-fdb-include", feature = "fdb-5_1"))]
-const INCLUDE_PATH: &str = "-I../include/510";
+const INCLUDE_PATH: &str = "-I./include/510";
 #[cfg(all(feature = "embedded-fdb-include", feature = "fdb-5_2"))]
-const INCLUDE_PATH: &str = "-I../include/520";
+const INCLUDE_PATH: &str = "-I./include/520";
 #[cfg(all(feature = "embedded-fdb-include", feature = "fdb-6_0"))]
-const INCLUDE_PATH: &str = "-I../include/600";
+const INCLUDE_PATH: &str = "-I./include/600";
 
 fn main() {
     // Link against fdb_c.
