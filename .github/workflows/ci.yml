@@ -102,7 +102,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: -p bindingtester
+          args: -p foundationdb --bin bindingtester
 
       - name: Run bindingtester
         run: scripts/run_bindingtester.sh
@@ -153,7 +153,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: -p bindingtester
+          args: -p foundationdb --bin bindingtester
         env:
           CARGO_INCREMENTAL: "0"
           RUSTFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zno-landing-pads"
