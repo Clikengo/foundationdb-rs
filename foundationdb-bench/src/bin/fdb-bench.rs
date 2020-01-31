@@ -158,7 +158,8 @@ impl Bench {
                 // of keys again, which makes benchmark result stable.
                 let rng = StepRng::new(n as u64, 1);
                 BenchRunner::new(self.db.clone(), rng, counter.clone(), &self.opt).run()
-            }).collect::<Vec<_>>();
+            })
+            .collect::<Vec<_>>();
 
         let f = join_all(runners).map(|_| ());
         Box::new(f)

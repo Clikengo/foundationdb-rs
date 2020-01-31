@@ -351,7 +351,8 @@ mod tests {
     fn test_decode_recursive_tuple() {
         let two_decode = <(String, (String, i64))>::try_from(&[
             2, 111, 110, 101, 0, 5, 2, 116, 119, 111, 0, 21, 42, 0,
-        ]).expect("failed two");
+        ])
+        .expect("failed two");
 
         // TODO: can we get eq for borrows of the inner types?
         assert_eq!(("one".to_string(), ("two".to_string(), 42)), two_decode);
@@ -359,7 +360,8 @@ mod tests {
         let three_decode = <(String, (String, i64, (String, i64)))>::try_from(&[
             2, 111, 110, 101, 0, 5, 2, 116, 119, 111, 0, 21, 42, 5, 2, 116, 104, 114, 101, 101, 0,
             21, 33, 0, 0,
-        ]).expect("failed three");
+        ])
+        .expect("failed three");
 
         assert_eq!(
             &(

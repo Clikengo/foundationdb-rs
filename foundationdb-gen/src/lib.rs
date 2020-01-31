@@ -62,7 +62,7 @@ impl FdbScope {
         for option in self.options.iter() {
             let rs_name = match option.name.as_ref() {
                 "AppendIfFit" => "AppendIfFits",
-                s => s
+                s => s,
             };
 
             s += &format!("{}::{}", self.name, rs_name);

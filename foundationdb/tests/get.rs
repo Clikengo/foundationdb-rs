@@ -186,7 +186,8 @@ fn test_transact() {
                     // `Database::transact` will handle commit by itself, so returns without commit
                     Ok(())
                 })
-            }).then(|res| match res {
+            })
+            .then(|res| match res {
                 Ok(_) => panic!("should not be able to commit"),
                 Err(e) => {
                     eprintln!("failed as expected: {:?}", e);

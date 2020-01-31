@@ -104,7 +104,8 @@ fn get_available_classes(db: &Database) -> Vec<String> {
             }
 
             future::ok(available_classes)
-        }).wait()
+        })
+        .wait()
         .expect("failed to get classes")
 }
 
@@ -129,7 +130,8 @@ fn ditch_trx(trx: &Transaction, student: &str, class: &str) {
             .expect("get failed")
             .value()
             .expect("class seats were not initialized"),
-    ).expect("failed to decode i64")
+    )
+    .expect("failed to decode i64")
         + 1;
 
     //println!("{} ditching class: {}", student, class);
@@ -141,7 +143,8 @@ fn ditch(db: &Database, student: String, class: String) -> Result<(), failure::E
     db.transact(move |trx| {
         ditch_trx(&trx, &student, &class);
         future::result(Ok::<(), failure::Error>(()))
-    }).wait()
+    })
+    .wait()
     .map_err(|e| format_err!("error in signup: {}", e))
 }
 
@@ -165,7 +168,8 @@ fn signup_trx(trx: &Transaction, student: &str, class: &str) -> Result<(), failu
             .expect("get failed")
             .value()
             .expect("class seats were not initialized"),
-    ).expect("failed to decode i64");
+    )
+    .expect("failed to decode i64");
 
     if available_seats <= 0 {
         bail!("No remaining seats");
@@ -204,7 +208,8 @@ fn switch_classes(
     db.transact(move |trx| {
         ditch_trx(&trx, &student_id, &old_class);
         future::result(signup_trx(&trx, &student_id, &new_class))
-    }).wait()
+    })
+    .wait()
     .map_err(|e| format_err!("error in switch: {}", e))
 }
 
@@ -282,7 +287,8 @@ fn simulate_students(student_id: usize, num_ops: usize) {
                     &student_id,
                     &available_classes,
                     &mut my_classes,
-                ).is_err()
+                )
+                .is_err()
                 {
                     println!("getting available classes");
                     available_classes = Cow::Owned(get_available_classes(&db));
@@ -290,7 +296,8 @@ fn simulate_students(student_id: usize, num_ops: usize) {
             }
 
             future::ok(())
-        }).wait()
+        })
+        .wait()
         .expect("got error in simulation");
 }
 
@@ -353,7 +360,8 @@ fn main() {
             run_sim(&db, 10, 10);
 
             future::ok(())
-        }).wait()
+        })
+        .wait()
         .expect("failed to create cluster");
 
     // shutdown
