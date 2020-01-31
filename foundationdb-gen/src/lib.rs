@@ -349,14 +349,22 @@ where
     bail!("unexpected end of token");
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(not(feature = "embedded-fdb-include"), target_os = "linux"))]
 const OPTIONS_DATA: &[u8] = include_bytes!("/usr/include/foundationdb/fdb.options");
 
-#[cfg(target_os = "macos")]
+#[cfg(all(not(feature = "embedded-fdb-include"), target_os = "macos"))]
 const OPTIONS_DATA: &[u8] = include_bytes!("/usr/local/include/foundationdb/fdb.options");
 
-#[cfg(target_os = "windows")]
-const OPTIONS_DATA: &[u8] = include_bytes!("C:/Program Files/foundationdb/include/foundationdb/fdb.options");
+#[cfg(all(not(feature = "embedded-fdb-include"), target_os = "windows"))]
+const OPTIONS_DATA: &[u8] =
+    include_bytes!("C:/Program Files/foundationdb/include/foundationdb/fdb.options");
+
+#[cfg(all(feature = "embedded-fdb-include", feature = "fdb-5_1"))]
+const OPTIONS_DATA: &[u8] = include_bytes!("../../include/510/fdb.options");
+#[cfg(all(feature = "embedded-fdb-include", feature = "fdb-5_2"))]
+const OPTIONS_DATA: &[u8] = include_bytes!("../../include/520/fdb.options");
+#[cfg(all(feature = "embedded-fdb-include", feature = "fdb-6_0"))]
+const OPTIONS_DATA: &[u8] = include_bytes!("../../include/600/fdb.options");
 
 pub fn emit() -> Result<String> {
     let mut reader = OPTIONS_DATA.as_ref();
