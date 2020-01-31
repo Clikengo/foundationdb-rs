@@ -1,6 +1,6 @@
 [![GitHub Workflow Status](https://img.shields.io/github/workflow/status/Clikengo/foundationdb-rs/CI)](https://github.com/Clikengo/foundationdb-rs/actions)
 [![Codecov](https://img.shields.io/codecov/c/github/Clikengo/foundationdb-rs)](https://codecov.io/gh/Clikengo/foundationdb-rs)
-![Crates.io](https://img.shields.io/crates/l/foundationdb)
+![Rustc 1.39+](https://img.shields.io/badge/rustc-1.39+-lightgrey)
 [![Dependabot Status](https://api.dependabot.com/badges/status?host=github&repo=Clikengo/foundationdb-rs)](https://dependabot.com)
 
 # FoundationDB Rust Client
