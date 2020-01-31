@@ -68,7 +68,7 @@ impl Database {
     pub fn transact<F, Fut, Item, Error>(
         &self,
         f: F,
-    ) -> Box<Future<Item = Fut::Item, Error = Error>>
+    ) -> Box<dyn Future<Item = Fut::Item, Error = Error>>
     where
         F: FnMut(Transaction) -> Fut + 'static,
         Fut: IntoFuture<Item = Item, Error = Error> + 'static,

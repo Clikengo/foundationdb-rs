@@ -5,14 +5,21 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::PathBuf;
 
-#[cfg(target_os = "linux")]
+#[cfg(all(not(feature = "embedded-fdb-include"), target_os = "linux"))]
 const INCLUDE_PATH: &str = "-I/usr/include/foundationdb/";
 
-#[cfg(target_os = "macos")]
+#[cfg(all(not(feature = "embedded-fdb-include"), target_os = "macos"))]
 const INCLUDE_PATH: &str = "-I/usr/local/include/foundationdb/";
 
-#[cfg(target_os = "windows")]
+#[cfg(all(not(feature = "embedded-fdb-include"), target_os = "windows"))]
 const INCLUDE_PATH: &str = "-IC:/Program Files/foundationdb/include/foundationdb";
+
+#[cfg(all(feature = "embedded-fdb-include", feature = "fdb-5_1"))]
+const INCLUDE_PATH: &str = "-I./include/510";
+#[cfg(all(feature = "embedded-fdb-include", feature = "fdb-5_2"))]
+const INCLUDE_PATH: &str = "-I./include/520";
+#[cfg(all(feature = "embedded-fdb-include", feature = "fdb-6_0"))]
+const INCLUDE_PATH: &str = "-I./include/600";
 
 fn main() {
     // Link against fdb_c.

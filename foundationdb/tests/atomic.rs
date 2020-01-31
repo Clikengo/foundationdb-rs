@@ -22,7 +22,7 @@ fn atomic_add(
     db: Database,
     key: &[u8],
     value: i64,
-) -> Box<Future<Item = (), Error = error::Error>> {
+) -> Box<dyn Future<Item = (), Error = error::Error>> {
     let trx = match db.create_trx() {
         Ok(trx) => trx,
         Err(e) => return Box::new(err(e)),

@@ -47,6 +47,7 @@ matrix:
       env: NAME=bindingtester
            RUST_BACKTRACE=full
       script:
+        - cargo build -p foundationdb --bin bindingtester
         - scripts/run_bindingtester.sh
 
   allow_failures:

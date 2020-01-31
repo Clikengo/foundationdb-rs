@@ -251,7 +251,7 @@ impl Instr {
     }
 }
 
-type StackFuture = Box<Future<Item = (Transaction, Vec<u8>), Error = Error>>;
+type StackFuture = Box<dyn Future<Item = (Transaction, Vec<u8>), Error = Error>>;
 struct StackItem {
     number: usize,
     // TODO: enum
@@ -350,14 +350,15 @@ impl StackMachine {
         }
     }
 
-    fn fetch_instr(&self) -> Box<Future<Item = Vec<Instr>, Error = Error>> {
+    fn fetch_instr(&self) -> Box<dyn Future<Item = Vec<Instr>, Error = Error>> {
         let db = self.db.clone();
 
         let prefix = self.prefix.clone();
         let f = db.transact(move |trx| {
             let opt = transaction::RangeOptionBuilder::from(&prefix).build();
             let instrs = Vec::new();
-            let f = trx.get_ranges(opt)
+            let f = trx
+                .get_ranges(opt)
                 .map_err(|(_opt, e)| e)
                 .fold(instrs, |mut instrs, res| {
                     let kvs = res.key_values();
@@ -494,7 +495,8 @@ impl StackMachine {
             OnError => {
                 let code: i64 = self.pop_item();
                 let trx0 = trx.clone();
-                let f = trx.on_error(Error::from(code as i32))
+                let f = trx
+                    .on_error(Error::from(code as i32))
                     .map(move |_| (trx0, b"RESULT_NOT_PRESENT".to_vec()));
                 self.push_fut(number, f);
             }
@@ -520,7 +522,8 @@ impl StackMachine {
                 let mut prefix: Vec<u8> = self.pop_item();
 
                 //TODO: wait
-                let key = trx.get_key(selector, instr.pop_snapshot())
+                let key = trx
+                    .get_key(selector, instr.pop_snapshot())
                     .map(move |res| res.value().to_vec())
                     .wait()
                     .unwrap();
@@ -582,11 +585,11 @@ impl StackMachine {
                     .snapshot(instr.pop_snapshot())
                     .build();
 
-                let mut out = Vec::new();
                 let trx0 = trx.clone();
-                let f = trx.get_ranges(opt)
+                let f = trx
+                    .get_ranges(opt)
                     .map_err(|(_, e)| e)
-                    .fold(out, move |mut out, res| {
+                    .fold(Vec::new(), move |mut out, res| {
                         let kvs = res.key_values();
 
                         debug!("range: len={:?}", kvs.as_ref().len());
@@ -620,7 +623,8 @@ impl StackMachine {
 
             GetReadVersion => {
                 //TODO: wait
-                let version = trx.get_read_version()
+                let version = trx
+                    .get_read_version()
                     .wait()
                     .expect("failed to get read version");
 
@@ -633,7 +637,8 @@ impl StackMachine {
 
             GetVersionstamp => {
                 let trx0 = trx.clone();
-                let f = trx.clone()
+                let f = trx
+                    .clone()
                     .get_versionstamp()
                     .map(move |v| (trx0, v.versionstamp().to_vec()));
                 self.push_fut(number, f);
@@ -689,14 +694,16 @@ impl StackMachine {
             }
 
             Commit => {
-                let f = trx.clone()
+                let f = trx
+                    .clone()
                     .commit()
                     .map(|trx| (trx, b"RESULT_NOT_PRESENT".to_vec()));
                 self.push_fut(number, f);
             }
 
             GetCommittedVersion => {
-                let last_version = trx.committed_version()
+                let last_version = trx
+                    .committed_version()
                     .expect("failed to get committed version");
                 self.last_version = last_version;
                 self.push_item(number, &b"GOT_COMMITTED_VERSION".to_vec());
@@ -775,7 +782,8 @@ impl StackMachine {
     }
 
     fn run(&mut self) {
-        let instrs = self.fetch_instr()
+        let instrs = self
+            .fetch_instr()
             .wait()
             .expect("failed to read instructions");
 

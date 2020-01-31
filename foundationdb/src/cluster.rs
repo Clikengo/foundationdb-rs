@@ -46,7 +46,7 @@ impl Cluster {
     /// Returns an `FdbFuture` which will be set to an `Database` object.
     ///
     /// TODO: impl Future
-    pub fn create_database(&self) -> Box<Future<Item = Database, Error = Error>> {
+    pub fn create_database(&self) -> Box<dyn Future<Item = Database, Error = Error>> {
         let f = unsafe {
             let f_db = fdb::fdb_cluster_create_database(self.inner.inner, b"DB" as *const _, 2);
             let cluster = self.clone();
