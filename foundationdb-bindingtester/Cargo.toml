@@ -11,16 +11,13 @@ description = """
 Bindings to the C api for FoundationDB
 """
 
-repository = "https://github.com/bluejekyll/foundationdb-rs"
+repository = "https://github.com/Clikengo/foundationdb-rs"
 
 readme = "README.md"
 keywords = ["foundationdb", "kv"]
 categories = ["database"]
 
 license = "MIT/Apache-2.0"
-
-[badges]
-travis-ci = { repository = "bluejekyll/foundationdb-rs" }
 
 [dependencies]
 env_logger = "0.7.1"

@@ -12,7 +12,7 @@ Bindings to the C api for FoundationDB
 """
 
 documentation = "https://docs.rs/foundationdb-sys"
-repository = "https://github.com/bluejekyll/foundationdb-rs"
+repository = "https://github.com/Clikengo/foundationdb-rs"
 
 readme = "README.md"
 keywords = ["foundationdb", "kv"]
