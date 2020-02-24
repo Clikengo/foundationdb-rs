@@ -79,5 +79,7 @@ impl fmt::Display for FdbError {
     }
 }
 
+impl std::error::Error for FdbError {}
+
 /// Alias for `Result<..., FdbError>`
 pub type FdbResult<T> = Result<T, FdbError>;
