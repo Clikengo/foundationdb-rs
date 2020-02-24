@@ -285,6 +285,27 @@ macro_rules! impl_ix {
                     let mut arr = [0xffu8; ::std::mem::size_of::<$ix>()];
                     (&mut arr[(SZ - n)..]).copy_from_slice(bytes);
                     Ok((input, $ix::from_be_bytes(arr).wrapping_add(1)))
+                } else if found == NEGINTSTART && found <= POSINTEND {
+                    let (input, bytes) = parse_bytes(input, 1)?;
+                    let length: usize = (bytes[0] ^ 0xFF) as usize;
+                    let (input, bytes) = parse_bytes(input, length)?;
+                    let mut arr = [0u8; ::std::mem::size_of::<$ix>()];
+                    (&mut arr[(SZ - length)..]).copy_from_slice(bytes);
+                    let raw = $ix::from_be_bytes(arr);
+
+                    // one's compliment
+                    let (shift, _) = (1 as $ix).overflowing_shl((length as u32) * 8);
+                    let val = raw - shift + 1;
+
+                    Ok((input, val))
+                } else if found == POSINTEND {
+                    let (input, bytes) = parse_bytes(input, 1)?;
+                    let length: usize = bytes[0] as usize;
+                    let (input, bytes) = parse_bytes(input, length)?;
+                    let mut arr = [0u8; ::std::mem::size_of::<$ix>()];
+                    (&mut arr[(SZ - length)..]).copy_from_slice(bytes);
+                    let val = $ix::from_be_bytes(arr);
+                    Ok((input, val))
                 } else {
                     Err(PackError::BadCode {
                         found,
@@ -570,6 +591,7 @@ impl<'de> TupleUnpack<'de> for Element<'de> {
             None => return Err(PackError::MissingBytes),
             Some(byte) => byte,
         };
+
         let (mut input, mut v) = match *first {
             NIL => {
                 let (input, _) = Option::<()>::unpack(input, tuple_depth)?;
@@ -588,6 +610,14 @@ impl<'de> TupleUnpack<'de> for Element<'de> {
                 (input, Element::Tuple(v))
             }
             INTMIN..=INTMAX => {
+                let (input, v) = i64::unpack(input, tuple_depth)?;
+                (input, Element::Int(v))
+            }
+            NEGINTSTART => {
+                let (input, v) = i64::unpack(input, tuple_depth)?;
+                (input, Element::Int(v))
+            }
+            POSINTEND => {
                 let (input, v) = i64::unpack(input, tuple_depth)?;
                 (input, Element::Int(v))
             }

@@ -33,4 +33,5 @@ esac
   ./bindings/bindingtester/bindingtester.py --test-name scripted ${fdb_rs_dir:?}/target/debug/bindingtester
   ./bindings/bindingtester/bindingtester.py --num-ops 1000 --test-name api --api-version 610 ${fdb_rs_dir:?}/target/debug/bindingtester
   ./bindings/bindingtester/bindingtester.py --num-ops 1000 --concurrency 5 --test-name api --api-version 610 ${fdb_rs_dir:?}/target/debug/bindingtester
+  ./bindings/bindingtester/bindingtester.py --num-ops 1000 --concurrency 5 --test-name tuple --api-version 610 ${fdb_rs_dir:?}/target/debug/bindingtester
 )
