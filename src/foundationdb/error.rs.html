@@ -81,6 +81,8 @@
 <span id="81">81</span>
 <span id="82">82</span>
 <span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 foundationdb-rs developers, https://github.com/Clikengo/foundationdb-rs/graphs/contributors</span>
 <span class="comment">// Copyright 2013-2018 Apple, Inc and the FoundationDB project authors.</span>
@@ -162,6 +164,8 @@
         <span class="self">self</span>.<span class="ident">message</span>().<span class="ident">fmt</span>(<span class="ident">f</span>)
     }
 }
+
+<span class="kw">impl</span> <span class="ident">std</span>::<span class="ident">error</span>::<span class="ident">Error</span> <span class="kw">for</span> <span class="ident">FdbError</span> {}
 
 <span class="doccomment">/// Alias for `Result&lt;..., FdbError&gt;`</span>
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">FdbResult</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">FdbError</span><span class="op">&gt;</span>;
