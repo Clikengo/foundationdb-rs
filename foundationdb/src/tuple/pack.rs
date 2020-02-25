@@ -285,22 +285,29 @@ macro_rules! impl_ix {
                     let mut arr = [0xffu8; ::std::mem::size_of::<$ix>()];
                     (&mut arr[(SZ - n)..]).copy_from_slice(bytes);
                     Ok((input, $ix::from_be_bytes(arr).wrapping_add(1)))
-                } else if found == NEGINTSTART && found <= POSINTEND {
-                    let (input, bytes) = parse_bytes(input, 1)?;
-                    let length: usize = (bytes[0] ^ 0xFF) as usize;
+                } else if found == NEGINTSTART {
+                    let (input, raw_length) = parse_byte(input)?;
+                    let length = usize::from(raw_length ^ 0xFF);
+
+                    if (length > SZ) {
+                        return Err(PackError::BadLength);
+                    }
+
                     let (input, bytes) = parse_bytes(input, length)?;
                     let mut arr = [0u8; ::std::mem::size_of::<$ix>()];
                     (&mut arr[(SZ - length)..]).copy_from_slice(bytes);
                     let raw = $ix::from_be_bytes(arr);
-
-                    // one's compliment
-                    let (shift, _) = (1 as $ix).overflowing_shl((length as u32) * 8);
-                    let val = raw - shift + 1;
+                    let val = raw.wrapping_add(1);
 
                     Ok((input, val))
                 } else if found == POSINTEND {
-                    let (input, bytes) = parse_bytes(input, 1)?;
-                    let length: usize = bytes[0] as usize;
+                    let (input, raw_length) = parse_byte(input)?;
+                    let length: usize = usize::from(raw_length);
+
+                    if (length > SZ) {
+                        return Err(PackError::BadLength);
+                    }
+
                     let (input, bytes) = parse_bytes(input, length)?;
                     let mut arr = [0u8; ::std::mem::size_of::<$ix>()];
                     (&mut arr[(SZ - length)..]).copy_from_slice(bytes);
