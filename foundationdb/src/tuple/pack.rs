@@ -259,7 +259,7 @@ macro_rules! impl_ux {
                     let (input, raw_length) = parse_byte(input)?;
                     let n: usize = usize::from(raw_length);
                     if n > SZ {
-                        return Err(PackError::BadLength);
+                        return Err(PackError::UnsupportedIntLength);
                     }
                     Ok(unpack_px!($ux, input, n))
                 } else {
@@ -323,14 +323,14 @@ macro_rules! impl_ix {
                     let (input, raw_length) = parse_byte(input)?;
                     let n = usize::from(raw_length ^ 0xff);
                     if n > SZ {
-                        return Err(PackError::BadLength);
+                        return Err(PackError::UnsupportedIntLength);
                     }
                     Ok(unpack_nx!($ix, input, n))
                 } else if found == POSINTEND {
                     let (input, raw_length) = parse_byte(input)?;
                     let n: usize = usize::from(raw_length);
                     if n > SZ {
-                        return Err(PackError::BadLength);
+                        return Err(PackError::UnsupportedIntLength);
                     }
                     Ok(unpack_px!($ix, input, n))
                 } else {

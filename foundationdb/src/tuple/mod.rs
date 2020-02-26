@@ -76,7 +76,7 @@ pub enum PackError {
     BadPrefix,
     #[cfg(feature = "uuid")]
     BadUuid,
-    BadLength,
+    UnsupportedIntLength,
 }
 
 impl From<io::Error> for PackError {
@@ -97,7 +97,7 @@ impl Display for PackError {
             PackError::BadPrefix => write!(f, "bad prefix"),
             #[cfg(feature = "uuid")]
             PackError::BadUuid => write!(f, "bad uuid"),
-            PackError::BadLength => write!(f, "length was to large"),
+            PackError::UnsupportedIntLength => write!(f, "integer length was to large"),
         }
     }
 }
