@@ -26,9 +26,9 @@ const NIL: u8 = 0x00;
 const BYTES: u8 = 0x01;
 const STRING: u8 = 0x02;
 const NESTED: u8 = 0x05;
-// const NEGINTSTART: u8 = 0x0b;
+const NEGINTSTART: u8 = 0x0b;
 const INTZERO: u8 = 0x14;
-// const POSINTEND: u8 = 0x1d;
+const POSINTEND: u8 = 0x1d;
 const FLOAT: u8 = 0x20;
 const DOUBLE: u8 = 0x21;
 const FALSE: u8 = 0x26;
@@ -76,6 +76,7 @@ pub enum PackError {
     BadPrefix,
     #[cfg(feature = "uuid")]
     BadUuid,
+    UnsupportedIntLength,
 }
 
 impl From<io::Error> for PackError {
@@ -96,6 +97,7 @@ impl Display for PackError {
             PackError::BadPrefix => write!(f, "bad prefix"),
             #[cfg(feature = "uuid")]
             PackError::BadUuid => write!(f, "bad uuid"),
+            PackError::UnsupportedIntLength => write!(f, "integer length was to large"),
         }
     }
 }
@@ -195,8 +197,8 @@ mod tests {
     where
         T: TuplePack + TupleUnpack<'de> + fmt::Debug + PartialEq,
     {
+        assert_eq!(Bytes::from(pack(&val)), Bytes::from(buf));
         assert_eq!(unpack::<'de, T>(buf).unwrap(), val);
-        assert_eq!(pack(&val), buf);
     }
 
     #[test]
@@ -263,6 +265,46 @@ mod tests {
             b"\x1C\x80\x00\x00\x00\x00\x00\x00\x00",
         );
         test_serde(u64::max_value(), b"\x1C\xff\xff\xff\xff\xff\xff\xff\xff");
+        test_serde(
+            u128::max_value(),
+            b"\x1D\x10\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff",
+        );
+        test_serde(
+            u64::max_value() as u128 + 1,
+            b"\x1D\x09\x01\x00\x00\x00\x00\x00\x00\x00\x00",
+        );
+        test_serde(
+            u64::max_value() as i128 + 1,
+            b"\x1D\x09\x01\x00\x00\x00\x00\x00\x00\x00\x00",
+        );
+        test_serde(
+            i64::min_value() as i128 + 1,
+            b"\x0C\x80\x00\x00\x00\x00\x00\x00\x00",
+        );
+        test_serde(
+            i64::min_value() as i128 - 1,
+            b"\x0C\x7f\xff\xff\xff\xff\xff\xff\xfe",
+        );
+        test_serde(
+            -(u64::max_value() as i128),
+            b"\x0C\x00\x00\x00\x00\x00\x00\x00\x00",
+        );
+        test_serde(
+            -(u64::max_value() as i128) - 1,
+            b"\x0b\xf6\xfe\xff\xff\xff\xff\xff\xff\xff\xff",
+        );
+        test_serde(
+            -(u64::max_value() as i128) - 2,
+            b"\x0b\xf6\xfe\xff\xff\xff\xff\xff\xff\xff\xfe",
+        );
+        test_serde(
+            (u64::max_value() as i128) * -2,
+            b"\x0b\xf6\xfe\x00\x00\x00\x00\x00\x00\x00\x01",
+        );
+        test_serde(
+            (u64::max_value() as i128) * 2,
+            b"\x1d\x09\x01\xff\xff\xff\xff\xff\xff\xff\xfe",
+        );
         test_serde(-4294967295i64, b"\x10\x00\x00\x00\x00");
         test_serde(
             i64::min_value() + 2,

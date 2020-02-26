@@ -207,8 +207,28 @@ macro_rules! sign_bit {
     };
 }
 
+macro_rules! unpack_px {
+    ($ux: ident, $input: expr, $n: expr) => {{
+        let (input, bytes) = parse_bytes($input, $n)?;
+        let mut arr = [0u8; ::std::mem::size_of::<$ux>()];
+        (&mut arr[(::std::mem::size_of::<$ux>() - $n)..]).copy_from_slice(bytes);
+        (input, $ux::from_be_bytes(arr))
+    }};
+}
+macro_rules! unpack_nx {
+    ($ix: ident, $input: expr, $n: expr) => {{
+        let (input, bytes) = parse_bytes($input, $n)?;
+        let mut arr = [0xffu8; ::std::mem::size_of::<$ix>()];
+        (&mut arr[(::std::mem::size_of::<$ix>() - $n)..]).copy_from_slice(bytes);
+        (input, $ix::from_be_bytes(arr).wrapping_add(1))
+    }};
+}
+
 macro_rules! impl_ux {
     ($ux: ident) => {
+        impl_ux!($ux, mem::size_of::<$ux>());
+    };
+    ($ux: ident, $max_sz:expr) => {
         impl TuplePack for $ux {
             fn pack<W: io::Write>(
                 &self,
@@ -218,7 +238,11 @@ macro_rules! impl_ux {
                 const SZ: usize = mem::size_of::<$ux>();
                 let u = *self;
                 let n = SZ - (u.leading_zeros() as usize) / 8;
-                w.write_all(&[INTZERO + n as u8])?;
+                if SZ <= 8 || n <= 8 {
+                    w.write_all(&[INTZERO + n as u8])?;
+                } else {
+                    w.write_all(&[POSINTEND, n as u8])?;
+                }
                 w.write_all(&u.to_be_bytes()[SZ - n..])?;
                 Ok(())
             }
@@ -228,12 +252,16 @@ macro_rules! impl_ux {
             fn unpack(input: &[u8], _tuple_depth: TupleDepth) -> PackResult<(&[u8], Self)> {
                 const SZ: usize = mem::size_of::<$ux>();
                 let (input, found) = parse_byte(input)?;
-                if INTZERO <= found && found <= INTZERO + SZ as u8 {
+                if INTZERO <= found && found <= INTZERO + $max_sz as u8 {
                     let n = (found - INTZERO) as usize;
-                    let (input, bytes) = parse_bytes(input, n)?;
-                    let mut arr = [0u8; ::std::mem::size_of::<$ux>()];
-                    (&mut arr[(SZ - n)..]).copy_from_slice(bytes);
-                    Ok((input, $ux::from_be_bytes(arr)))
+                    Ok(unpack_px!($ux, input, n))
+                } else if found == POSINTEND {
+                    let (input, raw_length) = parse_byte(input)?;
+                    let n: usize = usize::from(raw_length);
+                    if n > SZ {
+                        return Err(PackError::UnsupportedIntLength);
+                    }
+                    Ok(unpack_px!($ux, input, n))
                 } else {
                     Err(PackError::BadCode {
                         found,
@@ -247,6 +275,9 @@ macro_rules! impl_ux {
 
 macro_rules! impl_ix {
     ($ix: ident, $ux: ident) => {
+        impl_ix!($ix, $ux, mem::size_of::<$ix>());
+    };
+    ($ix: ident, $ux: ident, $max_sz:expr) => {
         impl TuplePack for $ix {
             fn pack<W: io::Write>(
                 &self,
@@ -257,12 +288,21 @@ macro_rules! impl_ix {
                 let i = *self;
                 let u = self.wrapping_abs() as $ux;
                 let n = SZ - (u.leading_zeros() as usize) / 8;
-                let (code, arr) = if i >= 0 {
-                    (INTZERO + n as u8, u.to_be_bytes())
+                let arr = if i >= 0 {
+                    if SZ <= 8 || n <= 8 {
+                        w.write_all(&[INTZERO + n as u8])?;
+                    } else {
+                        w.write_all(&[POSINTEND, n as u8])?;
+                    }
+                    (u.to_be_bytes())
                 } else {
-                    (INTZERO - n as u8, i.wrapping_sub(1).to_be_bytes())
+                    if SZ <= 8 || n <= 8 {
+                        w.write_all(&[INTZERO - n as u8])?;
+                    } else {
+                        w.write_all(&[NEGINTSTART, n as u8 ^ 0xff])?;
+                    }
+                    (i.wrapping_sub(1).to_be_bytes())
                 };
-                w.write_all(&[code])?;
                 w.write_all(&arr[SZ - n..])?;
 
                 Ok(())
@@ -273,18 +313,26 @@ macro_rules! impl_ix {
             fn unpack(input: &[u8], _tuple_depth: TupleDepth) -> PackResult<(&[u8], Self)> {
                 const SZ: usize = mem::size_of::<$ix>();
                 let (input, found) = parse_byte(input)?;
-                if INTZERO <= found && found <= INTZERO + SZ as u8 {
+                if INTZERO <= found && found <= INTZERO + $max_sz as u8 {
                     let n = (found - INTZERO) as usize;
-                    let (input, bytes) = parse_bytes(input, n)?;
-                    let mut arr = [0u8; ::std::mem::size_of::<$ix>()];
-                    (&mut arr[(SZ - n)..]).copy_from_slice(bytes);
-                    Ok((input, $ix::from_be_bytes(arr)))
-                } else if INTZERO - SZ as u8 <= found && found < INTZERO {
+                    Ok(unpack_px!($ix, input, n))
+                } else if INTZERO - $max_sz as u8 <= found && found < INTZERO {
                     let n = (INTZERO - found) as usize;
-                    let (input, bytes) = parse_bytes(input, n)?;
-                    let mut arr = [0xffu8; ::std::mem::size_of::<$ix>()];
-                    (&mut arr[(SZ - n)..]).copy_from_slice(bytes);
-                    Ok((input, $ix::from_be_bytes(arr).wrapping_add(1)))
+                    Ok(unpack_nx!($ix, input, n))
+                } else if found == NEGINTSTART {
+                    let (input, raw_length) = parse_byte(input)?;
+                    let n = usize::from(raw_length ^ 0xff);
+                    if n > SZ {
+                        return Err(PackError::UnsupportedIntLength);
+                    }
+                    Ok(unpack_nx!($ix, input, n))
+                } else if found == POSINTEND {
+                    let (input, raw_length) = parse_byte(input)?;
+                    let n: usize = usize::from(raw_length);
+                    if n > SZ {
+                        return Err(PackError::UnsupportedIntLength);
+                    }
+                    Ok(unpack_px!($ix, input, n))
                 } else {
                     Err(PackError::BadCode {
                         found,
@@ -343,12 +391,14 @@ macro_rules! impl_fx {
 impl_ux!(u16);
 impl_ux!(u32);
 impl_ux!(u64);
+impl_ux!(u128, 8);
 impl_ux!(usize);
 
 //impl_ix!(i8, u8);
 impl_ix!(i16, u16);
 impl_ix!(i32, u32);
 impl_ix!(i64, u64);
+impl_ix!(i128, u128, 8);
 impl_ix!(isize, usize);
 
 impl_fx!(f32, parse_u32, u32, FLOAT);
@@ -570,6 +620,7 @@ impl<'de> TupleUnpack<'de> for Element<'de> {
             None => return Err(PackError::MissingBytes),
             Some(byte) => byte,
         };
+
         let (mut input, mut v) = match *first {
             NIL => {
                 let (input, _) = Option::<()>::unpack(input, tuple_depth)?;
@@ -588,6 +639,14 @@ impl<'de> TupleUnpack<'de> for Element<'de> {
                 (input, Element::Tuple(v))
             }
             INTMIN..=INTMAX => {
+                let (input, v) = i64::unpack(input, tuple_depth)?;
+                (input, Element::Int(v))
+            }
+            NEGINTSTART => {
+                let (input, v) = i64::unpack(input, tuple_depth)?;
+                (input, Element::Int(v))
+            }
+            POSINTEND => {
                 let (input, v) = i64::unpack(input, tuple_depth)?;
                 (input, Element::Int(v))
             }
