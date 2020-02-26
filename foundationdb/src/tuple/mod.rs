@@ -197,8 +197,8 @@ mod tests {
     where
         T: TuplePack + TupleUnpack<'de> + fmt::Debug + PartialEq,
     {
+        assert_eq!(Bytes::from(pack(&val)), Bytes::from(buf));
         assert_eq!(unpack::<'de, T>(buf).unwrap(), val);
-        assert_eq!(pack(&val), buf);
     }
 
     #[test]
@@ -265,6 +265,46 @@ mod tests {
             b"\x1C\x80\x00\x00\x00\x00\x00\x00\x00",
         );
         test_serde(u64::max_value(), b"\x1C\xff\xff\xff\xff\xff\xff\xff\xff");
+        test_serde(
+            u128::max_value(),
+            b"\x1D\x10\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff",
+        );
+        test_serde(
+            u64::max_value() as u128 + 1,
+            b"\x1D\x09\x01\x00\x00\x00\x00\x00\x00\x00\x00",
+        );
+        test_serde(
+            u64::max_value() as i128 + 1,
+            b"\x1D\x09\x01\x00\x00\x00\x00\x00\x00\x00\x00",
+        );
+        test_serde(
+            i64::min_value() as i128 + 1,
+            b"\x0C\x80\x00\x00\x00\x00\x00\x00\x00",
+        );
+        test_serde(
+            i64::min_value() as i128 - 1,
+            b"\x0C\x7f\xff\xff\xff\xff\xff\xff\xfe",
+        );
+        test_serde(
+            -(u64::max_value() as i128),
+            b"\x0C\x00\x00\x00\x00\x00\x00\x00\x00",
+        );
+        test_serde(
+            -(u64::max_value() as i128) - 1,
+            b"\x0b\xf6\xfe\xff\xff\xff\xff\xff\xff\xff\xff",
+        );
+        test_serde(
+            -(u64::max_value() as i128) - 2,
+            b"\x0b\xf6\xfe\xff\xff\xff\xff\xff\xff\xff\xfe",
+        );
+        test_serde(
+            (u64::max_value() as i128) * -2,
+            b"\x0b\xf6\xfe\x00\x00\x00\x00\x00\x00\x00\x01",
+        );
+        test_serde(
+            (u64::max_value() as i128) * 2,
+            b"\x1d\x09\x01\xff\xff\xff\xff\xff\xff\xff\xfe",
+        );
         test_serde(-4294967295i64, b"\x10\x00\x00\x00\x00");
         test_serde(
             i64::min_value() + 2,
