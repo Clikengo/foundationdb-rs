@@ -6,7 +6,7 @@ fdb_rs_dir=$(pwd)
 bindingtester="${fdb_rs_dir:?}/$1"
 case $(uname) in
   Darwin)
-    brew install mono
+#    brew install mono
   ;;
   Linux)
     sudo apt update
@@ -22,7 +22,7 @@ esac
   cd ${fdb_builddir:?}
 
   ## Get foundationdb source
-  git clone --depth 1 https://github.com/apple/foundationdb.git -b release-6.1
+#  git clone --depth 1 https://github.com/apple/foundationdb.git -b release-6.1
   cd foundationdb
   git checkout release-6.1
 
