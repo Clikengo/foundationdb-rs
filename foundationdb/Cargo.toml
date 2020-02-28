@@ -45,6 +45,7 @@ memchr = "2.2.1"
 rand = "0.7.2"
 static_assertions = "1.1.0"
 uuid = { version = "0.8.1", optional = true }
+num-bigint = { version = "0.2.6", optional = true }
 
 [dev-dependencies]
 byteorder = "1.3.2"

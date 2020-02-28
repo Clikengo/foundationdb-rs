@@ -201,6 +201,8 @@ tuple_impls! {
     (0 T0 t0 1 T1 t1 2 T2 t2 3 T3 t3 4 T4 t4 5 T5 t5 6 T6 t6 7 T7 t7 8 T8 t8 9 T9 t9 10 T10 t10 11 T11 t11)
 }
 
+const MAX_SZ: usize = 8;
+
 macro_rules! sign_bit {
     ($type:ident) => {
         (1 << (mem::size_of::<$type>() * 8 - 1))
@@ -238,7 +240,7 @@ macro_rules! impl_ux {
                 const SZ: usize = mem::size_of::<$ux>();
                 let u = *self;
                 let n = SZ - (u.leading_zeros() as usize) / 8;
-                if SZ <= 8 || n <= 8 {
+                if SZ <= MAX_SZ || n <= MAX_SZ {
                     w.write_all(&[INTZERO + n as u8])?;
                 } else {
                     w.write_all(&[POSINTEND, n as u8])?;
@@ -289,14 +291,14 @@ macro_rules! impl_ix {
                 let u = self.wrapping_abs() as $ux;
                 let n = SZ - (u.leading_zeros() as usize) / 8;
                 let arr = if i >= 0 {
-                    if SZ <= 8 || n <= 8 {
+                    if SZ <= MAX_SZ || n <= MAX_SZ {
                         w.write_all(&[INTZERO + n as u8])?;
                     } else {
                         w.write_all(&[POSINTEND, n as u8])?;
                     }
                     (u.to_be_bytes())
                 } else {
-                    if SZ <= 8 || n <= 8 {
+                    if SZ <= MAX_SZ || n <= MAX_SZ {
                         w.write_all(&[INTZERO - n as u8])?;
                     } else {
                         w.write_all(&[NEGINTSTART, n as u8 ^ 0xff])?;
@@ -391,18 +393,150 @@ macro_rules! impl_fx {
 impl_ux!(u16);
 impl_ux!(u32);
 impl_ux!(u64);
-impl_ux!(u128, 8);
+impl_ux!(u128, MAX_SZ);
 impl_ux!(usize);
 
 //impl_ix!(i8, u8);
 impl_ix!(i16, u16);
 impl_ix!(i32, u32);
 impl_ix!(i64, u64);
-impl_ix!(i128, u128, 8);
+impl_ix!(i128, u128, MAX_SZ);
 impl_ix!(isize, usize);
 
 impl_fx!(f32, parse_u32, u32, FLOAT);
 impl_fx!(f64, parse_u64, u64, DOUBLE);
+
+#[cfg(feature = "num-bigint")]
+mod bigint {
+    use super::*;
+    use num_bigint::{BigInt, BigUint, Sign};
+    use std::convert::TryFrom;
+
+    fn invert(bytes: &mut [u8]) {
+        // The ones' complement of a binary number is defined as the value
+        // obtained by inverting all the bits in the binary representation
+        // of the number (swapping 0s for 1s and vice versa).
+        for byte in bytes.iter_mut() {
+            *byte = !*byte;
+        }
+    }
+
+    fn inverted(bytes: &[u8]) -> Vec<u8> {
+        // The ones' complement of a binary number is defined as the value
+        // obtained by inverting all the bits in the binary representation
+        // of the number (swapping 0s for 1s and vice versa).
+        bytes.iter().map(|byte| !*byte).collect()
+    }
+
+    impl TuplePack for BigInt {
+        fn pack<W: io::Write>(&self, w: &mut W, _tuple_depth: TupleDepth) -> std::io::Result<()> {
+            if self.sign() == Sign::NoSign {
+                return w.write_all(&[INTZERO]);
+            }
+            let (sign, mut bytes) = self.to_bytes_be();
+            let n = bytes.len();
+            match sign {
+                Sign::Minus => {
+                    if n <= MAX_SZ {
+                        w.write_all(&[INTZERO - n as u8])?;
+                    } else {
+                        w.write_all(&[NEGINTSTART, n as u8 ^ 0xff])?;
+                    }
+                    invert(&mut bytes);
+                    w.write_all(&bytes)?;
+                }
+                Sign::NoSign => unreachable!(),
+                Sign::Plus => {
+                    if n <= MAX_SZ {
+                        w.write_all(&[INTZERO + n as u8])?;
+                    } else {
+                        w.write_all(&[POSINTEND, n as u8])?;
+                    }
+                    w.write_all(&bytes)?;
+                }
+            };
+
+            Ok(())
+        }
+    }
+
+    impl<'de> TupleUnpack<'de> for BigInt {
+        fn unpack(input: &[u8], _tuple_depth: TupleDepth) -> PackResult<(&[u8], Self)> {
+            let (input, found) = parse_byte(input)?;
+            if INTZERO <= found && found <= INTZERO + MAX_SZ as u8 {
+                let n = (found - INTZERO) as usize;
+                let (input, bytes) = parse_bytes(input, n)?;
+                Ok((input, Self::from_bytes_be(Sign::Plus, bytes)))
+            } else if INTZERO - MAX_SZ as u8 <= found && found < INTZERO {
+                let n = (INTZERO - found) as usize;
+                let (input, bytes) = parse_bytes(input, n)?;
+                Ok((input, Self::from_bytes_be(Sign::Minus, &inverted(bytes))))
+            } else if found == NEGINTSTART {
+                let (input, raw_length) = parse_byte(input)?;
+                let n = usize::from(raw_length ^ 0xff);
+                let (input, bytes) = parse_bytes(input, n)?;
+                Ok((input, Self::from_bytes_be(Sign::Minus, &inverted(bytes))))
+            } else if found == POSINTEND {
+                let (input, raw_length) = parse_byte(input)?;
+                let n: usize = usize::from(raw_length);
+                let (input, bytes) = parse_bytes(input, n)?;
+                Ok((input, Self::from_bytes_be(Sign::Plus, bytes)))
+            } else {
+                Err(PackError::BadCode {
+                    found,
+                    expected: None,
+                })
+            }
+        }
+    }
+
+    impl TuplePack for BigUint {
+        fn pack<W: io::Write>(&self, w: &mut W, _tuple_depth: TupleDepth) -> std::io::Result<()> {
+            let n = self.bits();
+            if n == 0 {
+                return w.write_all(&[INTZERO]);
+            }
+            let bytes = self.to_bytes_be();
+            let n = bytes.len();
+            if n <= MAX_SZ {
+                w.write_all(&[INTZERO + n as u8])?;
+            } else {
+                w.write_all(&[
+                    POSINTEND,
+                    u8::try_from(n).map_err(|_| {
+                        std::io::Error::new(
+                            std::io::ErrorKind::InvalidInput,
+                            "BigUint requires more than 255 bytes to be represented",
+                        )
+                    })?,
+                ])?;
+            }
+            w.write_all(&bytes)?;
+            Ok(())
+        }
+    }
+
+    impl<'de> TupleUnpack<'de> for BigUint {
+        fn unpack(input: &[u8], _tuple_depth: TupleDepth) -> PackResult<(&[u8], Self)> {
+            let (input, found) = parse_byte(input)?;
+            if INTZERO <= found && found <= INTZERO + MAX_SZ as u8 {
+                let n = (found - INTZERO) as usize;
+                let (input, bytes) = parse_bytes(input, n)?;
+                Ok((input, Self::from_bytes_be(bytes)))
+            } else if found == POSINTEND {
+                let (input, raw_length) = parse_byte(input)?;
+                let n: usize = usize::from(raw_length);
+                let (input, bytes) = parse_bytes(input, n)?;
+                Ok((input, Self::from_bytes_be(bytes)))
+            } else {
+                Err(PackError::BadCode {
+                    found,
+                    expected: None,
+                })
+            }
+        }
+    }
+}
 
 impl TuplePack for bool {
     fn pack<W: io::Write>(&self, w: &mut W, _tuple_depth: TupleDepth) -> std::io::Result<()> {
