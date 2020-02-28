@@ -40,7 +40,7 @@ foundationdb-gen = { version = "0.5.0", path = "../foundationdb-gen", default-fe
 
 [dependencies]
 foundationdb-sys = { version = "0.5.0", path = "../foundationdb-sys", default-features = false }
-futures = "0.3.0"
+futures = "0.3.1"
 memchr = "2.2.1"
 rand = "0.7.2"
 static_assertions = "1.1.0"

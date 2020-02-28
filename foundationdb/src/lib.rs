@@ -104,12 +104,7 @@ pub use crate::error::FdbResult;
 pub use crate::keyselector::*;
 pub use crate::transaction::*;
 
-/// Initialize the FoundationDB Client API, this can only be called once per process.
-///
-/// # Returns
-///
-/// `Network` which must be run before the Client is ready. `Network::run` will not return until the
-///   network is stopped with the associated `Network::stop` and should be run in a separate thread.
+/// Execute `f` with the FoundationDB Client API ready, this can only be called once per process.
 ///
 /// # Examples
 ///
@@ -123,6 +118,28 @@ pub fn boot<T>(f: impl (FnOnce() -> T) + std::panic::UnwindSafe) -> T {
         .build()
         .expect("foundationdb API to be initialized")
         .boot(f)
+        .expect("foundationdb network to be setup")
+}
+
+/// Async execute `f` with the FoundationDB Client API ready, this can only be called once per process.
+///
+/// # Examples
+///
+/// ```rust
+/// foundationdb::boot_async(|| async {
+///     // do some interesting things with the API...
+/// });
+/// ```
+pub async fn boot_async<F, Fut, T>(f: F) -> T
+where
+    F: (FnOnce() -> Fut) + std::panic::UnwindSafe,
+    Fut: std::future::Future<Output = T> + std::panic::UnwindSafe,
+{
+    api::FdbApiBuilder::default()
+        .build()
+        .expect("foundationdb API to be initialized")
+        .boot_async(f)
+        .await
         .expect("foundationdb network to be setup")
 }
 

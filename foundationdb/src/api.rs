@@ -18,6 +18,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 
+use futures::prelude::*;
+
 use crate::options::NetworkOption;
 use crate::{error, FdbResult};
 use foundationdb_sys as fdb_sys;
@@ -142,7 +144,18 @@ impl NetworkBuilder {
         Ok((NetworkRunner { cond: cond.clone() }, NetworkWait { cond }))
     }
 
-    /// Finalizes the initialization of the Network and starts it in a new thread
+    /// Execute `f` with the FoundationDB Client API ready, this can only be called once per process.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use foundationdb::api::FdbApiBuilder;
+    ///
+    /// let network_builder = FdbApiBuilder::default().build().expect("fdb api initialized");
+    /// network_builder.boot(|| {
+    ///     // do some interesting things with the API...
+    /// });
+    /// ```
     pub fn boot<T>(self, f: impl (FnOnce() -> T) + panic::UnwindSafe) -> FdbResult<T> {
         let (runner, cond) = self.build()?;
 
@@ -153,6 +166,50 @@ impl NetworkBuilder {
         let network = cond.wait();
 
         let res = panic::catch_unwind(f);
+
+        if let Err(err) = network.stop() {
+            eprintln!("failed to stop network: {}", err);
+            // Not aborting can probably cause undefined behavior
+            std::process::abort();
+        }
+        net_thread.join().expect("failed to join fdb thread");
+
+        match res {
+            Err(payload) => panic::resume_unwind(payload),
+            Ok(v) => Ok(v),
+        }
+    }
+
+    /// Async execute `f` with the FoundationDB Client API ready, this can only be called once per process.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use foundationdb::api::FdbApiBuilder;
+    ///
+    /// let network_builder = FdbApiBuilder::default().build().expect("fdb api initialized");
+    /// network_builder.boot_async(|| async {
+    ///     // do some interesting things with the API...
+    /// });
+    /// ```
+    pub async fn boot_async<F, Fut, T>(self, f: F) -> FdbResult<T>
+    where
+        F: (FnOnce() -> Fut) + panic::UnwindSafe,
+        Fut: Future<Output = T> + panic::UnwindSafe,
+    {
+        let (runner, cond) = self.build()?;
+
+        let net_thread = thread::spawn(move || {
+            unsafe { runner.run() }.expect("failed to run");
+        });
+
+        let network = cond.wait();
+
+        let res = panic::catch_unwind(f);
+        let res = match res {
+            Ok(fut) => fut.catch_unwind().await,
+            Err(err) => Err(err),
+        };
 
         if let Err(err) = network.stop() {
             eprintln!("failed to stop network: {}", err);
