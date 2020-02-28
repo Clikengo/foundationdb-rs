@@ -1498,24 +1498,23 @@ fn main() {
         "Starting rust bindingtester with api_version {}",
         api_version
     );
-    let network = api::FdbApiBuilder::default()
+    api::FdbApiBuilder::default()
         .set_runtime_version(api_version)
         .build()
         .expect("failed to initialize FoundationDB API")
-        .boot()
+        .boot(|| {
+            let db = Arc::new(
+                futures::executor::block_on(fdb::Database::new_compat(cluster_path))
+                    .expect("failed to get database"),
+            );
+
+            let mut sm = StackMachine::new(&db, Bytes::from(prefix.to_owned().into_bytes()));
+            futures::executor::block_on(sm.run(db)).unwrap();
+            sm.join();
+
+            info!("Closing...");
+        })
         .expect("failed to initialize FoundationDB network thread");
-
-    let db = Arc::new(
-        futures::executor::block_on(fdb::Database::new_compat(cluster_path))
-            .expect("failed to get database"),
-    );
-
-    let mut sm = StackMachine::new(&db, Bytes::from(prefix.to_owned().into_bytes()));
-    futures::executor::block_on(sm.run(db)).unwrap();
-    sm.join();
-
-    info!("Closing...");
-    drop(network);
 
     info!("Done.");
 }

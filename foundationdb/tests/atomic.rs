@@ -10,6 +10,11 @@ use futures::future::*;
 
 mod common;
 
+#[test]
+fn test_atomic() {
+    boot(|| futures::executor::block_on(test_atomic_async()).expect("failed to run"));
+}
+
 async fn atomic_add(db: &Database, key: &[u8], value: i64) -> FdbResult<()> {
     let trx = db.create_trx()?;
 
@@ -57,10 +62,4 @@ async fn test_atomic_async() -> FdbResult<()> {
         }
     }
     Ok(())
-}
-
-#[test]
-fn test_atomic() {
-    common::boot();
-    futures::executor::block_on(test_atomic_async()).expect("failed to run");
 }

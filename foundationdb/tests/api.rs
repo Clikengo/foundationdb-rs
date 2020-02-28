@@ -11,7 +11,7 @@ fn test_run() {
         .expect("could not initialize network");
 
     let net_thread = thread::spawn(move || {
-        runner.run().expect("failed to run");
+        unsafe { runner.run() }.expect("failed to run");
     });
     let stopper = cond.wait();
     stopper.stop().expect("failed to stop");

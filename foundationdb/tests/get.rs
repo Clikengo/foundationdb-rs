@@ -12,10 +12,20 @@ use std::sync::{atomic::*, Arc};
 mod common;
 
 #[test]
-fn test_set_get() {
-    common::boot();
-    futures::executor::block_on(test_set_get_async()).expect("failed to run")
+fn test_get() {
+    boot(|| {
+        futures::executor::block_on(test_set_get_async()).expect("failed to run");
+        futures::executor::block_on(test_get_multi_async()).expect("failed to run");
+        futures::executor::block_on(test_set_conflict_async()).expect("failed to run");
+        futures::executor::block_on(test_set_conflict_snapshot_async()).expect("failed to run");
+        futures::executor::block_on(test_transact_async()).expect("failed to run");
+        futures::executor::block_on(test_versionstamp_async()).expect("failed to run");
+        futures::executor::block_on(test_read_version_async()).expect("failed to run");
+        futures::executor::block_on(test_set_read_version_async()).expect("failed to run");
+        futures::executor::block_on(test_get_addresses_for_key_async()).expect("failed to run");
+    });
 }
+
 async fn test_set_get_async() -> FdbResult<()> {
     let db = common::database().await?;
 
@@ -36,11 +46,6 @@ async fn test_set_get_async() -> FdbResult<()> {
     Ok(())
 }
 
-#[test]
-fn test_get_multi() {
-    common::boot();
-    futures::executor::block_on(test_get_multi_async()).expect("failed to run")
-}
 async fn test_get_multi_async() -> FdbResult<()> {
     let db = common::database().await?;
 
@@ -51,11 +56,6 @@ async fn test_get_multi_async() -> FdbResult<()> {
     Ok(())
 }
 
-#[test]
-fn test_set_conflict() {
-    common::boot();
-    futures::executor::block_on(test_set_conflict_async()).expect("failed to run")
-}
 async fn test_set_conflict_async() -> FdbResult<()> {
     let key = b"test_set_conflict";
     let db = common::database().await?;
@@ -90,11 +90,7 @@ async fn test_set_conflict_async() -> FdbResult<()> {
 
     Ok(())
 }
-#[test]
-fn test_set_conflict_snapshot() {
-    common::boot();
-    futures::executor::block_on(test_set_conflict_snapshot_async()).expect("failed to run")
-}
+
 async fn test_set_conflict_snapshot_async() -> FdbResult<()> {
     let key = b"test_set_conflict_snapshot";
     let db = common::database().await?;
@@ -126,11 +122,7 @@ async fn make_dirty(db: &Database, key: &[u8]) -> FdbResult<()> {
 
     Ok(())
 }
-#[test]
-fn test_transact() {
-    common::boot();
-    futures::executor::block_on(test_transact_async()).expect("failed to run")
-}
+
 async fn test_transact_async() -> FdbResult<()> {
     const KEY: &[u8] = b"test_transact";
     const RETRY_COUNT: usize = 5;
@@ -174,11 +166,7 @@ async fn test_transact_async() -> FdbResult<()> {
 
     Ok(())
 }
-#[test]
-fn test_versionstamp() {
-    common::boot();
-    futures::executor::block_on(test_versionstamp_async()).expect("failed to run")
-}
+
 async fn test_versionstamp_async() -> FdbResult<()> {
     const KEY: &[u8] = b"test_versionstamp";
     let db = common::database().await?;
@@ -192,11 +180,6 @@ async fn test_versionstamp_async() -> FdbResult<()> {
     Ok(())
 }
 
-#[test]
-fn test_read_version() {
-    common::boot();
-    futures::executor::block_on(test_read_version_async()).expect("failed to run")
-}
 async fn test_read_version_async() -> FdbResult<()> {
     let db = common::database().await?;
 
@@ -206,11 +189,6 @@ async fn test_read_version_async() -> FdbResult<()> {
     Ok(())
 }
 
-#[test]
-fn test_set_read_version() {
-    common::boot();
-    futures::executor::block_on(test_set_read_version_async()).expect("failed to run")
-}
 async fn test_set_read_version_async() -> FdbResult<()> {
     const KEY: &[u8] = b"test_set_read_version";
     let db = common::database().await?;
@@ -222,11 +200,6 @@ async fn test_set_read_version_async() -> FdbResult<()> {
     Ok(())
 }
 
-#[test]
-fn test_get_addresses_for_key() {
-    common::boot();
-    futures::executor::block_on(test_get_addresses_for_key_async()).expect("failed to run")
-}
 async fn test_get_addresses_for_key_async() -> FdbResult<()> {
     const KEY: &[u8] = b"test_get_addresses_for_key";
 

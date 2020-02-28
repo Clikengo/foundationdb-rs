@@ -1,5 +1,4 @@
 use foundationdb as fdb;
-use lazy_static::lazy_static;
 
 /// generate random string. Foundationdb watch only fires when value changed, so updating with same
 /// value twice will not fire watches. To make examples work over multiple run, we use random
@@ -14,15 +13,6 @@ pub fn random_str(len: usize) -> String {
         .take(len)
         .map(|()| rng.sample(Alphanumeric))
         .collect::<String>()
-}
-
-lazy_static! {
-    static ref ENV: fdb::api::NetworkAutoStop = fdb::boot().expect("fdb boot failed");
-}
-
-#[allow(unused)]
-pub fn boot() {
-    let _end = &*ENV;
 }
 
 #[allow(unused)]
