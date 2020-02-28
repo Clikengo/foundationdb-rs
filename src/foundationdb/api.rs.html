@@ -224,6 +224,28 @@
 <span id="224">224</span>
 <span id="225">225</span>
 <span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
+<span id="233">233</span>
+<span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
+<span id="244">244</span>
+<span id="245">245</span>
+<span id="246">246</span>
+<span id="247">247</span>
+<span id="248">248</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 foundationdb-rs developers, https://github.com/Clikengo/foundationdb-rs/graphs/contributors</span>
 <span class="comment">// Copyright 2013-2018 Apple, Inc and the FoundationDB project authors.</span>
@@ -240,6 +262,7 @@
 <span class="doccomment">//! - [API versioning](https://apple.github.io/foundationdb/api-c.html#api-versioning)</span>
 <span class="doccomment">//! - [Network](https://apple.github.io/foundationdb/api-c.html#network)</span>
 
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">panic</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">Ordering</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::{<span class="ident">Arc</span>, <span class="ident">Condvar</span>, <span class="ident">Mutex</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">thread</span>;
@@ -316,7 +339,7 @@
 <span class="doccomment">/// use foundationdb::api::FdbApiBuilder;</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// let network_builder = FdbApiBuilder::default().build().expect(&quot;fdb api initialized&quot;);</span>
-<span class="doccomment">/// let network_stop_if_dropped = network_builder.boot(|| {</span>
+<span class="doccomment">/// network_builder.boot(|| {</span>
 <span class="doccomment">///     // do some work with foundationDB</span>
 <span class="doccomment">/// }).expect(&quot;fdb network to run&quot;);</span>
 <span class="doccomment">/// ```</span>
@@ -333,6 +356,13 @@
 
     <span class="doccomment">/// Finalizes the initialization of the Network</span>
     <span class="doccomment">///</span>
+    <span class="doccomment">/// It&#39;s not recommended to use this method unless you really know what you are doing.</span>
+    <span class="doccomment">/// Otherwise, the `boot` method is the **safe** and easiest way to do it.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// In order to start the network you have to call the unsafe `NetworkRunner::run()` method.</span>
+    <span class="doccomment">/// This method stats the foundationdb network runloop, once started, the `NetworkStop::stop()`</span>
+    <span class="doccomment">/// method **MUST** be called before the process exit. Aborting the process is still safe.</span>
+    <span class="doccomment">///</span>
     <span class="doccomment">/// ```</span>
     <span class="doccomment">/// use foundationdb::api::FdbApiBuilder;</span>
     <span class="doccomment">///</span>
@@ -346,7 +376,8 @@
     <span class="doccomment">/// // Wait for the foundationDB network thread to start</span>
     <span class="doccomment">/// let fdb_network = cond.wait();</span>
     <span class="doccomment">///</span>
-    <span class="doccomment">/// // do some work with foundationDB</span>
+    <span class="doccomment">/// // do some work with foundationDB, if a panic occur you still **MUST** catch it and call</span>
+    <span class="doccomment">/// // fdb_network.stop();</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// // You **MUST** call fdb_network.stop() before the process exit</span>
     <span class="doccomment">/// fdb_network.stop().expect(&quot;failed to stop network&quot;);</span>
@@ -361,7 +392,7 @@
     }
 
     <span class="doccomment">/// Finalizes the initialization of the Network and starts it in a new thread</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">boot</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="self">self</span>, <span class="ident">f</span>: <span class="kw">impl</span> <span class="ident">FnOnce</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">FdbResult</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">boot</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="self">self</span>, <span class="ident">f</span>: <span class="kw">impl</span> (<span class="ident">FnOnce</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">T</span>) <span class="op">+</span> <span class="ident">panic</span>::<span class="ident">UnwindSafe</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">FdbResult</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
         <span class="kw">let</span> (<span class="ident">runner</span>, <span class="ident">cond</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">build</span>()<span class="question-mark">?</span>;
 
         <span class="kw">let</span> <span class="ident">net_thread</span> <span class="op">=</span> <span class="ident">thread</span>::<span class="ident">spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
@@ -370,16 +401,25 @@
 
         <span class="kw">let</span> <span class="ident">network</span> <span class="op">=</span> <span class="ident">cond</span>.<span class="ident">wait</span>();
 
-        <span class="kw">let</span> <span class="ident">v</span> <span class="op">=</span> <span class="ident">f</span>();
+        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">panic</span>::<span class="ident">catch_unwind</span>(<span class="ident">f</span>);
 
-        <span class="ident">network</span>.<span class="ident">stop</span>().<span class="ident">expect</span>(<span class="string">&quot;failed to stop network&quot;</span>);
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span> <span class="ident">network</span>.<span class="ident">stop</span>() {
+            <span class="macro">eprintln</span><span class="macro">!</span>(<span class="string">&quot;failed to stop network: {}&quot;</span>, <span class="ident">err</span>);
+            <span class="comment">// Not aborting can probably cause undefined behavior</span>
+            <span class="ident">std</span>::<span class="ident">process</span>::<span class="ident">abort</span>();
+        }
         <span class="ident">net_thread</span>.<span class="ident">join</span>().<span class="ident">expect</span>(<span class="string">&quot;failed to join fdb thread&quot;</span>);
 
-        <span class="prelude-val">Ok</span>(<span class="ident">v</span>)
+        <span class="kw">match</span> <span class="ident">res</span> {
+            <span class="prelude-val">Err</span>(<span class="ident">payload</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">panic</span>::<span class="ident">resume_unwind</span>(<span class="ident">payload</span>),
+            <span class="prelude-val">Ok</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="ident">v</span>),
+        }
     }
 }
 
 <span class="doccomment">/// A foundationDB network event loop runner</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Most of the time you should never need to use this directly and use `NetworkBuilder::boot()`.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">NetworkRunner</span> {
     <span class="ident">cond</span>: <span class="ident">Arc</span><span class="op">&lt;</span>(<span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span>, <span class="ident">Condvar</span>)<span class="op">&gt;</span>,
 }
@@ -410,6 +450,8 @@
 }
 
 <span class="doccomment">/// A condition object that can wait for the associated `NetworkRunner` to actually run.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Most of the time you should never need to use this directly and use `NetworkBuilder::boot()`.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">NetworkWait</span> {
     <span class="ident">cond</span>: <span class="ident">Arc</span><span class="op">&lt;</span>(<span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span>, <span class="ident">Condvar</span>)<span class="op">&gt;</span>,
 }
@@ -431,6 +473,8 @@
 }
 
 <span class="doccomment">/// Allow to stop the associated and running `NetworkRunner`.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Most of the time you should never need to use this directly and use `NetworkBuilder::boot()`.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">NetworkStop</span> {
     <span class="ident">_private</span>: (),
 }

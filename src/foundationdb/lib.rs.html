@@ -264,7 +264,7 @@
 <span class="doccomment">///     // do some interesting things with the API...</span>
 <span class="doccomment">/// });</span>
 <span class="doccomment">/// ```</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">boot</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">f</span>: <span class="kw">impl</span> <span class="ident">FnOnce</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">T</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">boot</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">f</span>: <span class="kw">impl</span> (<span class="ident">FnOnce</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">T</span>) <span class="op">+</span> <span class="ident">std</span>::<span class="ident">panic</span>::<span class="ident">UnwindSafe</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">T</span> {
     <span class="ident">api</span>::<span class="ident">FdbApiBuilder</span>::<span class="ident">default</span>()
         .<span class="ident">build</span>()
         .<span class="ident">expect</span>(<span class="string">&quot;foundationdb API to be initialized&quot;</span>)
