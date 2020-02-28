@@ -590,7 +590,10 @@ impl StackMachine {
     fn check<T>(&mut self, number: usize, r: FdbResult<T>) -> Result<T, ()> {
         match r {
             Ok(v) => Ok(v),
-            Err(err) => Err(self.push_err(number, err)),
+            Err(err) => {
+                self.push_err(number, err);
+                Err(())
+            }
         }
     }
 

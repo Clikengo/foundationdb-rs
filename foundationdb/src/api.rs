@@ -178,6 +178,8 @@ pub struct NetworkRunner {
 impl NetworkRunner {
     /// Start the foundationDB network event loop in the current thread.
     ///
+    /// # Safety
+    ///
     /// This method is unsafe because you **MUST** call the `stop` method on the
     /// associated `NetworkStop` before the program exit.
     ///
