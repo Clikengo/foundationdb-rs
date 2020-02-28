@@ -550,10 +550,9 @@ impl<'de> TupleUnpack<'de> for bool {
         match v {
             FALSE => Ok((input, false)),
             TRUE => Ok((input, true)),
-            _ => Err(PackError::Message(format!(
-                "{} is not a valid bool value",
-                v
-            ))),
+            _ => Err(PackError::Message(
+                format!("{} is not a valid bool value", v).into_boxed_str(),
+            )),
         }
     }
 }

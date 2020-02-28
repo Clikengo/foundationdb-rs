@@ -64,7 +64,7 @@ impl TupleDepth {
 /// A packing/unpacking error
 #[derive(Debug)]
 pub enum PackError {
-    Message(String),
+    Message(Box<str>),
     IoError(io::Error),
     TrailingBytes,
     MissingBytes,
@@ -101,6 +101,8 @@ impl Display for PackError {
         }
     }
 }
+
+impl std::error::Error for PackError {}
 
 /// Alias for `Result<..., tuple::Error>`
 pub type PackResult<T> = result::Result<T, PackError>;
