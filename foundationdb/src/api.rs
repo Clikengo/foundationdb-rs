@@ -13,6 +13,7 @@
 //! - [API versioning](https://apple.github.io/foundationdb/api-c.html#api-versioning)
 //! - [Network](https://apple.github.io/foundationdb/api-c.html#network)
 
+use std::panic;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
@@ -89,7 +90,7 @@ impl Default for FdbApiBuilder {
 /// use foundationdb::api::FdbApiBuilder;
 ///
 /// let network_builder = FdbApiBuilder::default().build().expect("fdb api initialized");
-/// let network_stop_if_dropped = network_builder.boot(|| {
+/// network_builder.boot(|| {
 ///     // do some work with foundationDB
 /// }).expect("fdb network to run");
 /// ```
@@ -106,6 +107,13 @@ impl NetworkBuilder {
 
     /// Finalizes the initialization of the Network
     ///
+    /// It's not recommended to use this method unless you really know what you are doing.
+    /// Otherwise, the `boot` method is the **safe** and easiest way to do it.
+    ///
+    /// In order to start the network you have to call the unsafe `NetworkRunner::run()` method.
+    /// This method stats the foundationdb network runloop, once started, the `NetworkStop::stop()`
+    /// method **MUST** be called before the process exit. Aborting the process is still safe.
+    ///
     /// ```
     /// use foundationdb::api::FdbApiBuilder;
     ///
@@ -119,7 +127,8 @@ impl NetworkBuilder {
     /// // Wait for the foundationDB network thread to start
     /// let fdb_network = cond.wait();
     ///
-    /// // do some work with foundationDB
+    /// // do some work with foundationDB, if a panic occur you still **MUST** catch it and call
+    /// // fdb_network.stop();
     ///
     /// // You **MUST** call fdb_network.stop() before the process exit
     /// fdb_network.stop().expect("failed to stop network");
@@ -134,7 +143,7 @@ impl NetworkBuilder {
     }
 
     /// Finalizes the initialization of the Network and starts it in a new thread
-    pub fn boot<T>(self, f: impl FnOnce() -> T) -> FdbResult<T> {
+    pub fn boot<T>(self, f: impl (FnOnce() -> T) + panic::UnwindSafe) -> FdbResult<T> {
         let (runner, cond) = self.build()?;
 
         let net_thread = thread::spawn(move || {
@@ -143,16 +152,25 @@ impl NetworkBuilder {
 
         let network = cond.wait();
 
-        let v = f();
+        let res = panic::catch_unwind(f);
 
-        network.stop().expect("failed to stop network");
+        if let Err(err) = network.stop() {
+            eprintln!("failed to stop network: {}", err);
+            // Not aborting can probably cause undefined behavior
+            std::process::abort();
+        }
         net_thread.join().expect("failed to join fdb thread");
 
-        Ok(v)
+        match res {
+            Err(payload) => panic::resume_unwind(payload),
+            Ok(v) => Ok(v),
+        }
     }
 }
 
 /// A foundationDB network event loop runner
+///
+/// Most of the time you should never need to use this directly and use `NetworkBuilder::boot()`.
 pub struct NetworkRunner {
     cond: Arc<(Mutex<bool>, Condvar)>,
 }
@@ -183,6 +201,8 @@ impl NetworkRunner {
 }
 
 /// A condition object that can wait for the associated `NetworkRunner` to actually run.
+///
+/// Most of the time you should never need to use this directly and use `NetworkBuilder::boot()`.
 pub struct NetworkWait {
     cond: Arc<(Mutex<bool>, Condvar)>,
 }
@@ -204,6 +224,8 @@ impl NetworkWait {
 }
 
 /// Allow to stop the associated and running `NetworkRunner`.
+///
+/// Most of the time you should never need to use this directly and use `NetworkBuilder::boot()`.
 pub struct NetworkStop {
     _private: (),
 }

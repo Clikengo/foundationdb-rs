@@ -118,7 +118,7 @@ pub use crate::transaction::*;
 ///     // do some interesting things with the API...
 /// });
 /// ```
-pub fn boot<T>(f: impl FnOnce() -> T) -> T {
+pub fn boot<T>(f: impl (FnOnce() -> T) + std::panic::UnwindSafe) -> T {
     api::FdbApiBuilder::default()
         .build()
         .expect("foundationdb API to be initialized")
