@@ -142,6 +142,7 @@
 <span id="142">142</span>
 <span id="143">143</span>
 <span id="144">144</span>
+<span id="145">145</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 foundationdb-rs developers, https://github.com/Clikengo/foundationdb-rs/graphs/contributors</span>
 <span class="comment">//</span>
@@ -215,10 +216,9 @@
 <span class="doccomment">//!     Ok(())</span>
 <span class="doccomment">//! }</span>
 <span class="doccomment">//!</span>
-<span class="doccomment">//! let network = foundationdb::boot().expect(&quot;failed to initialize Fdb&quot;);</span>
-<span class="doccomment">//! futures::executor::block_on(async_main()).expect(&quot;failed to run&quot;);</span>
-<span class="doccomment">//! // cleanly shutdown the client</span>
-<span class="doccomment">//! drop(network);</span>
+<span class="doccomment">//! foundationdb::boot(|| {</span>
+<span class="doccomment">//!     futures::executor::block_on(async_main()).expect(&quot;failed to run&quot;);</span>
+<span class="doccomment">//! });</span>
 <span class="doccomment">//! ```</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! ## API stability</span>
@@ -260,14 +260,16 @@
 <span class="doccomment">/// # Examples</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// ```rust</span>
-<span class="doccomment">/// let network = foundationdb::boot().expect(&quot;failed to initialize Fdb&quot;);</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// // do some interesting things with the API...</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// drop(network)</span>
+<span class="doccomment">/// foundationdb::boot(|| {</span>
+<span class="doccomment">///     // do some interesting things with the API...</span>
+<span class="doccomment">/// });</span>
 <span class="doccomment">/// ```</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">boot</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">FdbResult</span><span class="op">&lt;</span><span class="ident">api</span>::<span class="ident">NetworkAutoStop</span><span class="op">&gt;</span> {
-    <span class="ident">api</span>::<span class="ident">FdbApiBuilder</span>::<span class="ident">default</span>().<span class="ident">build</span>()<span class="question-mark">?</span>.<span class="ident">boot</span>()
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">boot</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">f</span>: <span class="kw">impl</span> <span class="ident">FnOnce</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">T</span> {
+    <span class="ident">api</span>::<span class="ident">FdbApiBuilder</span>::<span class="ident">default</span>()
+        .<span class="ident">build</span>()
+        .<span class="ident">expect</span>(<span class="string">&quot;foundationdb API to be initialized&quot;</span>)
+        .<span class="ident">boot</span>(<span class="ident">f</span>)
+        .<span class="ident">expect</span>(<span class="string">&quot;foundationdb network to be setup&quot;</span>)
 }
 
 <span class="doccomment">/// Returns the default Fdb cluster configuration file path</span>

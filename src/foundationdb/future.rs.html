@@ -497,12 +497,6 @@
 <span id="497">497</span>
 <span id="498">498</span>
 <span id="499">499</span>
-<span id="500">500</span>
-<span id="501">501</span>
-<span id="502">502</span>
-<span id="503">503</span>
-<span id="504">504</span>
-<span id="505">505</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 foundationdb-rs developers, https://github.com/Clikengo/foundationdb-rs/graphs/contributors</span>
 <span class="comment">// Copyright 2013-2018 Apple, Inc and the FoundationDB project authors.</span>
@@ -940,30 +934,24 @@
 
 <span class="doccomment">/// A keyvalue owned by a foundationDB future</span>
 <span class="doccomment">///</span>
-<span class="doccomment">/// # Internal info:</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Uses repr(C, packed(4)) because c API uses 4-byte alignment for this struct</span>
-<span class="doccomment">///</span>
 <span class="doccomment">/// Because the data it represent is owned by the future in FdbValues, you</span>
 <span class="doccomment">/// can never own a FdbKeyValue directly, you can only have references to it.</span>
 <span class="doccomment">/// This way, you can never obtain a lifetime greater than the lifetime of the</span>
 <span class="doccomment">/// slice that gave you access to it.</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>(<span class="number">4</span>))]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">FdbKeyValue</span> {
-    <span class="ident">key</span>: <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">u8</span>,
-    <span class="ident">key_len</span>: <span class="ident">i32</span>,
-    <span class="ident">value</span>: <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">u8</span>,
-    <span class="ident">value_len</span>: <span class="ident">i32</span>,
-}
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">transparent</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">FdbKeyValue</span>(<span class="ident">fdb_sys</span>::<span class="ident">FDBKeyValue</span>);
+
 <span class="kw">impl</span> <span class="ident">FdbKeyValue</span> {
     <span class="doccomment">/// key</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">key</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span>[<span class="ident">u8</span>] {
-        <span class="kw">unsafe</span> { <span class="ident">std</span>::<span class="ident">slice</span>::<span class="ident">from_raw_parts</span>(<span class="self">self</span>.<span class="ident">key</span>, <span class="self">self</span>.<span class="ident">key_len</span> <span class="kw">as</span> <span class="ident">usize</span>) }
+        <span class="kw">unsafe</span> { <span class="ident">std</span>::<span class="ident">slice</span>::<span class="ident">from_raw_parts</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">key</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">u8</span>, <span class="self">self</span>.<span class="number">0</span>.<span class="ident">key_length</span> <span class="kw">as</span> <span class="ident">usize</span>) }
     }
 
     <span class="doccomment">/// value</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">value</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span>[<span class="ident">u8</span>] {
-        <span class="kw">unsafe</span> { <span class="ident">std</span>::<span class="ident">slice</span>::<span class="ident">from_raw_parts</span>(<span class="self">self</span>.<span class="ident">value</span>, <span class="self">self</span>.<span class="ident">value_len</span> <span class="kw">as</span> <span class="ident">usize</span>) }
+        <span class="kw">unsafe</span> {
+            <span class="ident">std</span>::<span class="ident">slice</span>::<span class="ident">from_raw_parts</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">value</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">u8</span>, <span class="self">self</span>.<span class="number">0</span>.<span class="ident">value_length</span> <span class="kw">as</span> <span class="ident">usize</span>)
+        }
     }
 }
 
