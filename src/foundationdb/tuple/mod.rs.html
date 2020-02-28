@@ -550,6 +550,8 @@
 <span id="550">550</span>
 <span id="551">551</span>
 <span id="552">552</span>
+<span id="553">553</span>
+<span id="554">554</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! Implementation of the official tuple layer typecodes</span>
 <span class="doccomment">//!</span>
@@ -617,7 +619,7 @@
 <span class="doccomment">/// A packing/unpacking error</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">PackError</span> {
-    <span class="ident">Message</span>(<span class="ident">String</span>),
+    <span class="ident">Message</span>(<span class="ident">Box</span><span class="op">&lt;</span><span class="ident">str</span><span class="op">&gt;</span>),
     <span class="ident">IoError</span>(<span class="ident">io</span>::<span class="ident">Error</span>),
     <span class="ident">TrailingBytes</span>,
     <span class="ident">MissingBytes</span>,
@@ -654,6 +656,8 @@
         }
     }
 }
+
+<span class="kw">impl</span> <span class="ident">std</span>::<span class="ident">error</span>::<span class="ident">Error</span> <span class="kw">for</span> <span class="ident">PackError</span> {}
 
 <span class="doccomment">/// Alias for `Result&lt;..., tuple::Error&gt;`</span>
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">PackResult</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">result</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">PackError</span><span class="op">&gt;</span>;
