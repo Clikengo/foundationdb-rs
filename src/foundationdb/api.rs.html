@@ -246,6 +246,8 @@
 <span id="246">246</span>
 <span id="247">247</span>
 <span id="248">248</span>
+<span id="249">249</span>
+<span id="250">250</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 foundationdb-rs developers, https://github.com/Clikengo/foundationdb-rs/graphs/contributors</span>
 <span class="comment">// Copyright 2013-2018 Apple, Inc and the FoundationDB project authors.</span>
@@ -426,6 +428,8 @@
 
 <span class="kw">impl</span> <span class="ident">NetworkRunner</span> {
     <span class="doccomment">/// Start the foundationDB network event loop in the current thread.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Safety</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// This method is unsafe because you **MUST** call the `stop` method on the</span>
     <span class="doccomment">/// associated `NetworkStop` before the program exit.</span>
