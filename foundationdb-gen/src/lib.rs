@@ -325,7 +325,7 @@ where
     I: Iterator<Item = xml::reader::Result<XmlEvent>>,
 {
     let mut options = Vec::new();
-    while let Some(e) = parser.next() {
+    for e in parser {
         let e = e?;
         match e {
             XmlEvent::StartElement {
@@ -372,7 +372,7 @@ const OPTIONS_DATA: &[u8] = include_bytes!("../include/610/fdb.options");
 const OPTIONS_DATA: &[u8] = include_bytes!("../include/620/fdb.options");
 
 pub fn emit() -> Result<String> {
-    let mut reader = OPTIONS_DATA.as_ref();
+    let mut reader = OPTIONS_DATA;
     let parser = EventReader::new(&mut reader);
     let mut iter = parser.into_iter();
     let mut scopes = Vec::new();

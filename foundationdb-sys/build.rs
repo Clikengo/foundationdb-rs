@@ -76,7 +76,7 @@ fn main() {
         .write_all(format!("#define FDB_API_VERSION {}\n", api_version).as_bytes())
         .expect("couldn't write wrapper.h!");
     wrapper
-        .write_all("#include <fdb_c.h>\n".as_bytes())
+        .write_all(b"#include <fdb_c.h>\n")
         .expect("couldn't write wrapper.h!");
     drop(wrapper);
 
