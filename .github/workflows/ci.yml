@@ -21,7 +21,7 @@ jobs:
         uses: actions/checkout@v1
 
       - name: Install FoundationDB
-        uses: Clikengo/foundationdb-actions-install@v1.0.0
+        uses: Clikengo/foundationdb-actions-install@v1
 
       - name: Install Clang
         if: matrix.os == 'windows-latest'
@@ -102,7 +102,7 @@ jobs:
         uses: actions/checkout@v1
 
       - name: Install FoundationDB
-        uses: Clikengo/foundationdb-actions-install@v1.0.0
+        uses: Clikengo/foundationdb-actions-install@v1
 
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
@@ -127,7 +127,7 @@ jobs:
       - uses: actions/checkout@v1
 
       - name: Install FoundationDB
-        uses: Clikengo/foundationdb-actions-install@v1.0.0
+        uses: Clikengo/foundationdb-actions-install@v1
 
       - uses: actions-rs/toolchain@v1
         with:
@@ -154,7 +154,7 @@ jobs:
       - uses: actions/checkout@v1
 
       - name: Install FoundationDB
-        uses: Clikengo/foundationdb-actions-install@v1.0.0
+        uses: Clikengo/foundationdb-actions-install@v1
 
       - uses: actions-rs/toolchain@v1
         with:
