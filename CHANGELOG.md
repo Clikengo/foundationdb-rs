@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## 0.5.0
+
+- Fix #170: `fdb_stop_network` **MUST** be called before the program exits.
+  Fixing it required a breaking change with the `foundationdb::boot()` API.
+- #177: Add support for NEGINTSTART, POSINTEND encoding (@garrensmith).
+- #178: Add support for `num-bigint`
+
 ## 0.4.1
 
 - Fix docs.rs build issues

@@ -31,12 +31,12 @@ where
 }
 
 #[test]
-// dropping a future while it's in the pending state should not crash
 fn test_future_discard() {
-    common::boot();
-    futures::executor::block_on(test_future_discard_async()).expect("failed to run");
+    boot(|| futures::executor::block_on(test_future_discard_async()).expect("failed to run"));
 }
+
 async fn test_future_discard_async() -> FdbResult<()> {
+    // dropping a future while it's in the pending state should not crash
     let db = common::database().await?;
     let mut hit_pending = false;
     for _i in 0..=1000 {

@@ -146,15 +146,13 @@ fn main() {
     let opt = Opt::from_args();
     info!("opt: {:?}", opt);
 
-    let network = fdb::boot().expect("failed to init network");
+    fdb::boot(|| {
+        let db = Arc::new(
+            futures::executor::block_on(fdb::Database::new_compat(None))
+                .expect("failed to get database"),
+        );
 
-    let db = Arc::new(
-        futures::executor::block_on(fdb::Database::new_compat(None))
-            .expect("failed to get database"),
-    );
-
-    let bench = Bench { db, opt };
-    bench.run();
-
-    drop(network);
+        let bench = Bench { db, opt };
+        bench.run();
+    });
 }

@@ -434,30 +434,24 @@ impl fmt::Debug for FdbValue {
 
 /// A keyvalue owned by a foundationDB future
 ///
-/// # Internal info:
-///
-/// Uses repr(C, packed(4)) because c API uses 4-byte alignment for this struct
-///
 /// Because the data it represent is owned by the future in FdbValues, you
 /// can never own a FdbKeyValue directly, you can only have references to it.
 /// This way, you can never obtain a lifetime greater than the lifetime of the
 /// slice that gave you access to it.
-#[repr(C, packed(4))]
-pub struct FdbKeyValue {
-    key: *const u8,
-    key_len: i32,
-    value: *const u8,
-    value_len: i32,
-}
+#[repr(transparent)]
+pub struct FdbKeyValue(fdb_sys::FDBKeyValue);
+
 impl FdbKeyValue {
     /// key
     pub fn key(&self) -> &[u8] {
-        unsafe { std::slice::from_raw_parts(self.key, self.key_len as usize) }
+        unsafe { std::slice::from_raw_parts(self.0.key as *const u8, self.0.key_length as usize) }
     }
 
     /// value
     pub fn value(&self) -> &[u8] {
-        unsafe { std::slice::from_raw_parts(self.value, self.value_len as usize) }
+        unsafe {
+            std::slice::from_raw_parts(self.0.value as *const u8, self.0.value_length as usize)
+        }
     }
 }
 

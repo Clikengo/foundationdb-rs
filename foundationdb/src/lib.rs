@@ -70,10 +70,9 @@
 //!     Ok(())
 //! }
 //!
-//! let network = foundationdb::boot().expect("failed to initialize Fdb");
-//! futures::executor::block_on(async_main()).expect("failed to run");
-//! // cleanly shutdown the client
-//! drop(network);
+//! foundationdb::boot(|| {
+//!     futures::executor::block_on(async_main()).expect("failed to run");
+//! });
 //! ```
 //!
 //! ## API stability
@@ -115,14 +114,16 @@ pub use crate::transaction::*;
 /// # Examples
 ///
 /// ```rust
-/// let network = foundationdb::boot().expect("failed to initialize Fdb");
-///
-/// // do some interesting things with the API...
-///
-/// drop(network)
+/// foundationdb::boot(|| {
+///     // do some interesting things with the API...
+/// });
 /// ```
-pub fn boot() -> FdbResult<api::NetworkAutoStop> {
-    api::FdbApiBuilder::default().build()?.boot()
+pub fn boot<T>(f: impl FnOnce() -> T) -> T {
+    api::FdbApiBuilder::default()
+        .build()
+        .expect("foundationdb API to be initialized")
+        .boot(f)
+        .expect("foundationdb network to be setup")
 }
 
 /// Returns the default Fdb cluster configuration file path

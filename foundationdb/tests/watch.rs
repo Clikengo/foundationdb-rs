@@ -9,6 +9,14 @@ use foundationdb::*;
 
 mod common;
 
+#[test]
+fn test_watch() {
+    boot(|| {
+        futures::executor::block_on(test_watch_async()).expect("failed to run");
+        futures::executor::block_on(test_watch_without_commit_async()).expect("failed to run");
+    });
+}
+
 async fn test_watch_async() -> FdbResult<()> {
     const KEY: &'static [u8] = b"test-watch";
 
@@ -32,12 +40,6 @@ async fn test_watch_async() -> FdbResult<()> {
     Ok(())
 }
 
-#[test]
-fn test_watch() {
-    common::boot();
-    futures::executor::block_on(test_watch_async()).expect("failed to run");
-}
-
 async fn test_watch_without_commit_async() -> FdbResult<()> {
     const KEY: &'static [u8] = b"test-watch-2";
 
@@ -51,10 +53,4 @@ async fn test_watch_without_commit_async() -> FdbResult<()> {
     assert!(watch.await.is_err());
 
     Ok(())
-}
-
-#[test]
-fn test_watch_without_commit() {
-    common::boot();
-    futures::executor::block_on(test_watch_without_commit_async()).expect("failed to run");
 }

@@ -16,10 +16,14 @@ mod common;
 
 #[test]
 fn test_hca_many_sequential_allocations() {
-    common::boot();
-    futures::executor::block_on(test_hca_many_sequential_allocations_async())
-        .expect("failed to run");
+    foundationdb::boot(|| {
+        futures::executor::block_on(test_hca_many_sequential_allocations_async())
+            .expect("failed to run");
+        futures::executor::block_on(test_hca_concurrent_allocations_async())
+            .expect("failed to run");
+    });
 }
+
 async fn test_hca_many_sequential_allocations_async() -> FdbResult<()> {
     const N: usize = 1000;
     const KEY: &[u8] = b"test-hca-allocate";
@@ -52,11 +56,6 @@ async fn test_hca_many_sequential_allocations_async() -> FdbResult<()> {
     Ok(())
 }
 
-#[test]
-fn test_hca_concurrent_allocations() {
-    common::boot();
-    futures::executor::block_on(test_hca_concurrent_allocations_async()).expect("failed to run");
-}
 async fn test_hca_concurrent_allocations_async() -> FdbResult<()> {
     const N: usize = 1000;
     const KEY: &[u8] = b"test-hca-allocate-concurrent";

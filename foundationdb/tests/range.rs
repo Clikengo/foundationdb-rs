@@ -12,6 +12,15 @@ use std::borrow::Cow;
 
 mod common;
 
+#[test]
+fn test_range() {
+    foundationdb::boot(|| {
+        futures::executor::block_on(test_get_range_async()).expect("failed to run");
+        futures::executor::block_on(test_range_option_async()).expect("failed to run");
+        futures::executor::block_on(test_get_ranges_async()).expect("failed to run");
+    });
+}
+
 async fn test_get_range_async() -> FdbResult<()> {
     const N: usize = 10000;
 
@@ -64,11 +73,6 @@ async fn test_get_range_async() -> FdbResult<()> {
 
     Ok(())
 }
-#[test]
-fn test_get_range() {
-    common::boot();
-    futures::executor::block_on(test_get_range_async()).expect("failed to run");
-}
 
 async fn test_get_ranges_async() -> FdbResult<()> {
     const N: usize = 10000;
@@ -105,11 +109,6 @@ async fn test_get_ranges_async() -> FdbResult<()> {
     }
 
     Ok(())
-}
-#[test]
-fn test_get_ranges() {
-    common::boot();
-    futures::executor::block_on(test_get_ranges_async()).expect("failed to run");
 }
 
 async fn test_range_option_async() -> FdbResult<()> {
@@ -204,9 +203,4 @@ async fn test_range_option_async() -> FdbResult<()> {
     }
 
     Ok(())
-}
-#[test]
-fn test_range_option() {
-    common::boot();
-    futures::executor::block_on(test_range_option_async()).expect("failed to run");
 }
