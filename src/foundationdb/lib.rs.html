@@ -143,6 +143,23 @@
 <span id="143">143</span>
 <span id="144">144</span>
 <span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 foundationdb-rs developers, https://github.com/Clikengo/foundationdb-rs/graphs/contributors</span>
 <span class="comment">//</span>
@@ -250,12 +267,7 @@
 <span class="kw">pub</span> <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">keyselector</span>::<span class="kw-2">*</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">transaction</span>::<span class="kw-2">*</span>;
 
-<span class="doccomment">/// Initialize the FoundationDB Client API, this can only be called once per process.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Returns</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// `Network` which must be run before the Client is ready. `Network::run` will not return until the</span>
-<span class="doccomment">///   network is stopped with the associated `Network::stop` and should be run in a separate thread.</span>
+<span class="doccomment">/// Execute `f` with the FoundationDB Client API ready, this can only be called once per process.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// # Examples</span>
 <span class="doccomment">///</span>
@@ -269,6 +281,28 @@
         .<span class="ident">build</span>()
         .<span class="ident">expect</span>(<span class="string">&quot;foundationdb API to be initialized&quot;</span>)
         .<span class="ident">boot</span>(<span class="ident">f</span>)
+        .<span class="ident">expect</span>(<span class="string">&quot;foundationdb network to be setup&quot;</span>)
+}
+
+<span class="doccomment">/// Async execute `f` with the FoundationDB Client API ready, this can only be called once per process.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// # Examples</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// ```rust</span>
+<span class="doccomment">/// foundationdb::boot_async(|| async {</span>
+<span class="doccomment">///     // do some interesting things with the API...</span>
+<span class="doccomment">/// });</span>
+<span class="doccomment">/// ```</span>
+<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">boot_async</span><span class="op">&lt;</span><span class="ident">F</span>, <span class="ident">Fut</span>, <span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">f</span>: <span class="ident">F</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">T</span>
+<span class="kw">where</span>
+    <span class="ident">F</span>: (<span class="ident">FnOnce</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Fut</span>) <span class="op">+</span> <span class="ident">std</span>::<span class="ident">panic</span>::<span class="ident">UnwindSafe</span>,
+    <span class="ident">Fut</span>: <span class="ident">std</span>::<span class="ident">future</span>::<span class="ident">Future</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> <span class="ident">T</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">std</span>::<span class="ident">panic</span>::<span class="ident">UnwindSafe</span>,
+{
+    <span class="ident">api</span>::<span class="ident">FdbApiBuilder</span>::<span class="ident">default</span>()
+        .<span class="ident">build</span>()
+        .<span class="ident">expect</span>(<span class="string">&quot;foundationdb API to be initialized&quot;</span>)
+        .<span class="ident">boot_async</span>(<span class="ident">f</span>)
+        .<span class="kw">await</span>
         .<span class="ident">expect</span>(<span class="string">&quot;foundationdb network to be setup&quot;</span>)
 }
 
