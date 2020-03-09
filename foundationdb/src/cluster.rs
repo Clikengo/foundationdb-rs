@@ -39,9 +39,12 @@ impl Cluster {
     ) -> impl Future<Output = FdbResult<Cluster>> + Send + Sync + Unpin {
         let path_str = path.map(|path| std::ffi::CString::new(path).unwrap());
         let path_ptr = path_str
+            .as_ref()
             .map(|path| path.as_ptr())
             .unwrap_or(std::ptr::null());
-        FdbFuture::new(unsafe { fdb_sys::fdb_create_cluster(path_ptr) })
+        let f = FdbFuture::new(unsafe { fdb_sys::fdb_create_cluster(path_ptr) });
+        drop(path_str);
+        f
     }
 
     /// Returns an FdbFuture which will be set to an FDBCluster object.
