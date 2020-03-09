@@ -46,12 +46,15 @@ impl Drop for Database {
 impl Database {
     /// Create a database for the given configuration path if any, or the default one.
     pub fn new(path: Option<&str>) -> FdbResult<Database> {
-        let path_str = path.map(|path| std::ffi::CString::new(path).unwrap());
+        let path_str =
+            path.map(|path| std::ffi::CString::new(path).expect("path to be convertible to CStr"));
         let path_ptr = path_str
+            .as_ref()
             .map(|path| path.as_ptr())
             .unwrap_or(std::ptr::null());
         let mut v: *mut fdb_sys::FDBDatabase = std::ptr::null_mut();
         let err = unsafe { fdb_sys::fdb_create_database(path_ptr, &mut v) };
+        drop(path_str); // path_str own the CString that we are getting the ptr from
         error::eval(err)?;
         Ok(Database {
             inner: NonNull::new(v)
