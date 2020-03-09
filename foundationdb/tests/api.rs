@@ -1,4 +1,5 @@
-use foundationdb::api::FdbApiBuilder;
+use foundationdb as fdb;
+use foundationdb::{api::FdbApiBuilder, Database};
 use std::thread;
 
 #[test]
@@ -14,6 +15,22 @@ fn test_run() {
         unsafe { runner.run() }.expect("failed to run");
     });
     let stopper = cond.wait();
+
+    // network thread is running
+
+    #[cfg(not(any(feature = "fdb-5_1", feature = "fdb-5_2", feature = "fdb-6_0")))]
+    {
+        assert!(Database::from_path("test".to_string().as_str()).is_err());
+        assert!(Database::from_path(fdb::default_config_path()).is_ok());
+    }
+    assert!(
+        futures::executor::block_on(Database::new_compat(Some("test".to_string().as_str())))
+            .is_err()
+    );
+    assert!(
+        futures::executor::block_on(Database::new_compat(Some(fdb::default_config_path()))).is_ok()
+    );
+
     stopper.stop().expect("failed to stop");
     net_thread.join().expect("failed to join net thread");
     println!("stopped!");
