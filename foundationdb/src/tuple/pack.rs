@@ -41,7 +41,6 @@ where
     }
 }
 
-#[inline]
 fn parse_bytes(input: &[u8], num: usize) -> PackResult<(&[u8], &[u8])> {
     if input.len() < num {
         Err(PackError::MissingBytes)
@@ -50,7 +49,6 @@ fn parse_bytes(input: &[u8], num: usize) -> PackResult<(&[u8], &[u8])> {
     }
 }
 
-#[inline]
 fn parse_byte(input: &[u8]) -> PackResult<(&[u8], u8)> {
     if input.is_empty() {
         Err(PackError::MissingBytes)

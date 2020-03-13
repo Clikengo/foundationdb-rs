@@ -166,7 +166,6 @@ unsafe impl Send for Transaction {}
 unsafe impl Sync for Transaction {}
 
 /// Converts Rust `bool` into `fdb_sys::fdb_bool_t`
-#[inline]
 fn fdb_bool(v: bool) -> fdb_sys::fdb_bool_t {
     if v {
         1
@@ -174,7 +173,7 @@ fn fdb_bool(v: bool) -> fdb_sys::fdb_bool_t {
         0
     }
 }
-#[inline]
+
 fn fdb_len(len: usize, context: &'static str) -> std::os::raw::c_int {
     assert!(
         len <= i32::max_value() as usize,
@@ -183,7 +182,7 @@ fn fdb_len(len: usize, context: &'static str) -> std::os::raw::c_int {
     );
     len as i32
 }
-#[inline]
+
 fn fdb_iteration(iteration: usize) -> std::os::raw::c_int {
     if iteration > i32::max_value() as usize {
         0 // this will cause client_invalid_operation
@@ -191,7 +190,7 @@ fn fdb_iteration(iteration: usize) -> std::os::raw::c_int {
         iteration as i32
     }
 }
-#[inline]
+
 fn fdb_limit(v: usize) -> std::os::raw::c_int {
     if v > i32::max_value() as usize {
         i32::max_value()

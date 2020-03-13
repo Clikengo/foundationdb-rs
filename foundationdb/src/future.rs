@@ -373,7 +373,6 @@ impl Iterator for FdbValuesIter {
     }
 }
 impl ExactSizeIterator for FdbValuesIter {
-    #[inline]
     fn len(&self) -> usize {
         (self.len - self.pos) as usize
     }
