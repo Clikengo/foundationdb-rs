@@ -687,11 +687,19 @@
 <span id="687">687</span>
 <span id="688">688</span>
 <span id="689">689</span>
+<span id="690">690</span>
+<span id="691">691</span>
+<span id="692">692</span>
+<span id="693">693</span>
+<span id="694">694</span>
+<span id="695">695</span>
+<span id="696">696</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">convert</span>::<span class="ident">TryFrom</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">FdbError</span>, <span class="ident">FdbResult</span>};
 <span class="kw">use</span> <span class="ident">foundationdb_sys</span> <span class="kw">as</span> <span class="ident">fdb_sys</span>;
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Debug</span>)]</span>
+<span class="attribute">#[<span class="ident">non_exhaustive</span>]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">NetworkOption</span> {
     <span class="doccomment">/// IP:PORT</span>
     <span class="doccomment">///</span>
@@ -948,6 +956,7 @@
     }
 }
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Debug</span>)]</span>
+<span class="attribute">#[<span class="ident">non_exhaustive</span>]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">DatabaseOption</span> {
     <span class="doccomment">/// Max location cache entries</span>
     <span class="doccomment">///</span>
@@ -1060,6 +1069,7 @@
     }
 }
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Debug</span>)]</span>
+<span class="attribute">#[<span class="ident">non_exhaustive</span>]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">TransactionOption</span> {
     <span class="doccomment">/// The transaction, if not self-conflicting, may be committed a second time after commit succeeds, in the event of a fault</span>
     <span class="ident">CausalWriteRisky</span>,
@@ -1231,6 +1241,7 @@
     }
 }
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>)]</span>
+<span class="attribute">#[<span class="ident">non_exhaustive</span>]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">StreamingMode</span> {
     <span class="doccomment">/// Client intends to consume the entire range and would like it all transferred as early as possible.</span>
     <span class="ident">WantAll</span>,
@@ -1261,6 +1272,7 @@
     }
 }
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>)]</span>
+<span class="attribute">#[<span class="ident">non_exhaustive</span>]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">MutationType</span> {
     <span class="doccomment">/// addend</span>
     <span class="doccomment">///</span>
@@ -1345,6 +1357,7 @@
     }
 }
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>)]</span>
+<span class="attribute">#[<span class="ident">non_exhaustive</span>]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">ConflictRangeType</span> {
     <span class="doccomment">/// Used to add a read conflict range</span>
     <span class="ident">Read</span>,
@@ -1360,6 +1373,7 @@
     }
 }
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>)]</span>
+<span class="attribute">#[<span class="ident">non_exhaustive</span>]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">ErrorPredicate</span> {
     <span class="doccomment">/// Returns ``true`` if the error indicates the operations in the transactions should be retried because of transient error.</span>
     <span class="ident">Retryable</span>,
