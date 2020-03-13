@@ -71,12 +71,12 @@ impl<'a> KeySelector<'a> {
         Self::new(key.into(), true, 0)
     }
 
-    /// Creates a `KeySelector` that picks the first key greater than or equal to the parameter
+    /// Creates a `KeySelector` that picks the first key greater than the parameter
     pub fn first_greater_than<K: Into<Cow<'a, [u8]>>>(key: K) -> Self {
         Self::new(key.into(), true, 1)
     }
 
-    /// Creates a `KeySelector` that picks the first key greater than the parameter
+    /// Creates a `KeySelector` that picks the first key greater than or equal to the parameter
     pub fn first_greater_or_equal<K: Into<Cow<'a, [u8]>>>(key: K) -> Self {
         Self::new(key.into(), false, 1)
     }
