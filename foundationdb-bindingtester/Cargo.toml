@@ -1,6 +1,6 @@
 [package]
 name = "bindingtester"
-version = "0.4.1"
+version = "0.4.2"
 authors = [
     "Benjamin Fry <benjaminfry@me.com>",
     "Vincent Rouillé <vincent@clikengo.com>",
@@ -25,7 +25,7 @@ travis-ci = { repository = "bluejekyll/foundationdb-rs" }
 [dependencies]
 env_logger = "0.7.1"
 foundationdb = { path = "../foundationdb", features = ["uuid"] }
-foundationdb-sys = { version = "0.4.1", path = "../foundationdb-sys", default-features = false }
+foundationdb-sys = { version = "0.4.2", path = "../foundationdb-sys", default-features = false }
 futures = "0.3.0"
 log = "0.4.8"
 structopt = "0.3.3"
