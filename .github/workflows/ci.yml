@@ -9,7 +9,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        toolchain: ["1.39.0", "stable"]
+        toolchain: ["1.40.0", "stable"]
 
     runs-on: ${{ matrix.os }}
 

@@ -28,6 +28,7 @@ impl FdbScope {
         } else {
             writeln!(w, "#[derive(Clone, Copy, Debug)]")?;
         }
+        writeln!(w, "#[non_exhaustive]")?;
         writeln!(w, "pub enum {name} {{", name = self.name)?;
 
         let with_ty = self.with_ty();
