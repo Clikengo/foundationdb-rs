@@ -177,12 +177,12 @@
         <span class="self">Self</span>::<span class="ident">new</span>(<span class="ident">key</span>.<span class="ident">into</span>(), <span class="bool-val">true</span>, <span class="number">0</span>)
     }
 
-    <span class="doccomment">/// Creates a `KeySelector` that picks the first key greater than or equal to the parameter</span>
+    <span class="doccomment">/// Creates a `KeySelector` that picks the first key greater than the parameter</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">first_greater_than</span><span class="op">&lt;</span><span class="ident">K</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">Cow</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, [<span class="ident">u8</span>]<span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="ident">key</span>: <span class="ident">K</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="self">Self</span>::<span class="ident">new</span>(<span class="ident">key</span>.<span class="ident">into</span>(), <span class="bool-val">true</span>, <span class="number">1</span>)
     }
 
-    <span class="doccomment">/// Creates a `KeySelector` that picks the first key greater than the parameter</span>
+    <span class="doccomment">/// Creates a `KeySelector` that picks the first key greater than or equal to the parameter</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">first_greater_or_equal</span><span class="op">&lt;</span><span class="ident">K</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">Cow</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, [<span class="ident">u8</span>]<span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="ident">key</span>: <span class="ident">K</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="self">Self</span>::<span class="ident">new</span>(<span class="ident">key</span>.<span class="ident">into</span>(), <span class="bool-val">false</span>, <span class="number">1</span>)
     }
