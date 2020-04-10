@@ -113,7 +113,7 @@ impl NetworkBuilder {
     /// Otherwise, the `boot` method is the **safe** and easiest way to do it.
     ///
     /// In order to start the network you have to call the unsafe `NetworkRunner::run()` method.
-    /// This method stats the foundationdb network runloop, once started, the `NetworkStop::stop()`
+    /// This method starts the foundationdb network runloop, once started, the `NetworkStop::stop()`
     /// method **MUST** be called before the process exit. Aborting the process is still safe.
     ///
     /// ```
