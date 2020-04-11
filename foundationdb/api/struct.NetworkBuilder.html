@@ -13,7 +13,7 @@
 <p>It's not recommended to use this method unless you really know what you are doing.
 Otherwise, the <code>boot</code> method is the <strong>safe</strong> and easiest way to do it.</p>
 <p>In order to start the network you have to call the unsafe <code>NetworkRunner::run()</code> method.
-This method stats the foundationdb network runloop, once started, the <code>NetworkStop::stop()</code>
+This method starts the foundationdb network runloop, once started, the <code>NetworkStop::stop()</code>
 method <strong>MUST</strong> be called before the process exit. Aborting the process is still safe.</p>
 
 <div class="example-wrap"><pre class="rust rust-example-rendered">
