@@ -108,6 +108,7 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v1
+        submodules: recursive
 
       - name: Install FoundationDB
         uses: Clikengo/foundationdb-actions-install@v1
@@ -132,7 +133,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v1
+      - name: Checkout repository
+        uses: actions/checkout@v1
+        submodules: recursive
 
       - name: Install FoundationDB
         uses: Clikengo/foundationdb-actions-install@v1
