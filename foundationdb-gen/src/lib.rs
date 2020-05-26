@@ -1,11 +1,6 @@
 extern crate xml;
-#[macro_use]
-extern crate failure;
-
-type Result<T> = std::result::Result<T, failure::Error>;
 
 use std::fmt;
-use std::fmt::Write;
 use xml::attribute::OwnedAttribute;
 use xml::reader::{EventReader, XmlEvent};
 
@@ -321,18 +316,18 @@ impl From<Vec<OwnedAttribute>> for FdbOption {
     }
 }
 
-fn on_scope<I>(parser: &mut I) -> Result<Vec<FdbOption>>
+fn on_scope<I>(parser: &mut I) -> Vec<FdbOption>
 where
     I: Iterator<Item = xml::reader::Result<XmlEvent>>,
 {
     let mut options = Vec::new();
     for e in parser {
-        let e = e?;
+        let e = e.unwrap();
         match e {
             XmlEvent::StartElement {
                 name, attributes, ..
             } => {
-                ensure!(name.local_name == "Option", "unexpected token");
+                assert_eq!(name.local_name, "Option", "unexpected token");
 
                 let option = FdbOption::from(attributes.clone());
                 if !option.hidden {
@@ -341,14 +336,14 @@ where
             }
             XmlEvent::EndElement { name, .. } => {
                 if name.local_name == "Scope" {
-                    return Ok(options);
+                    return options;
                 }
             }
             _ => {}
         }
     }
 
-    bail!("unexpected end of token");
+    panic!("unexpected end of token");
 }
 
 #[cfg(all(not(feature = "embedded-fdb-include"), target_os = "linux"))]
@@ -372,7 +367,7 @@ const OPTIONS_DATA: &[u8] = include_bytes!("../include/610/fdb.options");
 #[cfg(all(feature = "embedded-fdb-include", feature = "fdb-6_2"))]
 const OPTIONS_DATA: &[u8] = include_bytes!("../include/620/fdb.options");
 
-pub fn emit() -> Result<String> {
+pub fn emit(w: &mut impl fmt::Write) -> fmt::Result {
     let mut reader = OPTIONS_DATA;
     let parser = EventReader::new(&mut reader);
     let mut iter = parser.into_iter();
@@ -389,7 +384,7 @@ pub fn emit() -> Result<String> {
                         .find(|attr| attr.name.local_name == "name")
                         .unwrap();
 
-                    let options = on_scope(&mut iter).unwrap();
+                    let options = on_scope(&mut iter);
                     scopes.push(FdbScope {
                         name: scope_name.value,
                         options,
@@ -403,14 +398,13 @@ pub fn emit() -> Result<String> {
         }
     }
 
-    let mut w = String::new();
     writeln!(w, "use std::convert::TryFrom;")?;
     writeln!(w, "use crate::{{FdbError, FdbResult}};")?;
     writeln!(w, "use foundationdb_sys as fdb_sys;")?;
     for scope in scopes.iter() {
-        scope.gen_ty(&mut w)?;
-        scope.gen_impl(&mut w)?;
+        scope.gen_ty(w)?;
+        scope.gen_impl(w)?;
     }
 
-    Ok(w)
+    Ok(())
 }

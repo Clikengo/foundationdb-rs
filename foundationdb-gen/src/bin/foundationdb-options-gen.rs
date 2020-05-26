@@ -1,6 +1,7 @@
 extern crate foundationdb_gen;
 
 fn main() {
-    let code = foundationdb_gen::emit().expect("couldn't generate options.rs code!");
+    let mut code = String::new();
+    foundationdb_gen::emit(&mut code).expect("couldn't generate options.rs code!");
     println!("{}", code);
 }

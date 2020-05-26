@@ -36,5 +36,4 @@ fdb-6_1 = [ ]
 fdb-6_2 = [ ]
 
 [dependencies]
-failure = "0.1.6"
 xml-rs = "0.8.0"
