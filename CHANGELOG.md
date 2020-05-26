@@ -23,7 +23,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## 0.4.0
 
-- Migration to stable (rust 1.39+) async/await
+- Migration to stable (rust 1.40+) async/await
 - Transaction aren't cloned anymore, they are shared by reference. Commit/cancel/reset api requires owned/mutable access to a Transaction. This protect against undefined behavior that was previously possible (cancel/reset) data races.
 - No more indirection within FdbFuture. Returned future give you direct access to the result.
 - Support for fdb api 610+

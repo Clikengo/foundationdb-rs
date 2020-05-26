@@ -7,11 +7,11 @@
 
 The repo consists of multiple crates
 
-| Library | Status | Description |
-|---------|--------|-------------|
-| [**foundationdb**](foundationdb/README.md) | [![Crates.io](https://img.shields.io/crates/v/foundationdb)](https://crates.io/crates/foundationdb) [![foundationdb](https://docs.rs/foundationdb/badge.svg)](https://docs.rs/foundationdb) | High level FoundationDB client API |
-| [**foundationdb-sys**](foundationdb-sys/README.md) | [![Crates.io](https://img.shields.io/crates/v/foundationdb-sys)](https://crates.io/crates/foundationdb-sys) [![foundationdb-sys](https://docs.rs/foundationdb-sys/badge.svg)](https://docs.rs/foundationdb-sys) | C API bindings for FoundationDB |
-| **foundationdb-gen** | n/a | Code generator for common options and types of FoundationDB |
+| Library                                            | Status                                                                                                                                                                                                          | Description                                                 |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| [**foundationdb**](foundationdb/README.md)         | [![Crates.io](https://img.shields.io/crates/v/foundationdb)](https://crates.io/crates/foundationdb) [![foundationdb](https://docs.rs/foundationdb/badge.svg)](https://docs.rs/foundationdb)                     | High level FoundationDB client API                          |
+| [**foundationdb-sys**](foundationdb-sys/README.md) | [![Crates.io](https://img.shields.io/crates/v/foundationdb-sys)](https://crates.io/crates/foundationdb-sys) [![foundationdb-sys](https://docs.rs/foundationdb-sys/badge.svg)](https://docs.rs/foundationdb-sys) | C API bindings for FoundationDB                             |
+| **foundationdb-gen**                               | n/a                                                                                                                                                                                                             | Code generator for common options and types of FoundationDB |
 
 The current version requires rustc 1.40+ to work (async/await feature).
 The previous version (0.3) is still maintained and is available within the 0.3 branch.
@@ -22,8 +22,8 @@ You can access the `master` branch documentation [here](https://clikengo.github.
 
 Licensed under either of
 
- * Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
- * MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+- Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
+- MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
 
 at your option.
 
