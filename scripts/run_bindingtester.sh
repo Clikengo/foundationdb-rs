@@ -3,7 +3,7 @@
 set -x
 
 fdb_rs_dir=$(pwd)
-
+bindingtester="${fdb_rs_dir:?}/$1"
 case $(uname) in
   Darwin)
     brew install mono
@@ -30,8 +30,8 @@ esac
   make fdb_python
 
   ## Run the test
-  ./bindings/bindingtester/bindingtester.py --test-name scripted ${fdb_rs_dir:?}/target/debug/bindingtester
-  ./bindings/bindingtester/bindingtester.py --num-ops 1000 --test-name api --api-version 610 ${fdb_rs_dir:?}/target/debug/bindingtester
-  ./bindings/bindingtester/bindingtester.py --num-ops 1000 --concurrency 5 --test-name api --api-version 610 ${fdb_rs_dir:?}/target/debug/bindingtester
-  ./bindings/bindingtester/bindingtester.py --num-ops 1000 --concurrency 5 --test-name tuple --api-version 610 ${fdb_rs_dir:?}/target/debug/bindingtester
+  ./bindings/bindingtester/bindingtester.py --test-name scripted ${bindingtester}
+  ./bindings/bindingtester/bindingtester.py --num-ops 1000 --test-name api --api-version 610 ${bindingtester}
+  ./bindings/bindingtester/bindingtester.py --num-ops 1000 --concurrency 5 --test-name api --api-version 610 ${bindingtester}
+  ./bindings/bindingtester/bindingtester.py --num-ops 1000 --concurrency 5 --test-name tuple --api-version 610 ${bindingtester}
 )
