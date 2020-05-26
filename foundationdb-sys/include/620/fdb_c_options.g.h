@@ -186,7 +186,7 @@ typedef enum {
     // Parameter: (Int) value in milliseconds of timeout
     FDB_DB_OPTION_TRANSACTION_TIMEOUT=500,
 
-    // Set a timeout in milliseconds which, when elapsed, will cause a transaction automatically to be cancelled. This sets the ``retry_limit`` option of each transaction created by this database. See the transaction option description for more information.
+    // Set a maximum number of retries after which additional calls to ``onError`` will throw the most recently seen error code. This sets the ``retry_limit`` option of each transaction created by this database. See the transaction option description for more information.
     // Parameter: (Int) number of times to retry
     FDB_DB_OPTION_TRANSACTION_RETRY_LIMIT=501,
 
@@ -202,7 +202,7 @@ typedef enum {
     // Parameter: Option takes no parameter
     FDB_DB_OPTION_TRANSACTION_CAUSAL_READ_RISKY=504,
 
-    // Addresses returned by get_addresses_for_key include the port when enabled. This will be enabled by default in api version 700, and this option will be deprecated.
+    // Addresses returned by get_addresses_for_key include the port when enabled. This will be enabled by default in api version 630, and this option will be deprecated.
     // Parameter: Option takes no parameter
     FDB_DB_OPTION_TRANSACTION_INCLUDE_PORT_IN_ADDRESS=505
 } FDBDatabaseOption;
@@ -220,7 +220,7 @@ typedef enum {
     // Parameter: Option takes no parameter
     FDB_TR_OPTION_CAUSAL_READ_DISABLE=21,
 
-    // Addresses returned by get_addresses_for_key include the port when enabled. This will be enabled by default in api version 700, and this option will be deprecated.
+    // Addresses returned by get_addresses_for_key include the port when enabled. This will be enabled by default in api version 630, and this option will be deprecated.
     // Parameter: Option takes no parameter
     FDB_TR_OPTION_INCLUDE_PORT_IN_ADDRESS=23,
 
@@ -280,7 +280,7 @@ typedef enum {
     // Parameter: (String) String identifier to be used when tracing or profiling this transaction. The identifier must not exceed 100 characters.
     FDB_TR_OPTION_DEBUG_TRANSACTION_IDENTIFIER=403,
 
-    // Enables tracing for this transaction and logs results to the client trace logs. The DEBUG_TRANSACTION_IDENTIFIER option must be set before using this option, and client trace logging must be enabled and to get log output.
+    // Enables tracing for this transaction and logs results to the client trace logs. The DEBUG_TRANSACTION_IDENTIFIER option must be set before using this option, and client trace logging must be enabled to get log output.
     // Parameter: Option takes no parameter
     FDB_TR_OPTION_LOG_TRANSACTION=404,
 
@@ -312,7 +312,7 @@ typedef enum {
     // Parameter: Option takes no parameter
     FDB_TR_OPTION_SNAPSHOT_RYW_DISABLE=601,
 
-    // The transaction can read and write to locked databases, and is resposible for checking that it took the lock.
+    // The transaction can read and write to locked databases, and is responsible for checking that it took the lock.
     // Parameter: Option takes no parameter
     FDB_TR_OPTION_LOCK_AWARE=700,
 
@@ -333,7 +333,7 @@ typedef enum {
     // Client intends to consume the entire range and would like it all transferred as early as possible.
     FDB_STREAMING_MODE_WANT_ALL=-2,
 
-    // The default. The client doesn't know how much of the range it is likely to used and wants different performance concerns to be balanced. Only a small portion of data is transferred to the client initially (in order to minimize costs if the client doesn't read the entire range), and as the caller iterates over more items in the range larger batches will be transferred in order to minimize latency.
+    // The default. The client doesn't know how much of the range it is likely to used and wants different performance concerns to be balanced. Only a small portion of data is transferred to the client initially (in order to minimize costs if the client doesn't read the entire range), and as the caller iterates over more items in the range larger batches will be transferred in order to minimize latency. After enough iterations, the iterator mode will eventually reach the same byte limit as ``WANT_ALL``
     FDB_STREAMING_MODE_ITERATOR=-1,
 
     // Infrequently used. The client has passed a specific row limit and wants that many rows delivered in a single batch. Because of iterator operation in client drivers make request batches transparent to the user, consider ``WANT_ALL`` StreamingMode instead. A row limit must be specified if this mode is used.
