@@ -12,11 +12,8 @@ pub enum VersionstampOffset {
 }
 impl std::ops::AddAssign<u32> for VersionstampOffset {
     fn add_assign(&mut self, r: u32) {
-        match self {
-            VersionstampOffset::None { size } => {
-                *size += r;
-            }
-            _ => {}
+        if let VersionstampOffset::None { size } = self {
+            *size += r;
         }
     }
 }
