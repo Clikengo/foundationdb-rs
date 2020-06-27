@@ -233,7 +233,7 @@ impl Instr {
             "WAIT_FUTURE" => WaitFuture,
 
             "TUPLE_PACK" => TuplePack,
-            "TUPKE_PACK_WITH_VERSONSTAMP" => TuplePackWithVersionstamp,
+            "TUPLE_PACK_WITH_VERSONSTAMP" => TuplePackWithVersionstamp,
             "TUPLE_UNPACK" => TupleUnpack,
             "TUPLE_RANGE" => TupleRange,
             "TUPLE_SORT" => TupleSort,
