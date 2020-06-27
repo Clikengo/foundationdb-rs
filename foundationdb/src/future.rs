@@ -22,7 +22,6 @@
 //! important for reducing the latency of transactions.
 //!
 
-use std;
 use std::convert::TryFrom;
 use std::ffi::CStr;
 use std::fmt;
