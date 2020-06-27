@@ -536,6 +536,15 @@ mod bigint {
         bytes.iter().map(|byte| !*byte).collect()
     }
 
+    fn bigint_n(n: usize) -> io::Result<u8> {
+        u8::try_from(n).map_err(|_| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "BigUint requires more than 255 bytes to be represented",
+            )
+        })
+    }
+
     impl TuplePack for BigInt {
         fn pack<W: io::Write>(
             &self,
@@ -543,7 +552,8 @@ mod bigint {
             _tuple_depth: TupleDepth,
         ) -> io::Result<VersionstampOffset> {
             if self.sign() == Sign::NoSign {
-                return w.write_all(&[INTZERO]);
+                w.write_all(&[INTZERO])?;
+                return Ok(VersionstampOffset::None { size: 1 });
             }
             let (sign, mut bytes) = self.to_bytes_be();
             let n = bytes.len();
@@ -552,7 +562,7 @@ mod bigint {
                     if n <= MAX_SZ {
                         w.write_all(&[INTZERO - n as u8])?;
                     } else {
-                        w.write_all(&[NEGINTSTART, n as u8 ^ 0xff])?;
+                        w.write_all(&[NEGINTSTART, bigint_n(n)? ^ 0xff])?;
                     }
                     invert(&mut bytes);
                     w.write_all(&bytes)?;
@@ -562,13 +572,13 @@ mod bigint {
                     if n <= MAX_SZ {
                         w.write_all(&[INTZERO + n as u8])?;
                     } else {
-                        w.write_all(&[POSINTEND, n as u8])?;
+                        w.write_all(&[POSINTEND, bigint_n(n)?])?;
                     }
                     w.write_all(&bytes)?;
                 }
             };
 
-            Ok(())
+            Ok(VersionstampOffset::None { size: n as u32 + 1 })
         }
     }
 
@@ -610,25 +620,19 @@ mod bigint {
         ) -> io::Result<VersionstampOffset> {
             let n = self.bits();
             if n == 0 {
-                return w.write_all(&[INTZERO]);
+                w.write_all(&[INTZERO])?;
+                return Ok(VersionstampOffset::None { size: 1 });
             }
             let bytes = self.to_bytes_be();
             let n = bytes.len();
             if n <= MAX_SZ {
                 w.write_all(&[INTZERO + n as u8])?;
             } else {
-                w.write_all(&[
-                    POSINTEND,
-                    u8::try_from(n).map_err(|_| {
-                        std::io::Error::new(
-                            std::io::ErrorKind::InvalidInput,
-                            "BigUint requires more than 255 bytes to be represented",
-                        )
-                    })?,
-                ])?;
+                w.write_all(&[POSINTEND, bigint_n(n)?])?;
             }
             w.write_all(&bytes)?;
-            Ok(())
+
+            Ok(VersionstampOffset::None { size: n as u32 + 1 })
         }
     }
 
