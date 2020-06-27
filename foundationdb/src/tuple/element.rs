@@ -11,9 +11,11 @@ pub enum Element<'a> {
     Float(f32),
     Double(f64),
     Bool(bool),
+    Versionstamp(Versionstamp),
     #[cfg(feature = "uuid")]
     Uuid(uuid::Uuid),
-    Versionstamp(Versionstamp),
+    #[cfg(feature = "num-bigint")]
+    BigInt(num_bigint::BigInt),
 }
 
 impl<'a> Element<'a> {
@@ -30,6 +32,8 @@ impl<'a> Element<'a> {
             Element::Tuple(v) => Element::Tuple(v.into_iter().map(|e| e.into_owned()).collect()),
             #[cfg(feature = "uuid")]
             Element::Uuid(v) => Element::Uuid(v),
+            #[cfg(feature = "num-bigint")]
+            Element::BigInt(v) => Element::BigInt(v),
         }
     }
 

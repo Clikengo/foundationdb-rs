@@ -914,6 +914,8 @@ impl<'a> TuplePack for Element<'a> {
             Element::Tuple(ref v) => v.pack(w, tuple_depth),
             #[cfg(feature = "uuid")]
             Element::Uuid(v) => v.pack(w, tuple_depth),
+            #[cfg(feature = "num-bigint")]
+            Element::BigInt(v) => v.pack(w, tuple_depth),
         }
     }
 }
@@ -950,10 +952,22 @@ impl<'de> TupleUnpack<'de> for Element<'de> {
                 let (input, v) = i64::unpack(input, tuple_depth)?;
                 (input, Element::Int(v))
             }
+            #[cfg(feature = "num-bigint")]
+            NEGINTSTART => {
+                let (input, v) = num_bigint::BigInt::unpack(input, tuple_depth)?;
+                (input, Element::BigInt(v))
+            }
+            #[cfg(feature = "num-bigint")]
+            POSINTEND => {
+                let (input, v) = num_bigint::BigInt::unpack(input, tuple_depth)?;
+                (input, Element::BigInt(v))
+            }
+            #[cfg(not(feature = "num-bigint"))]
             NEGINTSTART => {
                 let (input, v) = i64::unpack(input, tuple_depth)?;
                 (input, Element::Int(v))
             }
+            #[cfg(not(feature = "num-bigint"))]
             POSINTEND => {
                 let (input, v) = i64::unpack(input, tuple_depth)?;
                 (input, Element::Int(v))
