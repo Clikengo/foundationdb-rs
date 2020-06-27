@@ -18,7 +18,7 @@ use std::result;
 pub use uuid::Uuid;
 
 pub use element::Element;
-pub use pack::{TuplePack, TupleUnpack};
+pub use pack::{TuplePack, TupleUnpack, VersionstampOffset};
 pub use subspace::Subspace;
 pub use versionstamp::Versionstamp;
 
@@ -174,14 +174,39 @@ impl From<String> for Bytes<'static> {
 }
 
 /// Pack value and returns the packed buffer
+///
+/// # Panics
+///
+/// Panics if the encoded data size doesn't fit in `u32`.
 pub fn pack<T: TuplePack>(v: &T) -> Vec<u8> {
     v.pack_to_vec()
 }
 
+/// Pack value and returns the packed buffer
+///
+/// # Panics
+///
+/// Panics if there is multiple versionstamp present or if the encoded data size doesn't fit in `u32`.
+pub fn pack_with_versionstamp<T: TuplePack>(v: &T) -> Vec<u8> {
+    v.pack_to_vec_with_versionstamp()
+}
+
 /// Pack value into the given buffer
+///
+/// # Panics
+///
+/// Panics if the encoded data size doesn't fit in `u32`.
 pub fn pack_into<T: TuplePack>(v: &T, output: &mut Vec<u8>) {
-    v.pack_root(output)
-        .expect("tuple encoding should never fail");
+    v.pack_into_vec(output)
+}
+
+/// Pack value into the given buffer
+///
+/// # Panics
+///
+/// Panics if there is multiple versionstamp present or if the encoded data size doesn't fit in `u32`.
+pub fn pack_into_with_versionstamp<T: TuplePack>(v: &T, output: &mut Vec<u8>) {
+    v.pack_into_vec_with_versionstamp(output)
 }
 
 /// Unpack input
@@ -550,5 +575,23 @@ mod tests {
         );
         test_serde(Vec::<Element>::new(), &[]);
         test_serde(Element::Tuple(vec![]), &[]);
+    }
+
+    #[test]
+    fn test_verstionstamp() {
+        assert_eq!(
+            Bytes::from(pack(&("foo", Versionstamp::incomplete(0)))),
+            Bytes::from(&b"\x02foo\x00\x33\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00\x00"[..])
+        );
+        assert_eq!(
+            Bytes::from(pack_with_versionstamp(&(
+                "foo",
+                Versionstamp::incomplete(0)
+            ))),
+            Bytes::from(
+                &b"\x02foo\x00\x33\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00\x00\x06\x00\x00\x00"
+                    [..]
+            )
+        );
     }
 }

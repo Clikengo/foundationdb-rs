@@ -1,21 +1,109 @@
 use super::*;
 use memchr::memchr_iter;
+use std::convert::TryFrom;
 use std::io;
 use std::mem;
 
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
+pub enum VersionstampOffset {
+    None { size: u32 },
+    One { offset: u32 },
+    Multiple,
+}
+impl std::ops::AddAssign<u32> for VersionstampOffset {
+    fn add_assign(&mut self, r: u32) {
+        match self {
+            VersionstampOffset::None { size } => {
+                *size += r;
+            }
+            _ => {}
+        }
+    }
+}
+impl std::ops::AddAssign for VersionstampOffset {
+    fn add_assign(&mut self, rhs: Self) {
+        match (&mut *self, rhs) {
+            (VersionstampOffset::None { size }, VersionstampOffset::None { size: r }) => {
+                *size += r;
+            }
+            (VersionstampOffset::None { size }, VersionstampOffset::One { offset }) => {
+                *self = VersionstampOffset::One {
+                    offset: *size + offset,
+                };
+            }
+            (VersionstampOffset::One { .. }, VersionstampOffset::One { .. })
+            | (VersionstampOffset::One { .. }, VersionstampOffset::Multiple) => {
+                *self = VersionstampOffset::Multiple;
+            }
+            _ => {}
+        }
+    }
+}
+
+const PACK_ERR_MSG: &str = "pack io error on Vec, data size didn't fit in `u32`?";
+
 /// A type that can be packed
 pub trait TuplePack {
-    fn pack<W: io::Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> io::Result<()>;
+    fn pack<W: io::Write>(
+        &self,
+        w: &mut W,
+        tuple_depth: TupleDepth,
+    ) -> io::Result<VersionstampOffset>;
 
-    fn pack_root<W: io::Write>(&self, w: &mut W) -> io::Result<()> {
+    fn pack_root<W: io::Write>(&self, w: &mut W) -> io::Result<VersionstampOffset> {
         self.pack(w, TupleDepth::new())
     }
 
+    /// Pack value and returns the packed buffer
+    ///
+    /// # Panics
+    ///
+    /// Panics if the encoded data size doesn't fit in `u32`.
     fn pack_to_vec(&self) -> Vec<u8> {
-        let mut v = Vec::new();
-        self.pack_root(&mut v)
-            .expect("tuple encoding should never fail");
-        v
+        let mut vec = Vec::new();
+        self.pack_into_vec(&mut vec);
+        vec
+    }
+
+    /// Pack value and returns the packed buffer
+    ///
+    /// # Panics
+    ///
+    /// Panics if there is multiple versionstamp present or if the encoded data size doesn't fit in `u32`.
+    fn pack_to_vec_with_versionstamp(&self) -> Vec<u8> {
+        let mut vec = Vec::new();
+        self.pack_into_vec_with_versionstamp(&mut vec);
+        vec
+    }
+
+    /// Pack value into the given buffer
+    ///
+    /// # Panics
+    ///
+    /// Panics if the encoded data size doesn't fit in `u32`.
+    fn pack_into_vec(&self, output: &mut Vec<u8>) {
+        self.pack_root(output).expect(PACK_ERR_MSG);
+    }
+
+    /// Pack value into the given buffer
+    ///
+    /// # Panics
+    ///
+    /// Panics if there is multiple versionstamp present or if the encoded data size doesn't fit in `u32`.
+    fn pack_into_vec_with_versionstamp(&self, output: &mut Vec<u8>) {
+        let mut offset = VersionstampOffset::None {
+            size: u32::try_from(output.len()).expect(PACK_ERR_MSG),
+        };
+        offset += self.pack_root(output).expect(PACK_ERR_MSG);
+        match offset {
+            VersionstampOffset::None { size: _ } => {}
+            VersionstampOffset::One { offset } => {
+                output.extend_from_slice(&offset.to_le_bytes());
+            }
+            VersionstampOffset::Multiple => {
+                panic!("pack_into_with_versionstamp does not allow multiple versionstamps");
+            }
+        }
     }
 }
 
@@ -36,7 +124,11 @@ impl<'a, T> TuplePack for &'a T
 where
     T: TuplePack,
 {
-    fn pack<W: io::Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> std::io::Result<()> {
+    fn pack<W: io::Write>(
+        &self,
+        w: &mut W,
+        tuple_depth: TupleDepth,
+    ) -> io::Result<VersionstampOffset> {
         (*self).pack(w, tuple_depth)
     }
 }
@@ -71,17 +163,21 @@ fn parse_code(input: &[u8], expected: u8) -> PackResult<&[u8]> {
     }
 }
 
-fn write_bytes<W: io::Write>(w: &mut W, v: &[u8]) -> io::Result<()> {
+fn write_bytes<W: io::Write>(w: &mut W, v: &[u8]) -> io::Result<VersionstampOffset> {
+    let mut size =
+        u32::try_from(v.len()).map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?;
     let mut pos = 0;
     for idx in memchr_iter(NIL, v) {
         let next_idx = idx + 1;
+        size += 1;
         w.write_all(&v[pos..next_idx])?;
         w.write_all(&[ESCAPE])?;
         pos = next_idx;
     }
     w.write_all(&v[pos..])?;
     w.write_all(&[NIL])?;
-    Ok(())
+    size += 2;
+    Ok(VersionstampOffset::None { size })
 }
 
 fn parse_slice<'de>(input: &'de [u8]) -> PackResult<(&'de [u8], Cow<'de, [u8]>)> {
@@ -124,11 +220,17 @@ fn parse_string<'de>(input: &'de [u8]) -> PackResult<(&'de [u8], Cow<'de, str>)>
 }
 
 impl TuplePack for () {
-    fn pack<W: io::Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> std::io::Result<()> {
+    fn pack<W: io::Write>(
+        &self,
+        w: &mut W,
+        tuple_depth: TupleDepth,
+    ) -> io::Result<VersionstampOffset> {
         if tuple_depth.depth() > 0 {
             w.write_all(&[NESTED, NIL])?;
+            Ok(VersionstampOffset::None { size: 2 })
+        } else {
+            Ok(VersionstampOffset::None { size: 0 })
         }
-        Ok(())
     }
 }
 
@@ -149,19 +251,22 @@ macro_rules! tuple_impls {
             where
                 $($name: TuplePack,)+
             {
-                fn pack<W: io::Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> std::io::Result<()> {
+                fn pack<W: io::Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> io::Result<VersionstampOffset> {
+                    let mut offset = VersionstampOffset::None { size: 0 };
                     if tuple_depth.depth() > 0 {
                         w.write_all(&[NESTED])?;
+                        offset += 1;
                     }
 
                     $(
-                        self.$n.pack(w, tuple_depth.increment())?;
+                        offset += self.$n.pack(w, tuple_depth.increment())?;
                     )*
 
                     if tuple_depth.depth() > 0 {
                         w.write_all(&[NIL])?;
+                        offset += 1;
                     }
-                    Ok(())
+                    Ok(offset)
                 }
             }
 
@@ -236,7 +341,7 @@ macro_rules! impl_ux {
                 &self,
                 w: &mut W,
                 _tuple_depth: TupleDepth,
-            ) -> std::io::Result<()> {
+            ) -> io::Result<VersionstampOffset> {
                 const SZ: usize = mem::size_of::<$ux>();
                 let u = *self;
                 let n = SZ - (u.leading_zeros() as usize) / 8;
@@ -246,7 +351,8 @@ macro_rules! impl_ux {
                     w.write_all(&[POSINTEND, n as u8])?;
                 }
                 w.write_all(&u.to_be_bytes()[SZ - n..])?;
-                Ok(())
+
+                Ok(VersionstampOffset::None { size: n as u32 + 1 })
             }
         }
 
@@ -285,7 +391,7 @@ macro_rules! impl_ix {
                 &self,
                 w: &mut W,
                 _tuple_depth: TupleDepth,
-            ) -> std::io::Result<()> {
+            ) -> io::Result<VersionstampOffset> {
                 const SZ: usize = mem::size_of::<$ix>();
                 let i = *self;
                 let u = self.wrapping_abs() as $ux;
@@ -307,7 +413,7 @@ macro_rules! impl_ix {
                 };
                 w.write_all(&arr[SZ - n..])?;
 
-                Ok(())
+                Ok(VersionstampOffset::None { size: n as u32 + 1 })
             }
         }
 
@@ -353,7 +459,7 @@ macro_rules! impl_fx {
                 &self,
                 w: &mut W,
                 _tuple_depth: TupleDepth,
-            ) -> std::io::Result<()> {
+            ) -> io::Result<VersionstampOffset> {
                 let f = *self;
                 let u = if f.is_sign_negative() {
                     f.to_bits() ^ ::std::$ux::MAX
@@ -362,7 +468,9 @@ macro_rules! impl_fx {
                 };
                 w.write_all(&[$code])?;
                 w.write_all(&u.to_be_bytes())?;
-                Ok(())
+                Ok(VersionstampOffset::None {
+                    size: std::mem::size_of::<$fx>() as u32 / 8 + 1,
+                })
             }
         }
 
@@ -429,7 +537,11 @@ mod bigint {
     }
 
     impl TuplePack for BigInt {
-        fn pack<W: io::Write>(&self, w: &mut W, _tuple_depth: TupleDepth) -> std::io::Result<()> {
+        fn pack<W: io::Write>(
+            &self,
+            w: &mut W,
+            _tuple_depth: TupleDepth,
+        ) -> io::Result<VersionstampOffset> {
             if self.sign() == Sign::NoSign {
                 return w.write_all(&[INTZERO]);
             }
@@ -491,7 +603,11 @@ mod bigint {
     }
 
     impl TuplePack for BigUint {
-        fn pack<W: io::Write>(&self, w: &mut W, _tuple_depth: TupleDepth) -> std::io::Result<()> {
+        fn pack<W: io::Write>(
+            &self,
+            w: &mut W,
+            _tuple_depth: TupleDepth,
+        ) -> io::Result<VersionstampOffset> {
             let n = self.bits();
             if n == 0 {
                 return w.write_all(&[INTZERO]);
@@ -539,8 +655,13 @@ mod bigint {
 }
 
 impl TuplePack for bool {
-    fn pack<W: io::Write>(&self, w: &mut W, _tuple_depth: TupleDepth) -> std::io::Result<()> {
-        w.write_all(&[if *self { TRUE } else { FALSE }])
+    fn pack<W: io::Write>(
+        &self,
+        w: &mut W,
+        _tuple_depth: TupleDepth,
+    ) -> io::Result<VersionstampOffset> {
+        w.write_all(&[if *self { TRUE } else { FALSE }])?;
+        Ok(VersionstampOffset::None { size: 1 })
     }
 }
 
@@ -561,18 +682,27 @@ impl<'a, T> TuplePack for &'a [T]
 where
     T: TuplePack,
 {
-    fn pack<W: io::Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> io::Result<()> {
+    fn pack<W: io::Write>(
+        &self,
+        w: &mut W,
+        tuple_depth: TupleDepth,
+    ) -> io::Result<VersionstampOffset> {
+        let mut offset = VersionstampOffset::None { size: 0 };
+
         if tuple_depth.depth() > 0 {
             w.write_all(&[NESTED])?;
+            offset += 1;
         }
+
         for v in self.iter() {
-            v.pack(w, tuple_depth.increment())?;
+            offset += v.pack(w, tuple_depth.increment())?;
         }
 
         if tuple_depth.depth() > 0 {
             w.write_all(&[NIL])?;
+            offset += 1;
         }
-        Ok(())
+        Ok(offset)
     }
 }
 
@@ -580,7 +710,11 @@ impl<T> TuplePack for Vec<T>
 where
     T: TuplePack,
 {
-    fn pack<W: io::Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> std::io::Result<()> {
+    fn pack<W: io::Write>(
+        &self,
+        w: &mut W,
+        tuple_depth: TupleDepth,
+    ) -> io::Result<VersionstampOffset> {
         self.as_slice().pack(w, tuple_depth)
     }
 }
@@ -621,7 +755,11 @@ where
 }
 
 impl<'a> TuplePack for Bytes<'a> {
-    fn pack<W: io::Write>(&self, w: &mut W, _tuple_depth: TupleDepth) -> std::io::Result<()> {
+    fn pack<W: io::Write>(
+        &self,
+        w: &mut W,
+        _tuple_depth: TupleDepth,
+    ) -> io::Result<VersionstampOffset> {
         w.write_all(&[BYTES])?;
         write_bytes(w, self.as_ref())
     }
@@ -636,13 +774,21 @@ impl<'de> TupleUnpack<'de> for Bytes<'de> {
 }
 
 impl<'a> TuplePack for &'a [u8] {
-    fn pack<W: io::Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> io::Result<()> {
+    fn pack<W: io::Write>(
+        &self,
+        w: &mut W,
+        tuple_depth: TupleDepth,
+    ) -> io::Result<VersionstampOffset> {
         Bytes::from(*self).pack(w, tuple_depth)
     }
 }
 
 impl TuplePack for Vec<u8> {
-    fn pack<W: io::Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> std::io::Result<()> {
+    fn pack<W: io::Write>(
+        &self,
+        w: &mut W,
+        tuple_depth: TupleDepth,
+    ) -> io::Result<VersionstampOffset> {
         Bytes::from(self.as_slice()).pack(w, tuple_depth)
     }
 }
@@ -655,20 +801,32 @@ impl<'de> TupleUnpack<'de> for Vec<u8> {
 }
 
 impl<'a> TuplePack for &'a str {
-    fn pack<W: io::Write>(&self, w: &mut W, _tuple_depth: TupleDepth) -> std::io::Result<()> {
+    fn pack<W: io::Write>(
+        &self,
+        w: &mut W,
+        _tuple_depth: TupleDepth,
+    ) -> io::Result<VersionstampOffset> {
         w.write_all(&[STRING])?;
         write_bytes(w, self.as_bytes())
     }
 }
 
 impl TuplePack for String {
-    fn pack<W: io::Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> std::io::Result<()> {
+    fn pack<W: io::Write>(
+        &self,
+        w: &mut W,
+        tuple_depth: TupleDepth,
+    ) -> io::Result<VersionstampOffset> {
         self.as_str().pack(w, tuple_depth)
     }
 }
 
 impl<'a> TuplePack for Cow<'a, str> {
-    fn pack<W: io::Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> std::io::Result<()> {
+    fn pack<W: io::Write>(
+        &self,
+        w: &mut W,
+        tuple_depth: TupleDepth,
+    ) -> io::Result<VersionstampOffset> {
         self.as_ref().pack(w, tuple_depth)
     }
 }
@@ -693,15 +851,24 @@ impl<T> TuplePack for Option<T>
 where
     T: TuplePack,
 {
-    fn pack<W: io::Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> std::io::Result<()> {
+    fn pack<W: io::Write>(
+        &self,
+        w: &mut W,
+        tuple_depth: TupleDepth,
+    ) -> io::Result<VersionstampOffset> {
         match self {
-            None => Ok(if tuple_depth.depth() > 1 {
-                // Empty value in nested tuple is encoded with [NIL, ESCAPE] to
-                // disambiguate itself with end-of-tuple marker.
-                w.write_all(&[NIL, ESCAPE])
-            } else {
-                w.write_all(&[NIL])
-            }?),
+            None => {
+                let size = if tuple_depth.depth() > 1 {
+                    // Empty value in nested tuple is encoded with [NIL, ESCAPE] to
+                    // disambiguate itself with end-of-tuple marker.
+                    w.write_all(&[NIL, ESCAPE])?;
+                    2
+                } else {
+                    w.write_all(&[NIL])?;
+                    1
+                };
+                Ok(VersionstampOffset::None { size })
+            }
             Some(v) => v.pack(w, tuple_depth),
         }
     }
@@ -726,7 +893,11 @@ where
 }
 
 impl<'a> TuplePack for Element<'a> {
-    fn pack<W: io::Write>(&self, w: &mut W, tuple_depth: TupleDepth) -> std::io::Result<()> {
+    fn pack<W: io::Write>(
+        &self,
+        w: &mut W,
+        tuple_depth: TupleDepth,
+    ) -> io::Result<VersionstampOffset> {
         match self {
             Element::Nil => Option::<()>::None.pack(w, tuple_depth),
             Element::Bool(b) => b.pack(w, tuple_depth),
@@ -828,9 +999,14 @@ impl<'de> TupleUnpack<'de> for Element<'de> {
 }
 
 impl TuplePack for Versionstamp {
-    fn pack<W: io::Write>(&self, w: &mut W, _tuple_depth: TupleDepth) -> std::io::Result<()> {
+    fn pack<W: io::Write>(
+        &self,
+        w: &mut W,
+        _tuple_depth: TupleDepth,
+    ) -> io::Result<VersionstampOffset> {
         w.write_all(&[VERSIONSTAMP])?;
-        w.write_all(self.as_bytes())
+        w.write_all(self.as_bytes())?;
+        Ok(VersionstampOffset::One { offset: 1 })
     }
 }
 
@@ -850,9 +1026,14 @@ mod pack_uuid {
     use uuid::Uuid;
 
     impl TuplePack for Uuid {
-        fn pack<W: io::Write>(&self, w: &mut W, _tuple_depth: TupleDepth) -> std::io::Result<()> {
+        fn pack<W: io::Write>(
+            &self,
+            w: &mut W,
+            _tuple_depth: TupleDepth,
+        ) -> io::Result<VersionstampOffset> {
             w.write_all(&[UUID])?;
-            w.write_all(self.as_bytes())
+            w.write_all(self.as_bytes())?;
+            Ok(VersionstampOffset::None { size: 1 + 16 })
         }
     }
 
