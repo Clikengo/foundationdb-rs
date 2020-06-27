@@ -124,6 +124,8 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
+          command: test
+          args: --manifest-path foundationdb/Cargo.toml --no-default-features --features fdb-6_1 --tests
           args: -p bindingtester
 
       - name: Run bindingtester
@@ -195,6 +197,8 @@ jobs:
 
       - name: Run bindingtester
         run: scripts/run_bindingtester.sh target/x86_64-unknown-linux-gnu/debug/bindingtester
+        env:
+          RUST_BACKTRACE: 1
 
       - id: coverage
         uses: actions-rs/grcov@v0.1

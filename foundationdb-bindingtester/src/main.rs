@@ -681,11 +681,10 @@ impl StackMachine {
             // pushes the difference (A-B) onto the stack.
             // A and B may be assumed to be integers.
             Sub => {
-                let a: i64 = self.pop_item().await;
-                let b: i64 = self.pop_item().await;
+                let a: num_bigint::BigInt = self.pop_item().await;
+                let b: num_bigint::BigInt = self.pop_item().await;
                 debug!("sub {:?} - {:?}", a, b);
-                // wrapping sub to match bindingtester expected output
-                self.push_item(number, &(a.wrapping_sub(b)));
+                self.push_item(number, &(a - b));
             }
             // Pops the top two items off the stack as A and B and then pushes
             // the concatenation of A and B onto the stack. A and B can be
