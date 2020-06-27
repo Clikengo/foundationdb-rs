@@ -125,8 +125,6 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-          command: test
-          args: --manifest-path foundationdb/Cargo.toml --no-default-features --features fdb-6_1 --tests
           args: -p bindingtester
 
       - name: Run bindingtester
