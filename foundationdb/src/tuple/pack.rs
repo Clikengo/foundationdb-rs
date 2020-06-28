@@ -450,21 +450,25 @@ macro_rules! impl_ix {
 }
 
 macro_rules! impl_fx {
-    ( $fx: ident, $parse_ux: ident, $ux: ident, $code: ident) => {
+    ( $fx: ident, $fx_to_ux_be_bytes: ident, $ux_width: tt, $parse_ux: ident, $ux: ident, $code: ident) => {
+        #[inline]
+        pub(super) fn $fx_to_ux_be_bytes(f: $fx) -> [u8; $ux_width] {
+            let u = if f.is_sign_negative() {
+                f.to_bits() ^ ::std::$ux::MAX
+            } else {
+                f.to_bits() ^ sign_bit!($ux)
+            };
+            u.to_be_bytes()
+        }
         impl TuplePack for $fx {
             fn pack<W: io::Write>(
                 &self,
                 w: &mut W,
                 _tuple_depth: TupleDepth,
             ) -> io::Result<VersionstampOffset> {
-                let f = *self;
-                let u = if f.is_sign_negative() {
-                    f.to_bits() ^ ::std::$ux::MAX
-                } else {
-                    f.to_bits() ^ sign_bit!($ux)
-                };
+                let bytes = $fx_to_ux_be_bytes(*self);
                 w.write_all(&[$code])?;
-                w.write_all(&u.to_be_bytes())?;
+                w.write_all(&bytes)?;
                 Ok(VersionstampOffset::None {
                     size: std::mem::size_of::<$fx>() as u32 / 8 + 1,
                 })
@@ -508,8 +512,8 @@ impl_ix!(i64, u64);
 impl_ix!(i128, u128, MAX_SZ);
 impl_ix!(isize, usize);
 
-impl_fx!(f32, parse_u32, u32, FLOAT);
-impl_fx!(f64, parse_u64, u64, DOUBLE);
+impl_fx!(f32, f32_to_u32_be_bytes, 4, parse_u32, u32, FLOAT);
+impl_fx!(f64, f64_to_u64_be_bytes, 8, parse_u64, u64, DOUBLE);
 
 #[cfg(feature = "num-bigint")]
 mod bigint {
