@@ -123,7 +123,9 @@ impl<'a> fmt::Display for Bytes<'a> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "b\"")?;
         for &byte in self.0.iter() {
-            if byte.is_ascii_alphanumeric() || byte.is_ascii_punctuation() || byte == b' ' {
+            if byte == b'\\' {
+                write!(fmt, r"\\")?;
+            } else if byte.is_ascii_alphanumeric() {
                 write!(fmt, "{}", byte as char)?;
             } else {
                 write!(fmt, "\\x{:02x}", byte)?;
@@ -533,6 +535,13 @@ mod tests {
         test_serde(
             Element::Tuple(vec![Element::Nil, Element::Nil]),
             b"\x00\x00",
+        );
+        test_serde(
+            Element::Tuple(vec![
+                Element::String(Cow::Borrowed("PUSH")),
+                Element::Tuple(vec![Element::Double(-8.251343508909708e-15)]),
+            ]),
+            b"\x02PUSH\x00\x05!B\xfdkl\x9f\xcc\x8eK\x00",
         );
     }
 
