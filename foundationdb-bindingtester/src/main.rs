@@ -1198,11 +1198,18 @@ impl StackMachine {
             // limits, so these bindings can obtain different sizes back.
             GetApproximateSize => {
                 debug!("get_approximate_size");
-                trx.as_mut()
-                    .get_approximate_size()
-                    .await
-                    .expect("failed to get approximate size");
-                self.push(number, GOT_APPROXIMATE_SIZE.clone().into_owned());
+                #[cfg(feature = "fdb-6_2")]
+                {
+                    trx.as_mut()
+                        .get_approximate_size()
+                        .await
+                        .expect("failed to get approximate size");
+                    self.push(number, GOT_APPROXIMATE_SIZE.clone().into_owned());
+                }
+                #[cfg(not(feature = "fdb-6_2"))]
+                {
+                    unimplemented!("get_approximate_size requires fdb620+");
+                }
             }
 
             // Pops the top item off the stack and pushes it back on. If the top item on
