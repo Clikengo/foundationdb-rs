@@ -1521,6 +1521,87 @@
 <span id="1521">1521</span>
 <span id="1522">1522</span>
 <span id="1523">1523</span>
+<span id="1524">1524</span>
+<span id="1525">1525</span>
+<span id="1526">1526</span>
+<span id="1527">1527</span>
+<span id="1528">1528</span>
+<span id="1529">1529</span>
+<span id="1530">1530</span>
+<span id="1531">1531</span>
+<span id="1532">1532</span>
+<span id="1533">1533</span>
+<span id="1534">1534</span>
+<span id="1535">1535</span>
+<span id="1536">1536</span>
+<span id="1537">1537</span>
+<span id="1538">1538</span>
+<span id="1539">1539</span>
+<span id="1540">1540</span>
+<span id="1541">1541</span>
+<span id="1542">1542</span>
+<span id="1543">1543</span>
+<span id="1544">1544</span>
+<span id="1545">1545</span>
+<span id="1546">1546</span>
+<span id="1547">1547</span>
+<span id="1548">1548</span>
+<span id="1549">1549</span>
+<span id="1550">1550</span>
+<span id="1551">1551</span>
+<span id="1552">1552</span>
+<span id="1553">1553</span>
+<span id="1554">1554</span>
+<span id="1555">1555</span>
+<span id="1556">1556</span>
+<span id="1557">1557</span>
+<span id="1558">1558</span>
+<span id="1559">1559</span>
+<span id="1560">1560</span>
+<span id="1561">1561</span>
+<span id="1562">1562</span>
+<span id="1563">1563</span>
+<span id="1564">1564</span>
+<span id="1565">1565</span>
+<span id="1566">1566</span>
+<span id="1567">1567</span>
+<span id="1568">1568</span>
+<span id="1569">1569</span>
+<span id="1570">1570</span>
+<span id="1571">1571</span>
+<span id="1572">1572</span>
+<span id="1573">1573</span>
+<span id="1574">1574</span>
+<span id="1575">1575</span>
+<span id="1576">1576</span>
+<span id="1577">1577</span>
+<span id="1578">1578</span>
+<span id="1579">1579</span>
+<span id="1580">1580</span>
+<span id="1581">1581</span>
+<span id="1582">1582</span>
+<span id="1583">1583</span>
+<span id="1584">1584</span>
+<span id="1585">1585</span>
+<span id="1586">1586</span>
+<span id="1587">1587</span>
+<span id="1588">1588</span>
+<span id="1589">1589</span>
+<span id="1590">1590</span>
+<span id="1591">1591</span>
+<span id="1592">1592</span>
+<span id="1593">1593</span>
+<span id="1594">1594</span>
+<span id="1595">1595</span>
+<span id="1596">1596</span>
+<span id="1597">1597</span>
+<span id="1598">1598</span>
+<span id="1599">1599</span>
+<span id="1600">1600</span>
+<span id="1601">1601</span>
+<span id="1602">1602</span>
+<span id="1603">1603</span>
+<span id="1604">1604</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="attribute">#[<span class="ident">macro_use</span>]</span>
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
@@ -1530,20 +1611,34 @@
 
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">borrow</span>::<span class="ident">Cow</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">HashMap</span>;
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">convert</span>::<span class="ident">TryFrom</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Write</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">pin</span>::<span class="ident">Pin</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Arc</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">thread</span>;
 
 <span class="kw">use</span> <span class="ident">fdb</span>::<span class="ident">options</span>::{<span class="ident">ConflictRangeType</span>, <span class="ident">DatabaseOption</span>, <span class="ident">TransactionOption</span>};
-<span class="kw">use</span> <span class="ident">fdb</span>::<span class="ident">tuple</span>::{<span class="ident">pack</span>, <span class="ident">pack_into</span>, <span class="ident">unpack</span>, <span class="ident">Bytes</span>, <span class="ident">Element</span>, <span class="ident">Subspace</span>, <span class="ident">TuplePack</span>, <span class="ident">TupleUnpack</span>};
+<span class="kw">use</span> <span class="ident">fdb</span>::<span class="ident">tuple</span>::{<span class="ident">pack</span>, <span class="ident">pack_into</span>, <span class="ident">unpack</span>, <span class="ident">Bytes</span>, <span class="ident">Element</span>, <span class="ident">Subspace</span>, <span class="ident">TuplePack</span>};
 <span class="kw">use</span> <span class="ident">fdb</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">future</span>;
 <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">prelude</span>::<span class="kw-2">*</span>;
 
-<span class="kw">static</span> <span class="ident">RESULT_NOT_PRESENT</span>: <span class="ident">Bytes</span> <span class="op">=</span> <span class="ident">Bytes</span>(<span class="ident">Cow</span>::<span class="ident">Borrowed</span>(<span class="string">b&quot;RESULT_NOT_PRESENT&quot;</span>));
+<span class="kw">static</span> <span class="ident">WAITED_FOR_EMPTY</span>: <span class="ident">Element</span> <span class="op">=</span> <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">Bytes</span>(<span class="ident">Cow</span>::<span class="ident">Borrowed</span>(<span class="string">b&quot;WAITED_FOR_EMPTY&quot;</span>)));
+<span class="kw">static</span> <span class="ident">RESULT_NOT_PRESENT</span>: <span class="ident">Element</span> <span class="op">=</span> <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">Bytes</span>(<span class="ident">Cow</span>::<span class="ident">Borrowed</span>(<span class="string">b&quot;RESULT_NOT_PRESENT&quot;</span>)));
+<span class="kw">static</span> <span class="ident">GOT_READ_VERSION</span>: <span class="ident">Element</span> <span class="op">=</span> <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">Bytes</span>(<span class="ident">Cow</span>::<span class="ident">Borrowed</span>(<span class="string">b&quot;GOT_READ_VERSION&quot;</span>)));
+<span class="kw">static</span> <span class="ident">GOT_COMMITTED_VERSION</span>: <span class="ident">Element</span> <span class="op">=</span>
+    <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">Bytes</span>(<span class="ident">Cow</span>::<span class="ident">Borrowed</span>(<span class="string">b&quot;GOT_COMMITTED_VERSION&quot;</span>)));
+
+<span class="kw">static</span> <span class="ident">ERROR_NONE</span>: <span class="ident">Element</span> <span class="op">=</span> <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">Bytes</span>(<span class="ident">Cow</span>::<span class="ident">Borrowed</span>(<span class="string">b&quot;ERROR: NONE&quot;</span>)));
+<span class="kw">static</span> <span class="ident">ERROR_MULTIPLE</span>: <span class="ident">Element</span> <span class="op">=</span> <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">Bytes</span>(<span class="ident">Cow</span>::<span class="ident">Borrowed</span>(<span class="string">b&quot;ERROR: MULTIPLE&quot;</span>)));
+<span class="kw">static</span> <span class="ident">OK</span>: <span class="ident">Element</span> <span class="op">=</span> <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">Bytes</span>(<span class="ident">Cow</span>::<span class="ident">Borrowed</span>(<span class="string">b&quot;OK&quot;</span>)));
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;fdb-6_2&quot;</span>)]</span>
+<span class="kw">static</span> <span class="ident">GOT_APPROXIMATE_SIZE</span>: <span class="ident">Element</span> <span class="op">=</span>
+    <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">Bytes</span>(<span class="ident">Cow</span>::<span class="ident">Borrowed</span>(<span class="string">b&quot;GOT_APPROXIMATE_SIZE&quot;</span>)));
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">fdb</span>::<span class="ident">options</span>::{<span class="ident">MutationType</span>, <span class="ident">StreamingMode</span>};
+<span class="kw">use</span> <span class="ident">tuple</span>::<span class="ident">VersionstampOffset</span>;
 <span class="kw">fn</span> <span class="ident">mutation_from_str</span>(<span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">MutationType</span> {
     <span class="kw">match</span> <span class="ident">s</span> {
         <span class="string">&quot;ADD&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">MutationType</span>::<span class="ident">Add</span>,
@@ -1647,7 +1742,7 @@
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
 <span class="kw">enum</span> <span class="ident">InstrCode</span> {
     <span class="comment">// data operations</span>
-    <span class="ident">Push</span>(<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>),
+    <span class="ident">Push</span>(<span class="ident">Element</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>),
     <span class="ident">Dup</span>,
     <span class="ident">EmptyStack</span>,
     <span class="ident">Swap</span>,
@@ -1679,6 +1774,7 @@
     <span class="ident">Reset</span>,
     <span class="ident">Cancel</span>,
     <span class="ident">GetCommittedVersion</span>,
+    <span class="ident">GetApproximateSize</span>,
     <span class="ident">WaitFuture</span>,
 
     <span class="ident">TuplePack</span>,
@@ -1722,7 +1818,7 @@
         <span class="kw">let</span> (<span class="ident">cmd</span>, <span class="ident">selector</span>) <span class="op">=</span> <span class="ident">has_opt</span>(<span class="ident">cmd</span>, <span class="string">&quot;_SELECTOR&quot;</span>);
 
         <span class="kw">let</span> <span class="ident">code</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">cmd</span> {
-            <span class="string">&quot;PUSH&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Push</span>(<span class="ident">pack</span>(<span class="kw-2">&amp;</span><span class="ident">tup</span>[<span class="number">1</span>])),
+            <span class="string">&quot;PUSH&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Push</span>(<span class="ident">tup</span>[<span class="number">1</span>].<span class="ident">clone</span>().<span class="ident">into_owned</span>()),
             <span class="string">&quot;DUP&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Dup</span>,
             <span class="string">&quot;EMPTY_STACK&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">EmptyStack</span>,
             <span class="string">&quot;SWAP&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Swap</span>,
@@ -1754,10 +1850,11 @@
             <span class="string">&quot;RESET&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Reset</span>,
             <span class="string">&quot;CANCEL&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Cancel</span>,
             <span class="string">&quot;GET_COMMITTED_VERSION&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">GetCommittedVersion</span>,
+            <span class="string">&quot;GET_APPROXIMATE_SIZE&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">GetApproximateSize</span>,
             <span class="string">&quot;WAIT_FUTURE&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">WaitFuture</span>,
 
             <span class="string">&quot;TUPLE_PACK&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">TuplePack</span>,
-            <span class="string">&quot;TUPKE_PACK_WITH_VERSONSTAMP&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">TuplePackWithVersionstamp</span>,
+            <span class="string">&quot;TUPLE_PACK_WITH_VERSIONSTAMP&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">TuplePackWithVersionstamp</span>,
             <span class="string">&quot;TUPLE_UNPACK&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">TupleUnpack</span>,
             <span class="string">&quot;TUPLE_RANGE&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">TupleRange</span>,
             <span class="string">&quot;TUPLE_SORT&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">TupleSort</span>,
@@ -1785,7 +1882,7 @@
 
 <span class="kw">struct</span> <span class="ident">StackResult</span> {
     <span class="ident">state</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">Bytes</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>, <span class="ident">TransactionState</span>)<span class="op">&gt;</span>,
-    <span class="ident">data</span>: <span class="ident">FdbResult</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">data</span>: <span class="ident">FdbResult</span><span class="op">&lt;</span><span class="ident">Element</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 }
 <span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">FdbError</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">StackResult</span> {
     <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">err</span>: <span class="ident">FdbError</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
@@ -1795,8 +1892,8 @@
         }
     }
 }
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">StackResult</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">data</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Element</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">StackResult</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">data</span>: <span class="ident">Element</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="ident">StackResult</span> {
             <span class="ident">state</span>: <span class="prelude-val">None</span>,
             <span class="ident">data</span>: <span class="prelude-val">Ok</span>(<span class="ident">data</span>),
@@ -1804,8 +1901,8 @@
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">FdbResult</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">StackResult</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">data</span>: <span class="ident">FdbResult</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">FdbResult</span><span class="op">&lt;</span><span class="ident">Element</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">StackResult</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">data</span>: <span class="ident">FdbResult</span><span class="op">&lt;</span><span class="ident">Element</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="ident">StackResult</span> { <span class="ident">state</span>: <span class="prelude-val">None</span>, <span class="ident">data</span> }
     }
 }
@@ -1813,7 +1910,7 @@
 <span class="kw">type</span> <span class="ident">StackFuture</span> <span class="op">=</span> <span class="ident">Pin</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Future</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> <span class="ident">StackResult</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>;
 <span class="kw">struct</span> <span class="ident">StackItem</span> {
     <span class="ident">number</span>: <span class="ident">usize</span>,
-    <span class="ident">data</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">data</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Element</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">fut</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">usize</span>, <span class="ident">StackFuture</span>)<span class="op">&gt;</span>,
 }
 
@@ -1843,7 +1940,7 @@
                     <span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="string">b&quot;ERROR&quot;</span>.<span class="ident">as_ref</span>()),
                     <span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">err</span>.<span class="ident">code</span>()).<span class="ident">into_bytes</span>()),
                 ));
-                <span class="ident">pack</span>(<span class="kw-2">&amp;</span><span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">packed</span>))
+                <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">packed</span>.<span class="ident">into</span>())
             });
 
             <span class="self">self</span>.<span class="ident">data</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">data</span>);
@@ -1871,18 +1968,16 @@
     }
 }
 
-<span class="kw">fn</span> <span class="ident">range</span>(<span class="ident">bytes</span>: <span class="ident">Bytes</span>) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">Bytes</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>, <span class="ident">Bytes</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>) {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">begin</span> <span class="op">=</span> <span class="ident">bytes</span>.<span class="ident">into_owned</span>();
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">begin</span>.<span class="ident">clone</span>();
-
-    <span class="ident">begin</span>.<span class="ident">push</span>(<span class="number">0x00</span>);
-    <span class="ident">end</span>.<span class="ident">push</span>(<span class="number">0xff</span>);
+<span class="kw">fn</span> <span class="ident">range</span>(<span class="ident">prefix</span>: <span class="ident">Bytes</span>) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">Bytes</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>, <span class="ident">Bytes</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>) {
+    <span class="kw">let</span> <span class="ident">begin</span> <span class="op">=</span> <span class="ident">prefix</span>.<span class="ident">clone</span>().<span class="ident">into_owned</span>();
+    <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">strinc</span>(<span class="ident">prefix</span>).<span class="ident">into_owned</span>();
 
     (<span class="ident">begin</span>.<span class="ident">into</span>(), <span class="ident">end</span>.<span class="ident">into</span>())
 }
 
 <span class="kw">enum</span> <span class="ident">TransactionState</span> {
     <span class="ident">Transaction</span>(<span class="ident">Transaction</span>),
+    <span class="ident">TransactionCancelled</span>(<span class="ident">TransactionCancelled</span>),
     <span class="ident">TransactionCommitted</span>(<span class="ident">TransactionCommitted</span>),
     <span class="ident">TransactionCommitError</span>(<span class="ident">TransactionCommitError</span>),
     <span class="ident">Pending</span>(<span class="ident">usize</span>),
@@ -1894,6 +1989,7 @@
 
         <span class="kw">match</span> <span class="self">self</span> {
             <span class="ident">S</span>::<span class="ident">Transaction</span>(..) <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;Transaction&quot;</span>,
+            <span class="ident">S</span>::<span class="ident">TransactionCancelled</span>(..) <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;TransactionCancelled&quot;</span>,
             <span class="ident">S</span>::<span class="ident">TransactionCommitted</span>(..) <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;TransactionCommitted&quot;</span>,
             <span class="ident">S</span>::<span class="ident">TransactionCommitError</span>(..) <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;TransactionCommitError&quot;</span>,
             <span class="ident">S</span>::<span class="ident">Pending</span>(..) <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;Pending&quot;</span>,
@@ -1919,6 +2015,10 @@
         <span class="self">self</span>.<span class="ident">reset</span>();
         <span class="kw">match</span> <span class="kw-2">*</span><span class="self">self</span> {
             <span class="ident">S</span>::<span class="ident">Transaction</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">tr</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">tr</span>,
+            <span class="ident">S</span>::<span class="ident">TransactionCancelled</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">tr</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">unsafe</span> {
+                <span class="comment">// rust binding prevent accessing cancelled transaction</span>
+                <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">transmute</span>(<span class="ident">tr</span>)
+            },
             <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;transaction is owned by a future that is still not done&quot;</span>),
         }
     }
@@ -1931,6 +2031,13 @@
             <span class="ident">S</span>::<span class="ident">Transaction</span>(<span class="ident">tr</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">S</span>::<span class="ident">Pending</span>(<span class="ident">id</span>);
                 <span class="ident">tr</span>
+            }
+            <span class="ident">S</span>::<span class="ident">TransactionCancelled</span>(<span class="ident">tr</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">S</span>::<span class="ident">Pending</span>(<span class="ident">id</span>);
+                <span class="kw">unsafe</span> {
+                    <span class="comment">// rust binding prevent accessing cancelled transaction</span>
+                    <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">transmute</span>(<span class="ident">tr</span>)
+                }
             }
             <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;transaction is owned by a future that is still not done&quot;</span>),
         }
@@ -2021,40 +2128,47 @@
         <span class="ident">item</span>
     }
 
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">pop_item</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">S</span>
-    <span class="kw">where</span>
-        <span class="ident">S</span>: <span class="kw">for</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="ident">TupleUnpack</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span>,
-    {
-        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_data</span>().<span class="kw">await</span>;
-        <span class="kw">match</span> <span class="ident">unpack</span>(<span class="kw-2">&amp;</span><span class="ident">data</span>) {
-            <span class="prelude-val">Ok</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">v</span>,
-            <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;failed to decode item {:?}: {:?}&quot;</span>, <span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">data</span>), <span class="ident">e</span>);
-            }
+    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">maybe_pop</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">StackItem</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">item</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">stack</span>.<span class="ident">pop</span>()<span class="question-mark">?</span>;
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">name</span>, <span class="ident">state</span>)) <span class="op">=</span> <span class="ident">item</span>.<span class="ident">await_fut</span>().<span class="kw">await</span> {
+            <span class="self">self</span>.<span class="ident">transactions</span>.<span class="ident">insert</span>(<span class="ident">name</span>, <span class="ident">state</span>);
+        }
+        <span class="prelude-val">Some</span>(<span class="ident">item</span>)
+    }
+
+    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">pop_i64</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">i64</span> {
+        <span class="kw">let</span> <span class="ident">element</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_element</span>().<span class="kw">await</span>;
+        <span class="kw">match</span> <span class="ident">element</span> {
+            <span class="ident">Element</span>::<span class="ident">Int</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">v</span>,
+            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;i64 was expected, found {:?}&quot;</span>, <span class="ident">element</span>),
+        }
+    }
+
+    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">pop_i32</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">i32</span> {
+        <span class="ident">i32</span>::<span class="ident">try_from</span>(<span class="self">self</span>.<span class="ident">pop_i64</span>().<span class="kw">await</span>).<span class="ident">expect</span>(<span class="string">&quot;i64 to fit in i32&quot;</span>)
+    }
+
+    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">pop_usize</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+        <span class="ident">usize</span>::<span class="ident">try_from</span>(<span class="self">self</span>.<span class="ident">pop_i64</span>().<span class="kw">await</span>).<span class="ident">expect</span>(<span class="string">&quot;i64 to fit in usize&quot;</span>)
+    }
+
+    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">pop_str</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">String</span> {
+        <span class="kw">let</span> <span class="ident">element</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_element</span>().<span class="kw">await</span>;
+        <span class="kw">match</span> <span class="ident">element</span> {
+            <span class="ident">Element</span>::<span class="ident">String</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">v</span>.<span class="ident">into_owned</span>(),
+            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;string was expected, found {:?}&quot;</span>, <span class="ident">element</span>),
         }
     }
 
     <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">pop_bytes</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Bytes</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_data</span>().<span class="kw">await</span>;
-        <span class="kw">match</span> <span class="ident">unpack</span>::<span class="op">&lt;</span><span class="ident">Bytes</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">data</span>) {
-            <span class="prelude-val">Ok</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">v</span>.<span class="ident">into_owned</span>()),
-            <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;failed to decode bytes {:?}: {:?}&quot;</span>, <span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">data</span>), <span class="ident">e</span>);
-            }
+        <span class="kw">let</span> <span class="ident">element</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_element</span>().<span class="kw">await</span>;
+        <span class="kw">match</span> <span class="ident">element</span> {
+            <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">v</span>,
+            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;bytes were expected, found {:?}&quot;</span>, <span class="ident">element</span>),
         }
     }
 
     <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">pop_element</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Element</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_data</span>().<span class="kw">await</span>;
-        <span class="kw">match</span> <span class="ident">unpack</span>::<span class="op">&lt;</span><span class="ident">Element</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">data</span>) {
-            <span class="prelude-val">Ok</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">v</span>.<span class="ident">into_owned</span>(),
-            <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;failed to decode element {:?}: {:?}&quot;</span>, <span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">data</span>), <span class="ident">e</span>);
-            }
-        }
-    }
-
-    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">pop_data</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">item</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop</span>().<span class="kw">await</span>;
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">data</span>) <span class="op">=</span> <span class="ident">item</span>.<span class="ident">data</span> {
             <span class="kw">return</span> <span class="ident">data</span>;
@@ -2064,21 +2178,13 @@
 
     <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">pop_selector</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">KeySelector</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">key</span>: <span class="ident">Bytes</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_bytes</span>().<span class="kw">await</span>;
-        <span class="kw">let</span> <span class="ident">or_equal</span>: <span class="ident">i32</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_item</span>().<span class="kw">await</span>;
-        <span class="kw">let</span> <span class="ident">offset</span>: <span class="ident">i32</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_item</span>().<span class="kw">await</span>;
+        <span class="kw">let</span> <span class="ident">or_equal</span>: <span class="ident">i32</span> <span class="op">=</span> <span class="ident">i32</span>::<span class="ident">try_from</span>(<span class="self">self</span>.<span class="ident">pop_i64</span>().<span class="kw">await</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">offset</span>: <span class="ident">i32</span> <span class="op">=</span> <span class="ident">i32</span>::<span class="ident">try_from</span>(<span class="self">self</span>.<span class="ident">pop_i64</span>().<span class="kw">await</span>).<span class="ident">unwrap</span>();
 
         <span class="ident">KeySelector</span>::<span class="ident">new</span>(<span class="ident">key</span>.<span class="number">0</span>, <span class="ident">or_equal</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span>, <span class="ident">offset</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">push_item</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">number</span>: <span class="ident">usize</span>, <span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">S</span>)
-    <span class="kw">where</span>
-        <span class="ident">S</span>: <span class="ident">TuplePack</span>,
-    {
-        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="ident">pack</span>(<span class="ident">s</span>);
-        <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">number</span>, <span class="ident">data</span>);
-    }
-
-    <span class="kw">fn</span> <span class="ident">push</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">number</span>: <span class="ident">usize</span>, <span class="ident">data</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>) {
+    <span class="kw">fn</span> <span class="ident">push</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">number</span>: <span class="ident">usize</span>, <span class="ident">data</span>: <span class="ident">Element</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>) {
         <span class="self">self</span>.<span class="ident">stack</span>.<span class="ident">push</span>(<span class="ident">StackItem</span> {
             <span class="ident">number</span>,
             <span class="ident">data</span>: <span class="prelude-val">Some</span>(<span class="ident">data</span>),
@@ -2097,18 +2203,18 @@
 
     <span class="kw">fn</span> <span class="ident">push_res</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">number</span>: <span class="ident">usize</span>, <span class="ident">res</span>: <span class="ident">FdbResult</span><span class="op">&lt;</span>()<span class="op">&gt;</span>, <span class="ident">ok_str</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) {
         <span class="kw">match</span> <span class="ident">res</span> {
-            <span class="prelude-val">Ok</span>(..) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">push_item</span>(<span class="ident">number</span>, <span class="kw-2">&amp;</span><span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">ok_str</span>)),
+            <span class="prelude-val">Ok</span>(..) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">number</span>, <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">ok_str</span>.<span class="ident">to_vec</span>().<span class="ident">into</span>())),
             <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">push_err</span>(<span class="ident">number</span>, <span class="ident">err</span>),
         }
     }
 
     <span class="kw">fn</span> <span class="ident">push_err</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">number</span>: <span class="ident">usize</span>, <span class="ident">err</span>: <span class="ident">FdbError</span>) {
         <span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;ERROR {:?}&quot;</span>, <span class="ident">err</span>);
-        <span class="kw">let</span> <span class="ident">packed</span> <span class="op">=</span> <span class="ident">pack</span>(<span class="kw-2">&amp;</span>(
-            <span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="string">b&quot;ERROR&quot;</span>.<span class="ident">as_ref</span>()),
-            <span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">err</span>.<span class="ident">code</span>()).<span class="ident">into_bytes</span>()),
-        ));
-        <span class="self">self</span>.<span class="ident">push_item</span>(<span class="ident">number</span>, <span class="kw-2">&amp;</span><span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">packed</span>));
+        <span class="kw">let</span> <span class="ident">packed</span> <span class="op">=</span> <span class="ident">pack</span>(<span class="kw-2">&amp;</span><span class="ident">Element</span>::<span class="ident">Tuple</span>(<span class="macro">vec</span><span class="macro">!</span>[
+            <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="string">b&quot;ERROR&quot;</span>.<span class="ident">as_ref</span>())),
+            <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">err</span>.<span class="ident">code</span>()).<span class="ident">into_bytes</span>())),
+        ]));
+        <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">number</span>, <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">packed</span>.<span class="ident">into</span>()));
     }
 
     <span class="kw">fn</span> <span class="ident">check</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">number</span>: <span class="ident">usize</span>, <span class="ident">r</span>: <span class="ident">FdbResult</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">T</span>, ()<span class="op">&gt;</span> {
@@ -2160,18 +2266,15 @@
 
         <span class="kw">match</span> <span class="ident">instr</span>.<span class="ident">code</span> {
             <span class="comment">// Pushes the provided item onto the stack.</span>
-            <span class="ident">Push</span>(<span class="kw-2">ref</span> <span class="ident">data</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;push {:?}&quot;</span>, <span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">data</span>.<span class="ident">as_slice</span>()));
-                <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">number</span>, <span class="ident">data</span>.<span class="ident">clone</span>())
+            <span class="ident">Push</span>(<span class="kw-2">ref</span> <span class="ident">element</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;push {:?}&quot;</span>, <span class="ident">element</span>);
+                <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">number</span>, <span class="ident">element</span>.<span class="ident">clone</span>())
             }
             <span class="comment">// Duplicates the top item on the stack. The instruction number for</span>
             <span class="comment">// the duplicate item should be the same as the original.</span>
             <span class="ident">Dup</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> <span class="ident">top</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop</span>().<span class="kw">await</span>;
-                <span class="macro">debug</span><span class="macro">!</span>(
-                    <span class="string">&quot;dup {:?}&quot;</span>,
-                    <span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">top</span>.<span class="ident">data</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>().<span class="ident">as_slice</span>())
-                );
+                <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;dup {:?}&quot;</span>, <span class="ident">top</span>);
                 <span class="self">self</span>.<span class="ident">stack</span>.<span class="ident">push</span>(<span class="ident">top</span>.<span class="ident">clone</span>());
                 <span class="self">self</span>.<span class="ident">stack</span>.<span class="ident">push</span>(<span class="ident">top</span>);
             }
@@ -2184,7 +2287,7 @@
             <span class="comment">// Swaps the items in the stack at depth 0 and depth INDEX.</span>
             <span class="comment">// Does not modify the instruction numbers of the swapped items.</span>
             <span class="ident">Swap</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">let</span> <span class="ident">depth</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_item</span>().<span class="kw">await</span>;
+                <span class="kw">let</span> <span class="ident">depth</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_usize</span>().<span class="kw">await</span>;
                 <span class="macro">assert</span><span class="macro">!</span>(
                     <span class="ident">depth</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">stack</span>.<span class="ident">len</span>(),
                     <span class="string">&quot;swap index invalid {} &gt;= {}&quot;</span>,
@@ -2205,34 +2308,41 @@
             <span class="comment">// pushes the difference (A-B) onto the stack.</span>
             <span class="comment">// A and B may be assumed to be integers.</span>
             <span class="ident">Sub</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">let</span> <span class="ident">a</span>: <span class="ident">i64</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_item</span>().<span class="kw">await</span>;
-                <span class="kw">let</span> <span class="ident">b</span>: <span class="ident">i64</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_item</span>().<span class="kw">await</span>;
+                <span class="kw">let</span> <span class="ident">a</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_element</span>().<span class="kw">await</span>;
+                <span class="kw">let</span> <span class="ident">b</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_element</span>().<span class="kw">await</span>;
                 <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;sub {:?} - {:?}&quot;</span>, <span class="ident">a</span>, <span class="ident">b</span>);
-                <span class="comment">// wrapping sub to match bindingtester expected output</span>
-                <span class="self">self</span>.<span class="ident">push_item</span>(<span class="ident">number</span>, <span class="kw-2">&amp;</span>(<span class="ident">a</span>.<span class="ident">wrapping_sub</span>(<span class="ident">b</span>)));
+                <span class="kw">let</span> <span class="ident">c</span> <span class="op">=</span> <span class="kw">match</span> (<span class="ident">a</span>, <span class="ident">b</span>) {
+                    (<span class="ident">Element</span>::<span class="ident">Int</span>(<span class="ident">a</span>), <span class="ident">Element</span>::<span class="ident">Int</span>(<span class="ident">b</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Element</span>::<span class="ident">Int</span>(<span class="ident">a</span> <span class="op">-</span> <span class="ident">b</span>),
+                    (<span class="ident">Element</span>::<span class="ident">Float</span>(<span class="ident">a</span>), <span class="ident">Element</span>::<span class="ident">Float</span>(<span class="ident">b</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Element</span>::<span class="ident">Float</span>(<span class="ident">a</span> <span class="op">-</span> <span class="ident">b</span>),
+                    (<span class="ident">Element</span>::<span class="ident">Double</span>(<span class="ident">a</span>), <span class="ident">Element</span>::<span class="ident">Double</span>(<span class="ident">b</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Element</span>::<span class="ident">Double</span>(<span class="ident">a</span> <span class="op">-</span> <span class="ident">b</span>),
+                    (<span class="ident">Element</span>::<span class="ident">BigInt</span>(<span class="ident">a</span>), <span class="ident">Element</span>::<span class="ident">BigInt</span>(<span class="ident">b</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Element</span>::<span class="ident">BigInt</span>(<span class="ident">a</span> <span class="op">-</span> <span class="ident">b</span>),
+                    (<span class="ident">Element</span>::<span class="ident">Int</span>(<span class="ident">a</span>), <span class="ident">Element</span>::<span class="ident">BigInt</span>(<span class="ident">b</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Element</span>::<span class="ident">BigInt</span>(<span class="ident">a</span> <span class="op">-</span> <span class="ident">b</span>),
+                    (<span class="ident">Element</span>::<span class="ident">BigInt</span>(<span class="ident">a</span>), <span class="ident">Element</span>::<span class="ident">Int</span>(<span class="ident">b</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Element</span>::<span class="ident">BigInt</span>(<span class="ident">a</span> <span class="op">-</span> <span class="ident">b</span>),
+                    (<span class="ident">a</span>, <span class="ident">b</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;sub between invalid elements {:?} {:?}&quot;</span>, <span class="ident">a</span>, <span class="ident">b</span>),
+                };
+                <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">number</span>, <span class="ident">c</span>);
             }
             <span class="comment">// Pops the top two items off the stack as A and B and then pushes</span>
             <span class="comment">// the concatenation of A and B onto the stack. A and B can be</span>
             <span class="comment">// assumed to be of the same type and will be either byte strings or</span>
             <span class="comment">// unicode strings.</span>
             <span class="ident">Concat</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">let</span> <span class="ident">a</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_data</span>().<span class="kw">await</span>;
-                <span class="kw">let</span> <span class="ident">b</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_data</span>().<span class="kw">await</span>;
-                <span class="macro">debug</span><span class="macro">!</span>(
-                    <span class="string">&quot;concat {:?} {:?}&quot;</span>,
-                    <span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">a</span>.<span class="ident">as_slice</span>()),
-                    <span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">b</span>.<span class="ident">as_slice</span>())
-                );
-                <span class="kw">if</span> <span class="kw">let</span> (<span class="prelude-val">Ok</span>(<span class="ident">a</span>), <span class="prelude-val">Ok</span>(<span class="ident">b</span>)) <span class="op">=</span> (<span class="ident">unpack</span>::<span class="op">&lt;</span><span class="ident">Bytes</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">a</span>), <span class="ident">unpack</span>::<span class="op">&lt;</span><span class="ident">Bytes</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">b</span>)) {
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">new</span>();
-                    <span class="ident">bytes</span>.<span class="ident">extend_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">a</span>);
-                    <span class="ident">bytes</span>.<span class="ident">extend_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">b</span>);
-                    <span class="self">self</span>.<span class="ident">push_item</span>(<span class="ident">number</span>, <span class="kw-2">&amp;</span><span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">bytes</span>));
-                } <span class="kw">else</span> <span class="kw">if</span> <span class="kw">let</span> (<span class="prelude-val">Ok</span>(<span class="ident">a</span>), <span class="prelude-val">Ok</span>(<span class="ident">b</span>)) <span class="op">=</span> (<span class="ident">unpack</span>::<span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">a</span>), <span class="ident">unpack</span>::<span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">b</span>)) {
-                    <span class="self">self</span>.<span class="ident">push_item</span>(<span class="ident">number</span>, <span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;{}{}&quot;</span>, <span class="ident">a</span>, <span class="ident">b</span>));
-                } <span class="kw">else</span> {
-                    <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;failed to decode item {:?} {:?}&quot;</span>, <span class="ident">a</span>, <span class="ident">b</span>);
-                }
+                <span class="kw">let</span> <span class="ident">a</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_element</span>().<span class="kw">await</span>;
+                <span class="kw">let</span> <span class="ident">b</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_element</span>().<span class="kw">await</span>;
+                <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;concat {:?} {:?}&quot;</span>, <span class="ident">a</span>, <span class="ident">b</span>);
+                <span class="kw">let</span> <span class="ident">c</span> <span class="op">=</span> <span class="kw">match</span> (<span class="ident">a</span>, <span class="ident">b</span>) {
+                    (<span class="ident">Element</span>::<span class="ident">String</span>(<span class="ident">a</span>), <span class="ident">Element</span>::<span class="ident">String</span>(<span class="ident">b</span>)) <span class="op">=</span><span class="op">&gt;</span> {
+                        <span class="ident">Element</span>::<span class="ident">String</span>(<span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;{}{}&quot;</span>, <span class="ident">a</span>, <span class="ident">b</span>).<span class="ident">into</span>())
+                    }
+                    (<span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">a</span>), <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">b</span>)) <span class="op">=</span><span class="op">&gt;</span> {
+                        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">new</span>();
+                        <span class="ident">bytes</span>.<span class="ident">extend_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">a</span>);
+                        <span class="ident">bytes</span>.<span class="ident">extend_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">b</span>);
+                        <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">bytes</span>.<span class="ident">into</span>())
+                    }
+                    (<span class="ident">a</span>, <span class="ident">b</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;concat between invalid elements {:?} {:?}&quot;</span>, <span class="ident">a</span>, <span class="ident">b</span>),
+                };
+                <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">number</span>, <span class="ident">c</span>);
             }
             <span class="comment">// Pops the top item off the stack as PREFIX. Using a new</span>
             <span class="comment">// transaction with normal retry logic, inserts a key-value pair</span>
@@ -2251,8 +2361,27 @@
             <span class="comment">// large, it may be necessary to commit the transaction every so often (e.g.</span>
             <span class="comment">// after every 100 sets) to avoid past_version errors.</span>
             <span class="ident">LogStack</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">let</span> <span class="ident">_prefix</span>: <span class="ident">Bytes</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_bytes</span>().<span class="kw">await</span>;
-                <span class="comment">// TODO</span>
+                <span class="kw">let</span> <span class="ident">prefix</span>: <span class="ident">Bytes</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_bytes</span>().<span class="kw">await</span>;
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stack_idx</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">stack</span>.<span class="ident">len</span>();
+                <span class="kw">let</span> <span class="ident">trx_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">next_trx_id</span>();
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">t</span> <span class="op">=</span> <span class="ident">trx</span>.<span class="ident">take</span>(<span class="ident">trx_id</span>);
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">n</span> <span class="op">=</span> <span class="number">0</span>;
+                <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">stack_item</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">maybe_pop</span>().<span class="kw">await</span> {
+                    <span class="ident">stack_idx</span> <span class="op">-</span><span class="op">=</span> <span class="number">1</span>;
+                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">prefix</span>.<span class="ident">clone</span>().<span class="ident">into_owned</span>();
+                    <span class="ident">stack_idx</span>.<span class="ident">pack_into_vec</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">key</span>);
+                    <span class="ident">stack_item</span>.<span class="ident">number</span>.<span class="ident">pack_into_vec</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">key</span>);
+
+                    <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">pack</span>(<span class="kw-2">&amp;</span><span class="ident">stack_item</span>.<span class="ident">data</span>.<span class="ident">unwrap</span>());
+                    <span class="ident">t</span>.<span class="ident">set</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="kw-2">&amp;</span><span class="ident">value</span>[..<span class="ident">value</span>.<span class="ident">len</span>().<span class="ident">min</span>(<span class="number">40000</span>)]);
+                    <span class="ident">n</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+                    <span class="kw">if</span> <span class="ident">n</span> <span class="op">=</span><span class="op">=</span> <span class="number">100</span> {
+                        <span class="ident">t</span> <span class="op">=</span> <span class="ident">t</span>.<span class="ident">commit</span>().<span class="kw">await</span>.<span class="ident">unwrap</span>().<span class="ident">reset</span>();
+                        <span class="ident">n</span> <span class="op">=</span> <span class="number">0</span>;
+                    }
+                }
+                <span class="ident">t</span> <span class="op">=</span> <span class="ident">t</span>.<span class="ident">commit</span>().<span class="kw">await</span>.<span class="ident">unwrap</span>().<span class="ident">reset</span>();
+                <span class="ident">trx</span> <span class="op">=</span> <span class="ident">TransactionState</span>::<span class="ident">Transaction</span>(<span class="ident">t</span>);
             }
 
             <span class="comment">// Creates a new transaction and stores it in the global transaction map</span>
@@ -2261,6 +2390,12 @@
                 <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">cur_transaction</span>.<span class="ident">clone</span>();
                 <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;create_trx {:?}&quot;</span>, <span class="ident">name</span>);
                 <span class="kw">let</span> <span class="ident">trx</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">check</span>(<span class="ident">number</span>, <span class="ident">db</span>.<span class="ident">create_trx</span>())<span class="question-mark">?</span>;
+                <span class="ident">trx</span>.<span class="ident">set_option</span>(<span class="ident">fdb</span>::<span class="ident">options</span>::<span class="ident">TransactionOption</span>::<span class="ident">DebugTransactionIdentifier</span>(
+                    <span class="string">&quot;RUST&quot;</span>.<span class="ident">to_string</span>(),
+                ))
+                .<span class="ident">unwrap</span>();
+                <span class="ident">trx</span>.<span class="ident">set_option</span>(<span class="ident">fdb</span>::<span class="ident">options</span>::<span class="ident">TransactionOption</span>::<span class="ident">LogTransaction</span>)
+                    .<span class="ident">unwrap</span>();
                 <span class="self">self</span>.<span class="ident">transactions</span>
                     .<span class="ident">insert</span>(<span class="ident">name</span>, <span class="ident">TransactionState</span>::<span class="ident">Transaction</span>(<span class="ident">trx</span>));
             }
@@ -2286,7 +2421,7 @@
             <span class="comment">// stack.</span>
             <span class="ident">OnError</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> <span class="ident">trx_name</span> <span class="op">=</span> <span class="ident">trx_name</span>.<span class="ident">cloned</span>();
-                <span class="kw">let</span> <span class="ident">error_code</span>: <span class="ident">i32</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_item</span>().<span class="kw">await</span>;
+                <span class="kw">let</span> <span class="ident">error_code</span>: <span class="ident">i32</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_i32</span>().<span class="kw">await</span>;
                 <span class="kw">let</span> <span class="ident">error</span> <span class="op">=</span> <span class="ident">FdbError</span>::<span class="ident">from_code</span>(<span class="ident">error_code</span>);
                 <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;on_error {:?}&quot;</span>, <span class="ident">error</span>);
                 <span class="kw">let</span> <span class="ident">trx_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">next_trx_id</span>();
@@ -2296,7 +2431,7 @@
                     .<span class="ident">map</span>(<span class="op">|</span><span class="ident">res</span><span class="op">|</span> <span class="kw">match</span> <span class="ident">res</span> {
                         <span class="prelude-val">Ok</span>(<span class="ident">trx</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">StackResult</span> {
                             <span class="ident">state</span>: <span class="ident">trx_name</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">n</span><span class="op">|</span> (<span class="ident">n</span>, <span class="ident">TransactionState</span>::<span class="ident">Transaction</span>(<span class="ident">trx</span>))),
-                            <span class="ident">data</span>: <span class="prelude-val">Ok</span>(<span class="ident">pack</span>(<span class="kw-2">&amp;</span><span class="ident">RESULT_NOT_PRESENT</span>)),
+                            <span class="ident">data</span>: <span class="prelude-val">Ok</span>(<span class="ident">RESULT_NOT_PRESENT</span>.<span class="ident">clone</span>().<span class="ident">into_owned</span>()),
                         },
                         <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">StackResult</span>::<span class="ident">from</span>(<span class="ident">err</span>),
                     })
@@ -2315,8 +2450,8 @@
                     .<span class="ident">as_mut</span>()
                     .<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="ident">instr</span>.<span class="ident">pop_snapshot</span>())
                     .<span class="ident">map_ok</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="kw">match</span> <span class="ident">v</span> {
-                        <span class="prelude-val">Some</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">pack</span>(<span class="kw-2">&amp;</span><span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">v</span>.<span class="ident">as_ref</span>())),
-                        <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">pack</span>(<span class="kw-2">&amp;</span><span class="ident">RESULT_NOT_PRESENT</span>),
+                        <span class="prelude-val">Some</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">v</span>.<span class="ident">to_vec</span>().<span class="ident">into</span>()),
+                        <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">RESULT_NOT_PRESENT</span>.<span class="ident">clone</span>().<span class="ident">into_owned</span>(),
                     })
                     .<span class="ident">map</span>(<span class="ident">StackResult</span>::<span class="ident">from</span>)
                     .<span class="ident">boxed_local</span>();
@@ -2340,14 +2475,15 @@
                     .<span class="ident">get_key</span>(<span class="kw-2">&amp;</span><span class="ident">selector</span>, <span class="ident">instr</span>.<span class="ident">pop_snapshot</span>())
                     .<span class="ident">map_ok</span>(<span class="op">|</span><span class="ident">key</span><span class="op">|</span> {
                         <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">key</span>.<span class="ident">as_ref</span>());
-                        <span class="kw">if</span> <span class="ident">key</span>.<span class="ident">starts_with</span>(<span class="kw-2">&amp;</span><span class="ident">prefix</span>) {
-                            <span class="ident">pack</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>)
+                        <span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">key</span>.<span class="ident">starts_with</span>(<span class="kw-2">&amp;</span><span class="ident">prefix</span>) {
+                            <span class="ident">key</span>
                         } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">key</span> <span class="op">&lt;</span> <span class="ident">prefix</span> {
-                            <span class="ident">pack</span>(<span class="kw-2">&amp;</span><span class="ident">prefix</span>)
+                            <span class="ident">prefix</span>
                         } <span class="kw">else</span> {
                             <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">key</span> <span class="op">&gt;</span> <span class="ident">prefix</span>);
-                            <span class="ident">pack</span>(<span class="kw-2">&amp;</span><span class="ident">strinc</span>(<span class="ident">prefix</span>))
-                        }
+                            <span class="ident">strinc</span>(<span class="ident">prefix</span>)
+                        };
+                        <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">bytes</span>.<span class="ident">to_vec</span>().<span class="ident">into</span>())
                     })
                     .<span class="ident">map</span>(<span class="ident">StackResult</span>::<span class="ident">from</span>)
                     .<span class="ident">boxed_local</span>();
@@ -2381,7 +2517,6 @@
                 <span class="kw">let</span> <span class="ident">starts_with</span> <span class="op">=</span> <span class="ident">instr</span>.<span class="ident">pop_starts_with</span>();
                 <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">instr</span>.<span class="ident">pop_snapshot</span>();
 
-                <span class="kw">let</span> <span class="ident">trx_name</span> <span class="op">=</span> <span class="ident">trx_name</span>.<span class="ident">cloned</span>();
                 <span class="kw">let</span> (<span class="ident">begin</span>, <span class="ident">end</span>) <span class="op">=</span> <span class="kw">if</span> <span class="ident">starts_with</span> {
                     <span class="kw">let</span> <span class="ident">begin</span>: <span class="ident">Bytes</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_bytes</span>().<span class="kw">await</span>;
                     <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">strinc</span>(<span class="ident">begin</span>.<span class="ident">clone</span>());
@@ -2402,13 +2537,19 @@
                     )
                 };
 
-                <span class="kw">let</span> <span class="ident">limit</span>: <span class="ident">i64</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_item</span>().<span class="kw">await</span>;
-                <span class="kw">let</span> <span class="ident">reverse</span>: <span class="ident">i64</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_item</span>().<span class="kw">await</span>;
-                <span class="kw">let</span> <span class="ident">streaming_mode</span>: <span class="ident">i32</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_item</span>().<span class="kw">await</span>;
+                <span class="kw">let</span> <span class="ident">limit</span>: <span class="ident">i64</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_i64</span>().<span class="kw">await</span>;
+                <span class="kw">let</span> <span class="ident">reverse</span>: <span class="ident">i64</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_i64</span>().<span class="kw">await</span>;
+                <span class="kw">let</span> <span class="ident">streaming_mode</span>: <span class="ident">i32</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_i32</span>().<span class="kw">await</span>;
                 <span class="kw">let</span> <span class="ident">mode</span> <span class="op">=</span> <span class="ident">streaming_from_value</span>(<span class="ident">streaming_mode</span>);
                 <span class="macro">debug</span><span class="macro">!</span>(
-                    <span class="string">&quot;get_range begin={:?}, end={:?}, limit={:?}, rev={:?}, mode={:?}&quot;</span>,
-                    <span class="ident">begin</span>, <span class="ident">end</span>, <span class="ident">limit</span>, <span class="ident">reverse</span>, <span class="ident">mode</span>
+                    <span class="string">&quot;get_range begin={:?}\n, begin={:?}\n, end={:?}\n,end={:?}\n, limit={:?}, rev={:?}, mode={:?}&quot;</span>,
+                    <span class="ident">begin</span>,
+                    <span class="ident">unpack</span>::<span class="op">&lt;</span><span class="ident">Element</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">begin</span>.<span class="ident">key</span>()),
+                    <span class="ident">end</span>,
+                    <span class="ident">unpack</span>::<span class="op">&lt;</span><span class="ident">Element</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">end</span>.<span class="ident">key</span>()),
+                    <span class="ident">limit</span>,
+                    <span class="ident">reverse</span>,
+                    <span class="ident">mode</span>
                 );
 
                 <span class="kw">let</span> <span class="ident">prefix</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Bytes</span><span class="op">&gt;</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">selector</span> {
@@ -2428,40 +2569,31 @@
                     <span class="ident">reverse</span>: <span class="ident">reverse</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span>,
                     ..<span class="ident">RangeOption</span>::<span class="ident">default</span>()
                 };
-                <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">get_range</span>(
-                    <span class="ident">trx</span>: <span class="ident">Transaction</span>,
-                    <span class="ident">trx_name</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Bytes</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-                    <span class="ident">prefix</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Bytes</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-                    <span class="ident">opt</span>: <span class="ident">RangeOption</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>,
-                    <span class="ident">snapshot</span>: <span class="ident">bool</span>,
-                ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">StackResult</span> {
-                    <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">trx</span>
-                        .<span class="ident">get_ranges</span>(<span class="ident">opt</span>, <span class="ident">snapshot</span>)
-                        .<span class="ident">try_fold</span>(<span class="ident">Vec</span>::<span class="ident">new</span>(), <span class="kw">move</span> <span class="op">|</span><span class="kw-2">mut</span> <span class="ident">out</span>, <span class="ident">kvs</span><span class="op">|</span> {
-                            <span class="kw">for</span> <span class="ident">kv</span> <span class="kw">in</span> <span class="ident">kvs</span>.<span class="ident">iter</span>() {
-                                <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">kv</span>.<span class="ident">key</span>();
-                                <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">kv</span>.<span class="ident">value</span>();
-                                <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot; - {:?} {:?}&quot;</span>, <span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">key</span>), <span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">value</span>));
-                                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">prefix</span>) <span class="op">=</span> <span class="ident">prefix</span> {
-                                    <span class="kw">if</span> <span class="op">!</span><span class="ident">key</span>.<span class="ident">starts_with</span>(<span class="ident">prefix</span>) {
-                                        <span class="kw">continue</span>;
-                                    }
+
+                <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">trx</span>
+                    .<span class="ident">as_mut</span>()
+                    .<span class="ident">get_ranges</span>(<span class="ident">opt</span>, <span class="ident">snapshot</span>)
+                    .<span class="ident">try_fold</span>(<span class="ident">Vec</span>::<span class="ident">new</span>(), <span class="kw">move</span> <span class="op">|</span><span class="kw-2">mut</span> <span class="ident">out</span>, <span class="ident">kvs</span><span class="op">|</span> {
+                        <span class="kw">for</span> <span class="ident">kv</span> <span class="kw">in</span> <span class="ident">kvs</span>.<span class="ident">iter</span>() {
+                            <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">kv</span>.<span class="ident">key</span>();
+                            <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">kv</span>.<span class="ident">value</span>();
+                            <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot; - {:?} {:?}&quot;</span>, <span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">key</span>), <span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">value</span>));
+                            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">prefix</span>) <span class="op">=</span> <span class="ident">prefix</span> {
+                                <span class="kw">if</span> <span class="op">!</span><span class="ident">key</span>.<span class="ident">starts_with</span>(<span class="ident">prefix</span>) {
+                                    <span class="kw">continue</span>;
                                 }
-                                <span class="ident">pack_into</span>(<span class="kw-2">&amp;</span><span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">key</span>), <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">out</span>);
-                                <span class="ident">pack_into</span>(<span class="kw-2">&amp;</span><span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">value</span>), <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">out</span>);
                             }
-                            <span class="ident">future</span>::<span class="ident">ok</span>(<span class="ident">out</span>)
-                        })
-                        .<span class="kw">await</span>;
-                    <span class="ident">StackResult</span> {
-                        <span class="ident">state</span>: <span class="ident">trx_name</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">n</span><span class="op">|</span> (<span class="ident">n</span>, <span class="ident">TransactionState</span>::<span class="ident">Transaction</span>(<span class="ident">trx</span>))),
-                        <span class="ident">data</span>: <span class="ident">res</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">data</span><span class="op">|</span> <span class="ident">pack</span>(<span class="kw-2">&amp;</span><span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">data</span>))),
-                    }
+                            <span class="ident">pack_into</span>(<span class="kw-2">&amp;</span><span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">key</span>), <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">out</span>);
+                            <span class="ident">pack_into</span>(<span class="kw-2">&amp;</span><span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">value</span>), <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">out</span>);
+                        }
+                        <span class="ident">future</span>::<span class="ident">ok</span>(<span class="ident">out</span>)
+                    })
+                    .<span class="ident">map_ok</span>(<span class="op">|</span><span class="ident">data</span><span class="op">|</span> <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">data</span>.<span class="ident">into</span>()))
+                    .<span class="kw">await</span>;
+                <span class="kw">match</span> <span class="ident">res</span> {
+                    <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">push_err</span>(<span class="ident">number</span>, <span class="ident">err</span>),
+                    <span class="prelude-val">Ok</span>(<span class="ident">element</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">number</span>, <span class="ident">element</span>),
                 }
-                <span class="kw">let</span> <span class="ident">trx_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">next_trx_id</span>();
-                <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="ident">get_range</span>(<span class="ident">trx</span>.<span class="ident">take</span>(<span class="ident">trx_id</span>), <span class="ident">trx_name</span>, <span class="ident">prefix</span>, <span class="ident">opt</span>, <span class="ident">snapshot</span>).<span class="ident">boxed_local</span>();
-                <span class="self">self</span>.<span class="ident">push_fut</span>(<span class="ident">number</span>, <span class="ident">trx_id</span>, <span class="ident">f</span>);
-                <span class="ident">pending</span> <span class="op">=</span> <span class="bool-val">true</span>;
             }
 
             <span class="comment">// Gets the current read version and stores it in the internal stack machine</span>
@@ -2473,7 +2605,7 @@
                 <span class="kw">match</span> <span class="ident">version</span> {
                     <span class="prelude-val">Ok</span>(<span class="ident">version</span>) <span class="op">=</span><span class="op">&gt;</span> {
                         <span class="self">self</span>.<span class="ident">last_version</span> <span class="op">=</span> <span class="ident">version</span>;
-                        <span class="self">self</span>.<span class="ident">push_item</span>(<span class="ident">number</span>, <span class="kw-2">&amp;</span><span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="string">b&quot;GOT_READ_VERSION&quot;</span>.<span class="ident">as_ref</span>()));
+                        <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">number</span>, <span class="ident">GOT_READ_VERSION</span>.<span class="ident">clone</span>().<span class="ident">into_owned</span>());
                     }
                     <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">push_err</span>(<span class="ident">number</span>, <span class="ident">err</span>),
                 }
@@ -2484,7 +2616,7 @@
                 <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="ident">trx</span>
                     .<span class="ident">as_mut</span>()
                     .<span class="ident">get_versionstamp</span>()
-                    .<span class="ident">map_ok</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">pack</span>(<span class="kw-2">&amp;</span><span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">v</span>.<span class="ident">as_ref</span>())))
+                    .<span class="ident">map_ok</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">v</span>.<span class="ident">to_vec</span>().<span class="ident">into</span>()))
                     .<span class="ident">map</span>(<span class="ident">StackResult</span>::<span class="ident">from</span>)
                     .<span class="ident">boxed_local</span>();
                 <span class="self">self</span>.<span class="ident">push_fut</span>(<span class="ident">number</span>, <span class="number">0</span>, <span class="ident">f</span>);
@@ -2546,7 +2678,7 @@
             <span class="comment">// Performs the atomic operation described by OPTYPE upon KEY with VALUE. An</span>
             <span class="comment">// ATOMIC_OP_DATABASE call may optionally push a future onto the stack.</span>
             <span class="ident">AtomicOp</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">let</span> <span class="ident">optype</span>: <span class="ident">String</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_item</span>().<span class="kw">await</span>;
+                <span class="kw">let</span> <span class="ident">optype</span>: <span class="ident">String</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_str</span>().<span class="kw">await</span>;
                 <span class="kw">let</span> <span class="ident">key</span>: <span class="ident">Bytes</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_bytes</span>().<span class="kw">await</span>;
                 <span class="kw">let</span> <span class="ident">value</span>: <span class="ident">Bytes</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_bytes</span>().<span class="kw">await</span>;
                 <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;atomic_op {:?} {:?} {:?}&quot;</span>, <span class="ident">key</span>, <span class="ident">value</span>, <span class="ident">optype</span>);
@@ -2630,7 +2762,7 @@
                     .<span class="ident">map</span>(<span class="op">|</span><span class="ident">r</span><span class="op">|</span> <span class="kw">match</span> <span class="ident">r</span> {
                         <span class="prelude-val">Ok</span>(<span class="ident">c</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">StackResult</span> {
                             <span class="ident">state</span>: <span class="ident">trx_name</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">n</span><span class="op">|</span> (<span class="ident">n</span>, <span class="ident">TransactionState</span>::<span class="ident">TransactionCommitted</span>(<span class="ident">c</span>))),
-                            <span class="ident">data</span>: <span class="prelude-val">Ok</span>(<span class="ident">pack</span>(<span class="kw-2">&amp;</span><span class="ident">RESULT_NOT_PRESENT</span>)),
+                            <span class="ident">data</span>: <span class="prelude-val">Ok</span>(<span class="ident">RESULT_NOT_PRESENT</span>.<span class="ident">clone</span>().<span class="ident">into_owned</span>()),
                         },
                         <span class="prelude-val">Err</span>(<span class="ident">c</span>) <span class="op">=</span><span class="op">&gt;</span> {
                             <span class="kw">let</span> <span class="ident">err</span> <span class="op">=</span> <span class="ident">FdbError</span>::<span class="ident">from_code</span>(<span class="ident">c</span>.<span class="ident">code</span>());
@@ -2654,7 +2786,7 @@
             <span class="ident">Cancel</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;cancel&quot;</span>);
                 <span class="kw">let</span> <span class="ident">cancelled</span> <span class="op">=</span> <span class="ident">trx</span>.<span class="ident">take</span>(<span class="number">0</span>).<span class="ident">cancel</span>();
-                <span class="ident">trx</span> <span class="op">=</span> <span class="ident">TransactionState</span>::<span class="ident">Transaction</span>(<span class="ident">cancelled</span>.<span class="ident">reset</span>());
+                <span class="ident">trx</span> <span class="op">=</span> <span class="ident">TransactionState</span>::<span class="ident">TransactionCancelled</span>(<span class="ident">cancelled</span>);
             }
 
             <span class="comment">// Gets the committed version from the current transaction and stores it in the</span>
@@ -2667,11 +2799,30 @@
                         .<span class="ident">committed_version</span>()
                         .<span class="ident">expect</span>(<span class="string">&quot;failed to get committed version&quot;</span>);
                     <span class="self">self</span>.<span class="ident">last_version</span> <span class="op">=</span> <span class="ident">last_version</span>;
-                    <span class="self">self</span>.<span class="ident">push_item</span>(<span class="ident">number</span>, <span class="kw-2">&amp;</span><span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="string">b&quot;GOT_COMMITTED_VERSION&quot;</span>.<span class="ident">as_ref</span>()));
+                    <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">number</span>, <span class="ident">GOT_COMMITTED_VERSION</span>.<span class="ident">clone</span>().<span class="ident">into_owned</span>());
                 } <span class="kw">else</span> {
                     <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;committed_version() called on a non commited transaction&quot;</span>);
                     <span class="self">self</span>.<span class="ident">last_version</span> <span class="op">=</span> <span class="op">-</span><span class="number">1</span>;
-                    <span class="self">self</span>.<span class="ident">push_item</span>(<span class="ident">number</span>, <span class="kw-2">&amp;</span><span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="string">b&quot;GOT_COMMITTED_VERSION&quot;</span>.<span class="ident">as_ref</span>()));
+                    <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">number</span>, <span class="ident">GOT_COMMITTED_VERSION</span>.<span class="ident">clone</span>().<span class="ident">into_owned</span>());
+                }
+            }
+
+            <span class="comment">// Calls get_approximate_size and pushes the byte string &quot;GOT_APPROXIMATE_SIZE&quot;</span>
+            <span class="comment">// onto the stack. Note bindings may issue GET_RANGE calls with different</span>
+            <span class="comment">// limits, so these bindings can obtain different sizes back.</span>
+            <span class="ident">GetApproximateSize</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;get_approximate_size&quot;</span>);
+                <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;fdb-6_2&quot;</span>)]</span>
+                {
+                    <span class="ident">trx</span>.<span class="ident">as_mut</span>()
+                        .<span class="ident">get_approximate_size</span>()
+                        .<span class="kw">await</span>
+                        .<span class="ident">expect</span>(<span class="string">&quot;failed to get approximate size&quot;</span>);
+                    <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">number</span>, <span class="ident">GOT_APPROXIMATE_SIZE</span>.<span class="ident">clone</span>().<span class="ident">into_owned</span>());
+                }
+                <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;fdb-6_2&quot;</span>))]</span>
+                {
+                    <span class="macro">unimplemented</span><span class="macro">!</span>(<span class="string">&quot;get_approximate_size requires fdb620+&quot;</span>);
                 }
             }
 
@@ -2688,7 +2839,7 @@
             <span class="comment">// stack and packs them as the tuple [item0,item1,...,itemN], and then pushes</span>
             <span class="comment">// this single packed value onto the stack.</span>
             <span class="ident">TuplePack</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">let</span> <span class="ident">n</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_item</span>().<span class="kw">await</span>;
+                <span class="kw">let</span> <span class="ident">n</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_usize</span>().<span class="kw">await</span>;
                 <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;tuple_pack {}&quot;</span>, <span class="ident">n</span>);
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buf</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">new</span>();
                 <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">n</span> {
@@ -2696,8 +2847,8 @@
                     <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot; - {:?}&quot;</span>, <span class="ident">element</span>);
                     <span class="ident">buf</span>.<span class="ident">push</span>(<span class="ident">element</span>);
                 }
-                <span class="kw">let</span> <span class="ident">packed</span> <span class="op">=</span> <span class="ident">pack</span>(<span class="kw-2">&amp;</span><span class="ident">buf</span>);
-                <span class="self">self</span>.<span class="ident">push_item</span>(<span class="ident">number</span>, <span class="kw-2">&amp;</span><span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">packed</span>));
+                <span class="kw">let</span> <span class="ident">tuple</span> <span class="op">=</span> <span class="ident">Element</span>::<span class="ident">Tuple</span>(<span class="ident">buf</span>);
+                <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">number</span>, <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">pack</span>(<span class="kw-2">&amp;</span><span class="ident">tuple</span>).<span class="ident">into</span>()));
             }
 
             <span class="comment">// Pops the top item off of the stack as a byte string prefix. Pops the next item</span>
@@ -2713,7 +2864,7 @@
             <span class="comment">// operation.)</span>
             <span class="ident">TuplePackWithVersionstamp</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> <span class="ident">prefix</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_bytes</span>().<span class="kw">await</span>;
-                <span class="kw">let</span> <span class="ident">n</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_item</span>().<span class="kw">await</span>;
+                <span class="kw">let</span> <span class="ident">n</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_usize</span>().<span class="kw">await</span>;
                 <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;tuple_pack_with_versionstamp {:?} {}&quot;</span>, <span class="ident">prefix</span>, <span class="ident">n</span>);
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buf</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">new</span>();
                 <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">n</span> {
@@ -2722,22 +2873,25 @@
                     <span class="ident">buf</span>.<span class="ident">push</span>(<span class="ident">element</span>);
                 }
 
-                <span class="kw">let</span> <span class="ident">tuple</span> <span class="op">=</span> <span class="ident">Element</span>::<span class="ident">Tuple</span>(<span class="ident">buf</span>);
+                <span class="kw">let</span> <span class="ident">tuple</span> <span class="op">=</span> <span class="ident">Element</span>::<span class="ident">Tuple</span>(<span class="ident">buf</span>.<span class="ident">clone</span>());
                 <span class="kw">let</span> <span class="ident">i</span> <span class="op">=</span> <span class="ident">tuple</span>.<span class="ident">count_incomplete_versionstamp</span>();
-
-                <span class="self">self</span>.<span class="ident">push_item</span>(
-                    <span class="ident">number</span>,
-                    <span class="kw-2">&amp;</span><span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="kw">if</span> <span class="ident">i</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
-                        <span class="string">b&quot;ERROR: NONE&quot;</span>.<span class="ident">as_ref</span>()
-                    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">i</span> <span class="op">&gt;</span> <span class="number">0</span> {
-                        <span class="string">b&quot;ERROR: MULTIPLE&quot;</span>.<span class="ident">as_ref</span>()
-                    } <span class="kw">else</span> {
-                        <span class="string">b&quot;OK&quot;</span>.<span class="ident">as_ref</span>()
-                    }),
-                );
-                <span class="kw">if</span> <span class="ident">i</span> <span class="op">=</span><span class="op">=</span> <span class="number">1</span> {
-                    <span class="kw">let</span> <span class="ident">packed</span> <span class="op">=</span> <span class="ident">pack</span>(<span class="kw-2">&amp;</span><span class="ident">tuple</span>);
-                    <span class="self">self</span>.<span class="ident">push_item</span>(<span class="ident">number</span>, <span class="kw-2">&amp;</span><span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">packed</span>));
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">vec</span> <span class="op">=</span> <span class="ident">prefix</span>.<span class="ident">into_owned</span>();
+                <span class="kw">let</span> <span class="ident">offset</span> <span class="op">=</span> <span class="ident">buf</span>.<span class="ident">pack_into_vec_with_versionstamp</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">vec</span>);
+                <span class="kw">match</span> <span class="ident">offset</span> {
+                    <span class="ident">VersionstampOffset</span>::<span class="prelude-val">None</span> { <span class="ident">size</span>: <span class="kw">_</span> } <span class="op">=</span><span class="op">&gt;</span> {
+                        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">i</span>, <span class="number">0</span>);
+                        <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">number</span>, <span class="ident">ERROR_NONE</span>.<span class="ident">clone</span>().<span class="ident">into_owned</span>());
+                    }
+                    <span class="ident">VersionstampOffset</span>::<span class="ident">OneIncomplete</span> { <span class="ident">offset</span>: <span class="kw">_</span> } <span class="op">=</span><span class="op">&gt;</span> {
+                        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">i</span>, <span class="number">1</span>);
+                        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">vec</span>.<span class="ident">into</span>());
+                        <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">number</span>, <span class="ident">OK</span>.<span class="ident">clone</span>().<span class="ident">into_owned</span>());
+                        <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">number</span>, <span class="ident">data</span>);
+                    }
+                    <span class="ident">VersionstampOffset</span>::<span class="ident">MultipleIncomplete</span> <span class="op">=</span><span class="op">&gt;</span> {
+                        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">i</span> <span class="op">&gt;</span> <span class="number">1</span>);
+                        <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">number</span>, <span class="ident">ERROR_MULTIPLE</span>.<span class="ident">clone</span>().<span class="ident">into_owned</span>());
+                    }
                 }
             }
 
@@ -2750,7 +2904,7 @@
                 <span class="kw">let</span> <span class="ident">data</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Element</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">unpack</span>(<span class="kw-2">&amp;</span><span class="ident">data</span>).<span class="ident">unwrap</span>();
                 <span class="kw">for</span> <span class="ident">element</span> <span class="kw">in</span> <span class="ident">data</span> {
                     <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot; - {:?}&quot;</span>, <span class="ident">element</span>);
-                    <span class="self">self</span>.<span class="ident">push_item</span>(<span class="ident">number</span>, <span class="kw-2">&amp;</span><span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">pack</span>(<span class="kw-2">&amp;</span><span class="ident">element</span>)));
+                    <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">number</span>, <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">pack</span>(<span class="kw-2">&amp;</span>(<span class="ident">element</span>,)).<span class="ident">into</span>()));
                 }
             }
             <span class="comment">// Pops the top item off of the stack as N. Pops the next N items off of the</span>
@@ -2758,24 +2912,18 @@
             <span class="comment">// structure) to the tuple range method. Pushes the begin and end elements of</span>
             <span class="comment">// the returned range onto the stack.</span>
             <span class="ident">TupleRange</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">let</span> <span class="ident">n</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_item</span>().<span class="kw">await</span>;
+                <span class="kw">let</span> <span class="ident">n</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_usize</span>().<span class="kw">await</span>;
                 <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;tuple_range {:?}&quot;</span>, <span class="ident">n</span>);
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tup</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">new</span>();
                 <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">n</span> {
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_data</span>().<span class="kw">await</span>;
-                    <span class="ident">tup</span>.<span class="ident">append</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">data</span>);
+                    <span class="kw">let</span> <span class="ident">element</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_element</span>().<span class="kw">await</span>;
+                    <span class="ident">tup</span>.<span class="ident">push</span>(<span class="ident">element</span>);
                 }
 
-                {
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data</span> <span class="op">=</span> <span class="ident">tup</span>.<span class="ident">clone</span>();
-                    <span class="ident">data</span>.<span class="ident">push</span>(<span class="number">0x00</span>);
-                    <span class="self">self</span>.<span class="ident">push_item</span>(<span class="ident">number</span>, <span class="kw-2">&amp;</span><span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">data</span>));
-                }
-                {
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data</span> <span class="op">=</span> <span class="ident">tup</span>;
-                    <span class="ident">data</span>.<span class="ident">push</span>(<span class="number">0xff</span>);
-                    <span class="self">self</span>.<span class="ident">push_item</span>(<span class="ident">number</span>, <span class="kw-2">&amp;</span><span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">data</span>));
-                }
+                <span class="kw">let</span> <span class="ident">subspace</span> <span class="op">=</span> <span class="ident">Subspace</span>::<span class="ident">from</span>(<span class="ident">tup</span>);
+                <span class="kw">let</span> (<span class="ident">start</span>, <span class="ident">end</span>) <span class="op">=</span> <span class="ident">subspace</span>.<span class="ident">range</span>();
+                <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">number</span>, <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">start</span>.<span class="ident">into</span>()));
+                <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">number</span>, <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">end</span>.<span class="ident">into</span>()));
             }
 
             <span class="comment">// Pops the top item off of the stack as N. Pops the next N items off of the</span>
@@ -2786,16 +2934,20 @@
             <span class="comment">// use that to sort. Otherwise, it should sort them lexicographically by</span>
             <span class="comment">// their byte representation. The choice of function should not affect final sort order.</span>
             <span class="ident">TupleSort</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">let</span> <span class="ident">n</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_item</span>().<span class="kw">await</span>;
+                <span class="kw">let</span> <span class="ident">n</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_usize</span>().<span class="kw">await</span>;
                 <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;tuple_sort {:?}&quot;</span>, <span class="ident">n</span>);
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tup</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">new</span>();
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tup</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="op">&lt;</span><span class="ident">Element</span><span class="op">&gt;</span>::<span class="ident">new</span>();
                 <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">n</span> {
-                    <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_data</span>().<span class="kw">await</span>;
-                    <span class="ident">tup</span>.<span class="ident">push</span>(<span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">data</span>));
+                    <span class="kw">let</span> <span class="ident">packed</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_bytes</span>().<span class="kw">await</span>;
+                    <span class="kw">let</span> <span class="ident">element</span>: <span class="ident">Element</span> <span class="op">=</span> <span class="ident">unpack</span>(<span class="kw-2">&amp;</span><span class="ident">packed</span>).<span class="ident">unwrap</span>();
+                    <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;- {:?}&quot;</span>, <span class="ident">element</span>);
+                    <span class="ident">tup</span>.<span class="ident">push</span>(<span class="ident">element</span>.<span class="ident">into_owned</span>());
                 }
                 <span class="ident">tup</span>.<span class="ident">sort</span>();
-                <span class="kw">for</span> <span class="ident">data</span> <span class="kw">in</span> <span class="ident">tup</span> {
-                    <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">number</span>, <span class="ident">data</span>.<span class="ident">into_owned</span>());
+                <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;tuple_sorted&quot;</span>);
+                <span class="kw">for</span> <span class="ident">element</span> <span class="kw">in</span> <span class="ident">tup</span> {
+                    <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;- {:?}&quot;</span>, <span class="ident">element</span>);
+                    <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">number</span>, <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">pack</span>(<span class="kw-2">&amp;</span><span class="ident">element</span>).<span class="ident">into</span>()));
                 }
             }
 
@@ -2808,7 +2960,7 @@
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">arr</span> <span class="op">=</span> [<span class="number">0</span>; <span class="number">4</span>];
                 <span class="ident">arr</span>.<span class="ident">copy_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">bytes</span>);
                 <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="ident">f32</span>::<span class="ident">from_bits</span>(<span class="ident">u32</span>::<span class="ident">from_be_bytes</span>(<span class="ident">arr</span>));
-                <span class="self">self</span>.<span class="ident">push_item</span>(<span class="ident">number</span>, <span class="kw-2">&amp;</span><span class="ident">f</span>);
+                <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">number</span>, <span class="ident">Element</span>::<span class="ident">Float</span>(<span class="ident">f</span>));
             }
             <span class="comment">// Pops the top item off of the stack. This will be a byte-string of length 8</span>
             <span class="comment">// containing the IEEE 754 encoding of a double in big-endian order.</span>
@@ -2819,25 +2971,35 @@
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">arr</span> <span class="op">=</span> [<span class="number">0</span>; <span class="number">8</span>];
                 <span class="ident">arr</span>.<span class="ident">copy_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">bytes</span>);
                 <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="ident">f64</span>::<span class="ident">from_bits</span>(<span class="ident">u64</span>::<span class="ident">from_be_bytes</span>(<span class="ident">arr</span>));
-                <span class="self">self</span>.<span class="ident">push_item</span>(<span class="ident">number</span>, <span class="kw-2">&amp;</span><span class="ident">f</span>);
+                <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">number</span>, <span class="ident">Element</span>::<span class="ident">Double</span>(<span class="ident">f</span>));
             }
             <span class="comment">// Pops the top item off of the stack. This will be a single-precision float.</span>
             <span class="comment">// This is converted into a (4 byte) byte-string of its IEEE 754 representation</span>
             <span class="comment">// in big-endian order, and pushed onto the stack.</span>
             <span class="ident">DecodeFloat</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">let</span> <span class="ident">f</span>: <span class="ident">f32</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_item</span>().<span class="kw">await</span>;
+                <span class="kw">let</span> <span class="ident">f</span>: <span class="ident">f32</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">pop_element</span>().<span class="kw">await</span> {
+                    <span class="ident">Element</span>::<span class="ident">Float</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">v</span>,
+                    <span class="ident">element</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;float was expected, found {:?}&quot;</span>, <span class="ident">element</span>),
+                };
                 <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;decode_float {}&quot;</span>, <span class="ident">f</span>);
-                <span class="kw">let</span> <span class="ident">packed</span> <span class="op">=</span> <span class="ident">pack</span>(<span class="kw-2">&amp;</span><span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">f</span>.<span class="ident">to_bits</span>().<span class="ident">to_be_bytes</span>().<span class="ident">as_ref</span>()));
-                <span class="self">self</span>.<span class="ident">push_item</span>(<span class="ident">number</span>, <span class="kw-2">&amp;</span><span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">packed</span>));
+                <span class="self">self</span>.<span class="ident">push</span>(
+                    <span class="ident">number</span>,
+                    <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">f</span>.<span class="ident">to_bits</span>().<span class="ident">to_be_bytes</span>().<span class="ident">to_vec</span>().<span class="ident">into</span>()),
+                );
             }
             <span class="comment">// Pops the top item off of the stack. This will be a double-precision float.</span>
             <span class="comment">// This is converted into a (8 byte) byte-string its IEEE 754 representation</span>
             <span class="comment">// in big-endian order, and pushed onto the stack.</span>
             <span class="ident">DecodeDouble</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">let</span> <span class="ident">f</span>: <span class="ident">f64</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_item</span>().<span class="kw">await</span>;
+                <span class="kw">let</span> <span class="ident">f</span>: <span class="ident">f64</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">pop_element</span>().<span class="kw">await</span> {
+                    <span class="ident">Element</span>::<span class="ident">Double</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">v</span>,
+                    <span class="ident">element</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;double was expected, found {:?}&quot;</span>, <span class="ident">element</span>),
+                };
                 <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;decode_double {}&quot;</span>, <span class="ident">f</span>);
-                <span class="kw">let</span> <span class="ident">packed</span> <span class="op">=</span> <span class="ident">pack</span>(<span class="kw-2">&amp;</span><span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">f</span>.<span class="ident">to_bits</span>().<span class="ident">to_be_bytes</span>().<span class="ident">as_ref</span>()));
-                <span class="self">self</span>.<span class="ident">push_item</span>(<span class="ident">number</span>, <span class="kw-2">&amp;</span><span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="ident">packed</span>));
+                <span class="self">self</span>.<span class="ident">push</span>(
+                    <span class="ident">number</span>,
+                    <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">f</span>.<span class="ident">to_bits</span>().<span class="ident">to_be_bytes</span>().<span class="ident">to_vec</span>().<span class="ident">into</span>()),
+                );
             }
 
             <span class="comment">// Pops the top item off of the stack as PREFIX. Creates a new stack machine</span>
@@ -2896,7 +3058,7 @@
                     )
                     .<span class="kw">await</span>;
                 <span class="self">self</span>.<span class="ident">check</span>(<span class="ident">number</span>, <span class="ident">r</span>)<span class="question-mark">?</span>;
-                <span class="self">self</span>.<span class="ident">push_item</span>(<span class="ident">number</span>, <span class="kw-2">&amp;</span><span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="string">b&quot;WAITED_FOR_EMPTY&quot;</span>.<span class="ident">as_ref</span>()));
+                <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">number</span>, <span class="ident">WAITED_FOR_EMPTY</span>.<span class="ident">clone</span>().<span class="ident">into_owned</span>());
             }
 
             <span class="ident">UnitTests</span> <span class="op">=</span><span class="op">&gt;</span> {
@@ -2959,7 +3121,7 @@
         <span class="kw">if</span> <span class="ident">is_db</span> <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="ident">mutation</span> {
             <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">trx</span>.<span class="ident">take</span>(<span class="number">0</span>).<span class="ident">commit</span>().<span class="kw">await</span>.<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">e</span>.<span class="ident">into</span>());
             <span class="self">self</span>.<span class="ident">check</span>(<span class="ident">number</span>, <span class="ident">r</span>)<span class="question-mark">?</span>;
-            <span class="self">self</span>.<span class="ident">push_item</span>(<span class="ident">number</span>, <span class="kw-2">&amp;</span><span class="ident">RESULT_NOT_PRESENT</span>);
+            <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">number</span>, <span class="ident">RESULT_NOT_PRESENT</span>.<span class="ident">clone</span>().<span class="ident">into_owned</span>());
         } <span class="kw">else</span> <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">transactions</span>.<span class="ident">contains_key</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">cur_transaction</span>) {
             <span class="self">self</span>.<span class="ident">transactions</span>.<span class="ident">insert</span>(<span class="self">self</span>.<span class="ident">cur_transaction</span>.<span class="ident">clone</span>(), <span class="ident">trx</span>);
         }
