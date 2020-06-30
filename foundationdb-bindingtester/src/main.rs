@@ -23,11 +23,14 @@ static RESULT_NOT_PRESENT: Element = Element::Bytes(Bytes(Cow::Borrowed(b"RESULT
 static GOT_READ_VERSION: Element = Element::Bytes(Bytes(Cow::Borrowed(b"GOT_READ_VERSION")));
 static GOT_COMMITTED_VERSION: Element =
     Element::Bytes(Bytes(Cow::Borrowed(b"GOT_COMMITTED_VERSION")));
-static GOT_APPROXIMATE_SIZE: Element =
-    Element::Bytes(Bytes(Cow::Borrowed(b"GOT_APPROXIMATE_SIZE")));
+
 static ERROR_NONE: Element = Element::Bytes(Bytes(Cow::Borrowed(b"ERROR: NONE")));
 static ERROR_MULTIPLE: Element = Element::Bytes(Bytes(Cow::Borrowed(b"ERROR: MULTIPLE")));
 static OK: Element = Element::Bytes(Bytes(Cow::Borrowed(b"OK")));
+
+#[cfg(feature = "fdb-6_2")]
+static GOT_APPROXIMATE_SIZE: Element =
+    Element::Bytes(Bytes(Cow::Borrowed(b"GOT_APPROXIMATE_SIZE")));
 
 use crate::fdb::options::{MutationType, StreamingMode};
 use tuple::VersionstampOffset;
