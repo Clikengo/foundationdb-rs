@@ -313,7 +313,7 @@ macro_rules! sign_bit {
     };
 }
 
-macro_rules! unpack_px {
+macro_rules! unpack_ux {
     ($ux: ident, $input: expr, $n: expr) => {{
         let (input, bytes) = parse_bytes($input, $n)?;
         let mut arr = [0u8; ::std::mem::size_of::<$ux>()];
@@ -321,12 +321,31 @@ macro_rules! unpack_px {
         (input, $ux::from_be_bytes(arr))
     }};
 }
+
+macro_rules! unpack_px {
+    ($ix: ident, $ux: ident, $input: expr, $n: expr) => {{
+        let (input, bytes) = parse_bytes($input, $n)?;
+        let mut arr = [0u8; ::std::mem::size_of::<$ux>()];
+        (&mut arr[(::std::mem::size_of::<$ux>() - $n)..]).copy_from_slice(bytes);
+        let x = $ix::from_be_bytes(arr);
+        if x < 0 {
+            Err(PackError::UnsupportedIntLength)
+        } else {
+            Ok((input, x))
+        }
+    }};
+}
 macro_rules! unpack_nx {
-    ($ix: ident, $input: expr, $n: expr) => {{
+    ($ix: ident, $ux: ident, $input: expr, $n: expr) => {{
         let (input, bytes) = parse_bytes($input, $n)?;
         let mut arr = [0xffu8; ::std::mem::size_of::<$ix>()];
         (&mut arr[(::std::mem::size_of::<$ix>() - $n)..]).copy_from_slice(bytes);
-        (input, $ix::from_be_bytes(arr).wrapping_add(1))
+        let x = $ix::from_be_bytes(arr).wrapping_add(1);
+        if x > 0 {
+            Err(PackError::UnsupportedIntLength)
+        } else {
+            Ok((input, x))
+        }
     }};
 }
 
@@ -363,14 +382,14 @@ macro_rules! impl_ux {
                 let (input, found) = parse_byte(input)?;
                 if INTZERO <= found && found <= INTZERO + $max_sz as u8 {
                     let n = (found - INTZERO) as usize;
-                    Ok(unpack_px!($ux, input, n))
+                    Ok(unpack_ux!($ux, input, n))
                 } else if found == POSINTEND {
                     let (input, raw_length) = parse_byte(input)?;
                     let n: usize = usize::from(raw_length);
                     if n > SZ {
                         return Err(PackError::UnsupportedIntLength);
                     }
-                    Ok(unpack_px!($ux, input, n))
+                    Ok(unpack_ux!($ux, input, n))
                 } else {
                     Err(PackError::BadCode {
                         found,
@@ -427,24 +446,24 @@ macro_rules! impl_ix {
                 let (input, found) = parse_byte(input)?;
                 if INTZERO <= found && found <= INTZERO + $max_sz as u8 {
                     let n = (found - INTZERO) as usize;
-                    Ok(unpack_px!($ix, input, n))
+                    unpack_px!($ix, $ux, input, n)
                 } else if INTZERO - $max_sz as u8 <= found && found < INTZERO {
                     let n = (INTZERO - found) as usize;
-                    Ok(unpack_nx!($ix, input, n))
+                    unpack_nx!($ix, $ux, input, n)
                 } else if found == NEGINTSTART {
                     let (input, raw_length) = parse_byte(input)?;
                     let n = usize::from(raw_length ^ 0xff);
                     if n > SZ {
                         return Err(PackError::UnsupportedIntLength);
                     }
-                    Ok(unpack_nx!($ix, input, n))
+                    unpack_nx!($ix, $ux, input, n)
                 } else if found == POSINTEND {
                     let (input, raw_length) = parse_byte(input)?;
                     let n: usize = usize::from(raw_length);
                     if n > SZ {
                         return Err(PackError::UnsupportedIntLength);
                     }
-                    Ok(unpack_px!($ix, input, n))
+                    unpack_px!($ix, $ux, input, n)
                 } else {
                     Err(PackError::BadCode {
                         found,
@@ -961,10 +980,15 @@ impl<'de> TupleUnpack<'de> for Element<'de> {
                 let (input, v) = Vec::<Self>::unpack(input, tuple_depth)?;
                 (input, Element::Tuple(v))
             }
-            INTMIN..=INTMAX => {
-                let (input, v) = i64::unpack(input, tuple_depth)?;
-                (input, Element::Int(v))
-            }
+            INTMIN..=INTMAX => match i64::unpack(input, tuple_depth) {
+                Ok((input, v)) => (input, Element::Int(v)),
+                #[cfg(feature = "num-bigint")]
+                Err(PackError::UnsupportedIntLength) => {
+                    let (input, v) = num_bigint::BigInt::unpack(input, tuple_depth)?;
+                    (input, Element::BigInt(v))
+                }
+                Err(err) => return Err(err),
+            },
             #[cfg(feature = "num-bigint")]
             NEGINTSTART => {
                 let (input, v) = num_bigint::BigInt::unpack(input, tuple_depth)?;
