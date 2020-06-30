@@ -3,7 +3,9 @@ use super::{Bytes, Versionstamp};
 use std::{borrow::Cow, cmp};
 
 #[cfg(feature = "num-bigint")]
-use std::convert::TryInto;
+use num_bigint::Sign;
+#[cfg(feature = "num-bigint")]
+use std::convert::TryFrom;
 
 #[derive(Clone, Debug)]
 pub enum Element<'a> {
@@ -53,6 +55,16 @@ impl<'a, 'b> Ord for CmpElement<'a, 'b> {
                 (Element::Int(a), Element::Int(b)) => a.cmp(b),
                 #[cfg(feature = "num-bigint")]
                 (Element::BigInt(a), Element::BigInt(b)) => a.cmp(b),
+                #[cfg(feature = "num-bigint")]
+                (Element::BigInt(a), Element::Int(b)) => match i64::try_from(a) {
+                    Ok(a) => a.cmp(b),
+                    Err(_) => a.sign().cmp(&Sign::NoSign),
+                },
+                #[cfg(feature = "num-bigint")]
+                (Element::Int(a), Element::BigInt(b)) => match i64::try_from(b) {
+                    Ok(b) => a.cmp(&b),
+                    Err(_) => Sign::NoSign.cmp(&b.sign()),
+                },
                 (Element::Float(a), Element::Float(b)) => {
                     f32_to_u32_be_bytes(*a).cmp(&f32_to_u32_be_bytes(*b))
                 }
@@ -94,7 +106,7 @@ impl<'a> Element<'a> {
             Element::Tuple(_) => super::NESTED,
             Element::Int(_) => super::INTZERO,
             #[cfg(feature = "num-bigint")]
-            Element::BigInt(_) => super::POSINTEND,
+            Element::BigInt(_) => super::INTZERO,
             Element::Float(_) => super::FLOAT,
             Element::Double(_) => super::DOUBLE,
             Element::Bool(v) => {
@@ -167,7 +179,7 @@ impl<'a> Element<'a> {
         match self {
             Element::Int(v) => Some(*v),
             #[cfg(feature = "num-bigint")]
-            Element::BigInt(v) => v.try_into().ok(),
+            Element::BigInt(v) => i64::try_from(v).ok(),
             _ => None,
         }
     }
