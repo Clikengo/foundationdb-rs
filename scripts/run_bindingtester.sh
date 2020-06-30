@@ -30,8 +30,9 @@ esac
   make fdb_python
 
   ## Run the test
-  ./bindings/bindingtester/bindingtester.py --test-name scripted ${bindingtester}
-  ./bindings/bindingtester/bindingtester.py --num-ops 1000 --test-name api --api-version 610 ${bindingtester}
-  ./bindings/bindingtester/bindingtester.py --num-ops 1000 --concurrency 5 --test-name api --api-version 610 ${bindingtester}
-  ./bindings/bindingtester/bindingtester.py --num-ops 1000 --concurrency 5 --test-name tuple --api-version 610 ${bindingtester}
+  echo "testers['rust'] = Tester('rust', '${bindingtester}', 2040, 23, MAX_API_VERSION, types=ALL_TYPES)
+" >> ./bindings/bindingtester/known_testers.py
+  ./bindings/bindingtester/bindingtester.py --test-name scripted rust
+  ./bindings/bindingtester/bindingtester.py --num-ops 1000 --api-version 610 --test-name api --compare python rust
+  ./bindings/bindingtester/bindingtester.py --num-ops 1000 --api-version 610 --test-name api --concurrency 5 rust
 )

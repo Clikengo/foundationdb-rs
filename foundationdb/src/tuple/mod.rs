@@ -18,7 +18,7 @@ use std::result;
 pub use uuid::Uuid;
 
 pub use element::Element;
-pub use pack::{TuplePack, TupleUnpack};
+pub use pack::{TuplePack, TupleUnpack, VersionstampOffset};
 pub use subspace::Subspace;
 pub use versionstamp::Versionstamp;
 
@@ -123,7 +123,9 @@ impl<'a> fmt::Display for Bytes<'a> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "b\"")?;
         for &byte in self.0.iter() {
-            if byte.is_ascii_alphanumeric() || byte.is_ascii_punctuation() || byte == b' ' {
+            if byte == b'\\' {
+                write!(fmt, r"\\")?;
+            } else if byte.is_ascii_alphanumeric() {
                 write!(fmt, "{}", byte as char)?;
             } else {
                 write!(fmt, "\\x{:02x}", byte)?;
@@ -174,14 +176,42 @@ impl From<String> for Bytes<'static> {
 }
 
 /// Pack value and returns the packed buffer
+///
+/// # Panics
+///
+/// Panics if the encoded data size doesn't fit in `u32`.
 pub fn pack<T: TuplePack>(v: &T) -> Vec<u8> {
     v.pack_to_vec()
 }
 
+/// Pack value and returns the packed buffer
+///
+/// # Panics
+///
+/// Panics if there is multiple versionstamp present or if the encoded data size doesn't fit in `u32`.
+pub fn pack_with_versionstamp<T: TuplePack>(v: &T) -> Vec<u8> {
+    v.pack_to_vec_with_versionstamp()
+}
+
 /// Pack value into the given buffer
+///
+/// # Panics
+///
+/// Panics if the encoded data size doesn't fit in `u32`.
 pub fn pack_into<T: TuplePack>(v: &T, output: &mut Vec<u8>) {
-    v.pack_root(output)
-        .expect("tuple encoding should never fail");
+    v.pack_into_vec(output)
+}
+
+/// Pack value into the given buffer
+///
+/// # Panics
+///
+/// Panics if there is multiple versionstamp present or if the encoded data size doesn't fit in `u32`.
+pub fn pack_into_with_versionstamp<T: TuplePack>(v: &T, output: &mut Vec<u8>) {
+    let offset = v.pack_into_vec_with_versionstamp(output);
+    if let VersionstampOffset::MultipleIncomplete = offset {
+        panic!("pack_into_with_versionstamp does not allow multiple versionstamps");
+    }
 }
 
 /// Unpack input
@@ -317,6 +347,69 @@ mod tests {
             b"\x0C\x80\x00\x00\x00\x00\x00\x00\x00",
         );
         test_serde(i64::min_value(), b"\x0C\x7f\xff\xff\xff\xff\xff\xff\xff");
+
+        test_serde(9252427359321063944i128, b"\x1c\x80g9\xa9np\x02\x08");
+        assert!(
+            match unpack::<i64>(b"\x1c\x80g9\xa9np\x02\x08").unwrap_err() {
+                PackError::UnsupportedIntLength => true,
+                _ => false,
+            }
+        );
+
+        test_serde(
+            -9252427359321063944i128,
+            b"\x0c\x7f\x98\xc6V\x91\x8f\xfd\xf7",
+        );
+        assert!(
+            match unpack::<i64>(b"\x0c\x7f\x98\xc6V\x91\x8f\xfd\xf7").unwrap_err() {
+                PackError::UnsupportedIntLength => true,
+                _ => false,
+            }
+        );
+
+        test_serde(
+            u64::max_value() as i128,
+            b"\x1c\xff\xff\xff\xff\xff\xff\xff\xff",
+        );
+        assert!(
+            match unpack::<i64>(b"\x1c\xff\xff\xff\xff\xff\xff\xff\xff").unwrap_err() {
+                PackError::UnsupportedIntLength => true,
+                _ => false,
+            }
+        );
+
+        test_serde(
+            -(u64::max_value() as i128),
+            b"\x0c\x00\x00\x00\x00\x00\x00\x00\x00",
+        );
+        assert!(
+            match unpack::<i64>(b"\x0c\x00\x00\x00\x00\x00\x00\x00\x00").unwrap_err() {
+                PackError::UnsupportedIntLength => true,
+                _ => false,
+            }
+        );
+
+        test_serde(
+            (i64::max_value() as i128) + 1,
+            b"\x1c\x80\x00\x00\x00\x00\x00\x00\x00",
+        );
+        assert!(
+            match unpack::<i64>(b"\x1c\x80\x00\x00\x00\x00\x00\x00\x00").unwrap_err() {
+                PackError::UnsupportedIntLength => true,
+                _ => false,
+            }
+        );
+
+        test_serde(
+            (i64::min_value() as i128) - 1,
+            b"\x0c\x7f\xff\xff\xff\xff\xff\xff\xfe",
+        );
+        assert!(
+            match unpack::<i64>(b"\x0c\x7f\xff\xff\xff\xff\xff\xff\xfe").unwrap_err() {
+                PackError::UnsupportedIntLength => true,
+                _ => false,
+            }
+        );
     }
 
     #[cfg(feature = "num-bigint")]
@@ -448,6 +541,15 @@ mod tests {
             BigInt::from(i64::min_value()),
             b"\x0C\x7f\xff\xff\xff\xff\xff\xff\xff",
         );
+
+        test_serde(
+            Element::BigInt(9252427359321063944i128.into()),
+            b"\x1c\x80g9\xa9np\x02\x08",
+        );
+        test_serde(
+            Element::BigInt((-9252427359321063944i128).into()),
+            b"\x0c\x7f\x98\xc6V\x91\x8f\xfd\xf7",
+        );
     }
 
     #[cfg(feature = "uuid")]
@@ -509,6 +611,13 @@ mod tests {
             Element::Tuple(vec![Element::Nil, Element::Nil]),
             b"\x00\x00",
         );
+        test_serde(
+            Element::Tuple(vec![
+                Element::String(Cow::Borrowed("PUSH")),
+                Element::Tuple(vec![Element::Double(-8.251343508909708e-15)]),
+            ]),
+            b"\x02PUSH\x00\x05!B\xfdkl\x9f\xcc\x8eK\x00",
+        );
     }
 
     #[test]
@@ -550,5 +659,23 @@ mod tests {
         );
         test_serde(Vec::<Element>::new(), &[]);
         test_serde(Element::Tuple(vec![]), &[]);
+    }
+
+    #[test]
+    fn test_verstionstamp() {
+        assert_eq!(
+            Bytes::from(pack(&("foo", Versionstamp::incomplete(0)))),
+            Bytes::from(&b"\x02foo\x00\x33\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00\x00"[..])
+        );
+        assert_eq!(
+            Bytes::from(pack_with_versionstamp(&(
+                "foo",
+                Versionstamp::incomplete(0)
+            ))),
+            Bytes::from(
+                &b"\x02foo\x00\x33\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00\x00\x06\x00\x00\x00"
+                    [..]
+            )
+        );
     }
 }

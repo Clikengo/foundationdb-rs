@@ -26,6 +26,7 @@ use futures::{
 
 /// A committed transaction.
 #[derive(Debug)]
+#[repr(transparent)]
 pub struct TransactionCommitted {
     tr: Transaction,
 }
@@ -129,6 +130,7 @@ type TransactionResult = Result<TransactionCommitted, TransactionCommitError>;
 
 /// A cancelled transaction
 #[derive(Debug)]
+#[repr(transparent)]
 pub struct TransactionCancelled {
     tr: Transaction,
 }

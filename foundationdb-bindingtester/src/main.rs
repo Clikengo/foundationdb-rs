@@ -6,20 +6,34 @@ use foundationdb_sys as fdb_sys;
 
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::io::Write;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::thread;
 
 use fdb::options::{ConflictRangeType, DatabaseOption, TransactionOption};
-use fdb::tuple::{pack, pack_into, unpack, Bytes, Element, Subspace, TuplePack, TupleUnpack};
+use fdb::tuple::{pack, pack_into, unpack, Bytes, Element, Subspace, TuplePack};
 use fdb::*;
 use futures::future;
 use futures::prelude::*;
 
-static RESULT_NOT_PRESENT: Bytes = Bytes(Cow::Borrowed(b"RESULT_NOT_PRESENT"));
+static WAITED_FOR_EMPTY: Element = Element::Bytes(Bytes(Cow::Borrowed(b"WAITED_FOR_EMPTY")));
+static RESULT_NOT_PRESENT: Element = Element::Bytes(Bytes(Cow::Borrowed(b"RESULT_NOT_PRESENT")));
+static GOT_READ_VERSION: Element = Element::Bytes(Bytes(Cow::Borrowed(b"GOT_READ_VERSION")));
+static GOT_COMMITTED_VERSION: Element =
+    Element::Bytes(Bytes(Cow::Borrowed(b"GOT_COMMITTED_VERSION")));
+
+static ERROR_NONE: Element = Element::Bytes(Bytes(Cow::Borrowed(b"ERROR: NONE")));
+static ERROR_MULTIPLE: Element = Element::Bytes(Bytes(Cow::Borrowed(b"ERROR: MULTIPLE")));
+static OK: Element = Element::Bytes(Bytes(Cow::Borrowed(b"OK")));
+
+#[cfg(feature = "fdb-6_2")]
+static GOT_APPROXIMATE_SIZE: Element =
+    Element::Bytes(Bytes(Cow::Borrowed(b"GOT_APPROXIMATE_SIZE")));
 
 use crate::fdb::options::{MutationType, StreamingMode};
+use tuple::VersionstampOffset;
 fn mutation_from_str(s: &str) -> MutationType {
     match s {
         "ADD" => MutationType::Add,
@@ -123,7 +137,7 @@ impl Instr {
 #[derive(Debug)]
 enum InstrCode {
     // data operations
-    Push(Vec<u8>),
+    Push(Element<'static>),
     Dup,
     EmptyStack,
     Swap,
@@ -155,6 +169,7 @@ enum InstrCode {
     Reset,
     Cancel,
     GetCommittedVersion,
+    GetApproximateSize,
     WaitFuture,
 
     TuplePack,
@@ -198,7 +213,7 @@ impl Instr {
         let (cmd, selector) = has_opt(cmd, "_SELECTOR");
 
         let code = match cmd {
-            "PUSH" => Push(pack(&tup[1])),
+            "PUSH" => Push(tup[1].clone().into_owned()),
             "DUP" => Dup,
             "EMPTY_STACK" => EmptyStack,
             "SWAP" => Swap,
@@ -230,10 +245,11 @@ impl Instr {
             "RESET" => Reset,
             "CANCEL" => Cancel,
             "GET_COMMITTED_VERSION" => GetCommittedVersion,
+            "GET_APPROXIMATE_SIZE" => GetApproximateSize,
             "WAIT_FUTURE" => WaitFuture,
 
             "TUPLE_PACK" => TuplePack,
-            "TUPKE_PACK_WITH_VERSONSTAMP" => TuplePackWithVersionstamp,
+            "TUPLE_PACK_WITH_VERSIONSTAMP" => TuplePackWithVersionstamp,
             "TUPLE_UNPACK" => TupleUnpack,
             "TUPLE_RANGE" => TupleRange,
             "TUPLE_SORT" => TupleSort,
@@ -261,7 +277,7 @@ impl Instr {
 
 struct StackResult {
     state: Option<(Bytes<'static>, TransactionState)>,
-    data: FdbResult<Vec<u8>>,
+    data: FdbResult<Element<'static>>,
 }
 impl From<FdbError> for StackResult {
     fn from(err: FdbError) -> Self {
@@ -271,8 +287,8 @@ impl From<FdbError> for StackResult {
         }
     }
 }
-impl From<Vec<u8>> for StackResult {
-    fn from(data: Vec<u8>) -> Self {
+impl From<Element<'static>> for StackResult {
+    fn from(data: Element<'static>) -> Self {
         StackResult {
             state: None,
             data: Ok(data),
@@ -280,8 +296,8 @@ impl From<Vec<u8>> for StackResult {
     }
 }
 
-impl From<FdbResult<Vec<u8>>> for StackResult {
-    fn from(data: FdbResult<Vec<u8>>) -> Self {
+impl From<FdbResult<Element<'static>>> for StackResult {
+    fn from(data: FdbResult<Element<'static>>) -> Self {
         StackResult { state: None, data }
     }
 }
@@ -289,7 +305,7 @@ impl From<FdbResult<Vec<u8>>> for StackResult {
 type StackFuture = Pin<Box<dyn Future<Output = StackResult>>>;
 struct StackItem {
     number: usize,
-    data: Option<Vec<u8>>,
+    data: Option<Element<'static>>,
     fut: Option<(usize, StackFuture)>,
 }
 
@@ -319,7 +335,7 @@ impl StackItem {
                     Bytes::from(b"ERROR".as_ref()),
                     Bytes::from(format!("{}", err.code()).into_bytes()),
                 ));
-                pack(&Bytes::from(packed))
+                Element::Bytes(packed.into())
             });
 
             self.data = Some(data);
@@ -347,18 +363,16 @@ impl std::fmt::Debug for StackItem {
     }
 }
 
-fn range(bytes: Bytes) -> (Bytes<'static>, Bytes<'static>) {
-    let mut begin = bytes.into_owned();
-    let mut end = begin.clone();
-
-    begin.push(0x00);
-    end.push(0xff);
+fn range(prefix: Bytes) -> (Bytes<'static>, Bytes<'static>) {
+    let begin = prefix.clone().into_owned();
+    let end = strinc(prefix).into_owned();
 
     (begin.into(), end.into())
 }
 
 enum TransactionState {
     Transaction(Transaction),
+    TransactionCancelled(TransactionCancelled),
     TransactionCommitted(TransactionCommitted),
     TransactionCommitError(TransactionCommitError),
     Pending(usize),
@@ -370,6 +384,7 @@ impl std::fmt::Debug for TransactionState {
 
         match self {
             S::Transaction(..) => "Transaction",
+            S::TransactionCancelled(..) => "TransactionCancelled",
             S::TransactionCommitted(..) => "TransactionCommitted",
             S::TransactionCommitError(..) => "TransactionCommitError",
             S::Pending(..) => "Pending",
@@ -395,6 +410,10 @@ impl TransactionState {
         self.reset();
         match *self {
             S::Transaction(ref mut tr) => tr,
+            S::TransactionCancelled(ref mut tr) => unsafe {
+                // rust binding prevent accessing cancelled transaction
+                std::mem::transmute(tr)
+            },
             _ => panic!("transaction is owned by a future that is still not done"),
         }
     }
@@ -407,6 +426,13 @@ impl TransactionState {
             S::Transaction(tr) => {
                 *self = S::Pending(id);
                 tr
+            }
+            S::TransactionCancelled(tr) => {
+                *self = S::Pending(id);
+                unsafe {
+                    // rust binding prevent accessing cancelled transaction
+                    std::mem::transmute(tr)
+                }
             }
             _ => panic!("transaction is owned by a future that is still not done"),
         }
@@ -497,40 +523,47 @@ impl StackMachine {
         item
     }
 
-    async fn pop_item<S>(&mut self) -> S
-    where
-        S: for<'de> TupleUnpack<'de>,
-    {
-        let data = self.pop_data().await;
-        match unpack(&data) {
-            Ok(v) => v,
-            Err(e) => {
-                panic!("failed to decode item {:?}: {:?}", Bytes::from(data), e);
-            }
+    async fn maybe_pop(&mut self) -> Option<StackItem> {
+        let mut item = self.stack.pop()?;
+        if let Some((name, state)) = item.await_fut().await {
+            self.transactions.insert(name, state);
+        }
+        Some(item)
+    }
+
+    async fn pop_i64(&mut self) -> i64 {
+        let element = self.pop_element().await;
+        match element {
+            Element::Int(v) => v,
+            _ => panic!("i64 was expected, found {:?}", element),
+        }
+    }
+
+    async fn pop_i32(&mut self) -> i32 {
+        i32::try_from(self.pop_i64().await).expect("i64 to fit in i32")
+    }
+
+    async fn pop_usize(&mut self) -> usize {
+        usize::try_from(self.pop_i64().await).expect("i64 to fit in usize")
+    }
+
+    async fn pop_str(&mut self) -> String {
+        let element = self.pop_element().await;
+        match element {
+            Element::String(v) => v.into_owned(),
+            _ => panic!("string was expected, found {:?}", element),
         }
     }
 
     async fn pop_bytes(&mut self) -> Bytes<'static> {
-        let data = self.pop_data().await;
-        match unpack::<Bytes>(&data) {
-            Ok(v) => Bytes::from(v.into_owned()),
-            Err(e) => {
-                panic!("failed to decode bytes {:?}: {:?}", Bytes::from(data), e);
-            }
+        let element = self.pop_element().await;
+        match element {
+            Element::Bytes(v) => v,
+            _ => panic!("bytes were expected, found {:?}", element),
         }
     }
 
     async fn pop_element(&mut self) -> Element<'static> {
-        let data = self.pop_data().await;
-        match unpack::<Element>(&data) {
-            Ok(v) => v.into_owned(),
-            Err(e) => {
-                panic!("failed to decode element {:?}: {:?}", Bytes::from(data), e);
-            }
-        }
-    }
-
-    async fn pop_data(&mut self) -> Vec<u8> {
         let item = self.pop().await;
         if let Some(data) = item.data {
             return data;
@@ -540,21 +573,13 @@ impl StackMachine {
 
     async fn pop_selector(&mut self) -> KeySelector<'static> {
         let key: Bytes = self.pop_bytes().await;
-        let or_equal: i32 = self.pop_item().await;
-        let offset: i32 = self.pop_item().await;
+        let or_equal: i32 = i32::try_from(self.pop_i64().await).unwrap();
+        let offset: i32 = i32::try_from(self.pop_i64().await).unwrap();
 
         KeySelector::new(key.0, or_equal != 0, offset)
     }
 
-    fn push_item<S>(&mut self, number: usize, s: &S)
-    where
-        S: TuplePack,
-    {
-        let data = pack(s);
-        self.push(number, data);
-    }
-
-    fn push(&mut self, number: usize, data: Vec<u8>) {
+    fn push(&mut self, number: usize, data: Element<'static>) {
         self.stack.push(StackItem {
             number,
             data: Some(data),
@@ -573,18 +598,18 @@ impl StackMachine {
 
     fn push_res(&mut self, number: usize, res: FdbResult<()>, ok_str: &[u8]) {
         match res {
-            Ok(..) => self.push_item(number, &Bytes::from(ok_str)),
+            Ok(..) => self.push(number, Element::Bytes(ok_str.to_vec().into())),
             Err(err) => self.push_err(number, err),
         }
     }
 
     fn push_err(&mut self, number: usize, err: FdbError) {
         trace!("ERROR {:?}", err);
-        let packed = pack(&(
-            Bytes::from(b"ERROR".as_ref()),
-            Bytes::from(format!("{}", err.code()).into_bytes()),
-        ));
-        self.push_item(number, &Bytes::from(packed));
+        let packed = pack(&Element::Tuple(vec![
+            Element::Bytes(Bytes::from(b"ERROR".as_ref())),
+            Element::Bytes(Bytes::from(format!("{}", err.code()).into_bytes())),
+        ]));
+        self.push(number, Element::Bytes(packed.into()));
     }
 
     fn check<T>(&mut self, number: usize, r: FdbResult<T>) -> Result<T, ()> {
@@ -636,18 +661,15 @@ impl StackMachine {
 
         match instr.code {
             // Pushes the provided item onto the stack.
-            Push(ref data) => {
-                debug!("push {:?}", Bytes::from(data.as_slice()));
-                self.push(number, data.clone())
+            Push(ref element) => {
+                debug!("push {:?}", element);
+                self.push(number, element.clone())
             }
             // Duplicates the top item on the stack. The instruction number for
             // the duplicate item should be the same as the original.
             Dup => {
                 let top = self.pop().await;
-                debug!(
-                    "dup {:?}",
-                    Bytes::from(top.data.as_ref().unwrap().as_slice())
-                );
+                debug!("dup {:?}", top);
                 self.stack.push(top.clone());
                 self.stack.push(top);
             }
@@ -660,7 +682,7 @@ impl StackMachine {
             // Swaps the items in the stack at depth 0 and depth INDEX.
             // Does not modify the instruction numbers of the swapped items.
             Swap => {
-                let depth: usize = self.pop_item().await;
+                let depth: usize = self.pop_usize().await;
                 assert!(
                     depth < self.stack.len(),
                     "swap index invalid {} >= {}",
@@ -681,34 +703,41 @@ impl StackMachine {
             // pushes the difference (A-B) onto the stack.
             // A and B may be assumed to be integers.
             Sub => {
-                let a: i64 = self.pop_item().await;
-                let b: i64 = self.pop_item().await;
+                let a = self.pop_element().await;
+                let b = self.pop_element().await;
                 debug!("sub {:?} - {:?}", a, b);
-                // wrapping sub to match bindingtester expected output
-                self.push_item(number, &(a.wrapping_sub(b)));
+                let c = match (a, b) {
+                    (Element::Int(a), Element::Int(b)) => Element::Int(a - b),
+                    (Element::Float(a), Element::Float(b)) => Element::Float(a - b),
+                    (Element::Double(a), Element::Double(b)) => Element::Double(a - b),
+                    (Element::BigInt(a), Element::BigInt(b)) => Element::BigInt(a - b),
+                    (Element::Int(a), Element::BigInt(b)) => Element::BigInt(a - b),
+                    (Element::BigInt(a), Element::Int(b)) => Element::BigInt(a - b),
+                    (a, b) => panic!("sub between invalid elements {:?} {:?}", a, b),
+                };
+                self.push(number, c);
             }
             // Pops the top two items off the stack as A and B and then pushes
             // the concatenation of A and B onto the stack. A and B can be
             // assumed to be of the same type and will be either byte strings or
             // unicode strings.
             Concat => {
-                let a = self.pop_data().await;
-                let b = self.pop_data().await;
-                debug!(
-                    "concat {:?} {:?}",
-                    Bytes::from(a.as_slice()),
-                    Bytes::from(b.as_slice())
-                );
-                if let (Ok(a), Ok(b)) = (unpack::<Bytes>(&a), unpack::<Bytes>(&b)) {
-                    let mut bytes = Vec::new();
-                    bytes.extend_from_slice(&a);
-                    bytes.extend_from_slice(&b);
-                    self.push_item(number, &Bytes::from(bytes));
-                } else if let (Ok(a), Ok(b)) = (unpack::<String>(&a), unpack::<String>(&b)) {
-                    self.push_item(number, &format!("{}{}", a, b));
-                } else {
-                    panic!("failed to decode item {:?} {:?}", a, b);
-                }
+                let a = self.pop_element().await;
+                let b = self.pop_element().await;
+                debug!("concat {:?} {:?}", a, b);
+                let c = match (a, b) {
+                    (Element::String(a), Element::String(b)) => {
+                        Element::String(format!("{}{}", a, b).into())
+                    }
+                    (Element::Bytes(a), Element::Bytes(b)) => {
+                        let mut bytes = Vec::new();
+                        bytes.extend_from_slice(&a);
+                        bytes.extend_from_slice(&b);
+                        Element::Bytes(bytes.into())
+                    }
+                    (a, b) => panic!("concat between invalid elements {:?} {:?}", a, b),
+                };
+                self.push(number, c);
             }
             // Pops the top item off the stack as PREFIX. Using a new
             // transaction with normal retry logic, inserts a key-value pair
@@ -727,8 +756,27 @@ impl StackMachine {
             // large, it may be necessary to commit the transaction every so often (e.g.
             // after every 100 sets) to avoid past_version errors.
             LogStack => {
-                let _prefix: Bytes = self.pop_bytes().await;
-                // TODO
+                let prefix: Bytes = self.pop_bytes().await;
+                let mut stack_idx = self.stack.len();
+                let trx_id = self.next_trx_id();
+                let mut t = trx.take(trx_id);
+                let mut n = 0;
+                while let Some(stack_item) = self.maybe_pop().await {
+                    stack_idx -= 1;
+                    let mut key = prefix.clone().into_owned();
+                    stack_idx.pack_into_vec(&mut key);
+                    stack_item.number.pack_into_vec(&mut key);
+
+                    let value = pack(&stack_item.data.unwrap());
+                    t.set(&key, &value[..value.len().min(40000)]);
+                    n += 1;
+                    if n == 100 {
+                        t = t.commit().await.unwrap().reset();
+                        n = 0;
+                    }
+                }
+                t = t.commit().await.unwrap().reset();
+                trx = TransactionState::Transaction(t);
             }
 
             // Creates a new transaction and stores it in the global transaction map
@@ -737,6 +785,12 @@ impl StackMachine {
                 let name = self.cur_transaction.clone();
                 debug!("create_trx {:?}", name);
                 let trx = self.check(number, db.create_trx())?;
+                trx.set_option(fdb::options::TransactionOption::DebugTransactionIdentifier(
+                    "RUST".to_string(),
+                ))
+                .unwrap();
+                trx.set_option(fdb::options::TransactionOption::LogTransaction)
+                    .unwrap();
                 self.transactions
                     .insert(name, TransactionState::Transaction(trx));
             }
@@ -762,7 +816,7 @@ impl StackMachine {
             // stack.
             OnError => {
                 let trx_name = trx_name.cloned();
-                let error_code: i32 = self.pop_item().await;
+                let error_code: i32 = self.pop_i32().await;
                 let error = FdbError::from_code(error_code);
                 debug!("on_error {:?}", error);
                 let trx_id = self.next_trx_id();
@@ -772,7 +826,7 @@ impl StackMachine {
                     .map(|res| match res {
                         Ok(trx) => StackResult {
                             state: trx_name.map(|n| (n, TransactionState::Transaction(trx))),
-                            data: Ok(pack(&RESULT_NOT_PRESENT)),
+                            data: Ok(RESULT_NOT_PRESENT.clone().into_owned()),
                         },
                         Err(err) => StackResult::from(err),
                     })
@@ -791,8 +845,8 @@ impl StackMachine {
                     .as_mut()
                     .get(&key, instr.pop_snapshot())
                     .map_ok(|v| match v {
-                        Some(v) => pack(&Bytes::from(v.as_ref())),
-                        None => pack(&RESULT_NOT_PRESENT),
+                        Some(v) => Element::Bytes(v.to_vec().into()),
+                        None => RESULT_NOT_PRESENT.clone().into_owned(),
                     })
                     .map(StackResult::from)
                     .boxed_local();
@@ -816,14 +870,15 @@ impl StackMachine {
                     .get_key(&selector, instr.pop_snapshot())
                     .map_ok(|key| {
                         let key = Bytes::from(key.as_ref());
-                        if key.starts_with(&prefix) {
-                            pack(&key)
+                        let bytes = if key.starts_with(&prefix) {
+                            key
                         } else if key < prefix {
-                            pack(&prefix)
+                            prefix
                         } else {
                             assert!(key > prefix);
-                            pack(&strinc(prefix))
-                        }
+                            strinc(prefix)
+                        };
+                        Element::Bytes(bytes.to_vec().into())
                     })
                     .map(StackResult::from)
                     .boxed_local();
@@ -857,7 +912,6 @@ impl StackMachine {
                 let starts_with = instr.pop_starts_with();
                 let snapshot = instr.pop_snapshot();
 
-                let trx_name = trx_name.cloned();
                 let (begin, end) = if starts_with {
                     let begin: Bytes = self.pop_bytes().await;
                     let end = strinc(begin.clone());
@@ -878,13 +932,19 @@ impl StackMachine {
                     )
                 };
 
-                let limit: i64 = self.pop_item().await;
-                let reverse: i64 = self.pop_item().await;
-                let streaming_mode: i32 = self.pop_item().await;
+                let limit: i64 = self.pop_i64().await;
+                let reverse: i64 = self.pop_i64().await;
+                let streaming_mode: i32 = self.pop_i32().await;
                 let mode = streaming_from_value(streaming_mode);
                 debug!(
-                    "get_range begin={:?}, end={:?}, limit={:?}, rev={:?}, mode={:?}",
-                    begin, end, limit, reverse, mode
+                    "get_range begin={:?}\n, begin={:?}\n, end={:?}\n,end={:?}\n, limit={:?}, rev={:?}, mode={:?}",
+                    begin,
+                    unpack::<Element>(&begin.key()),
+                    end,
+                    unpack::<Element>(&end.key()),
+                    limit,
+                    reverse,
+                    mode
                 );
 
                 let prefix: Option<Bytes> = if selector {
@@ -904,40 +964,31 @@ impl StackMachine {
                     reverse: reverse != 0,
                     ..RangeOption::default()
                 };
-                async fn get_range(
-                    trx: Transaction,
-                    trx_name: Option<Bytes<'static>>,
-                    prefix: Option<Bytes<'static>>,
-                    opt: RangeOption<'static>,
-                    snapshot: bool,
-                ) -> StackResult {
-                    let res = trx
-                        .get_ranges(opt, snapshot)
-                        .try_fold(Vec::new(), move |mut out, kvs| {
-                            for kv in kvs.iter() {
-                                let key = kv.key();
-                                let value = kv.value();
-                                debug!(" - {:?} {:?}", Bytes::from(key), Bytes::from(value));
-                                if let Some(ref prefix) = prefix {
-                                    if !key.starts_with(prefix) {
-                                        continue;
-                                    }
+
+                let res = trx
+                    .as_mut()
+                    .get_ranges(opt, snapshot)
+                    .try_fold(Vec::new(), move |mut out, kvs| {
+                        for kv in kvs.iter() {
+                            let key = kv.key();
+                            let value = kv.value();
+                            debug!(" - {:?} {:?}", Bytes::from(key), Bytes::from(value));
+                            if let Some(ref prefix) = prefix {
+                                if !key.starts_with(prefix) {
+                                    continue;
                                 }
-                                pack_into(&Bytes::from(key), &mut out);
-                                pack_into(&Bytes::from(value), &mut out);
                             }
-                            future::ok(out)
-                        })
-                        .await;
-                    StackResult {
-                        state: trx_name.map(|n| (n, TransactionState::Transaction(trx))),
-                        data: res.map(|data| pack(&Bytes::from(data))),
-                    }
+                            pack_into(&Bytes::from(key), &mut out);
+                            pack_into(&Bytes::from(value), &mut out);
+                        }
+                        future::ok(out)
+                    })
+                    .map_ok(|data| Element::Bytes(data.into()))
+                    .await;
+                match res {
+                    Err(err) => self.push_err(number, err),
+                    Ok(element) => self.push(number, element),
                 }
-                let trx_id = self.next_trx_id();
-                let f = get_range(trx.take(trx_id), trx_name, prefix, opt, snapshot).boxed_local();
-                self.push_fut(number, trx_id, f);
-                pending = true;
             }
 
             // Gets the current read version and stores it in the internal stack machine
@@ -949,7 +1000,7 @@ impl StackMachine {
                 match version {
                     Ok(version) => {
                         self.last_version = version;
-                        self.push_item(number, &Bytes::from(b"GOT_READ_VERSION".as_ref()));
+                        self.push(number, GOT_READ_VERSION.clone().into_owned());
                     }
                     Err(err) => self.push_err(number, err),
                 }
@@ -960,7 +1011,7 @@ impl StackMachine {
                 let f = trx
                     .as_mut()
                     .get_versionstamp()
-                    .map_ok(|v| pack(&Bytes::from(v.as_ref())))
+                    .map_ok(|v| Element::Bytes(v.to_vec().into()))
                     .map(StackResult::from)
                     .boxed_local();
                 self.push_fut(number, 0, f);
@@ -1022,7 +1073,7 @@ impl StackMachine {
             // Performs the atomic operation described by OPTYPE upon KEY with VALUE. An
             // ATOMIC_OP_DATABASE call may optionally push a future onto the stack.
             AtomicOp => {
-                let optype: String = self.pop_item().await;
+                let optype: String = self.pop_str().await;
                 let key: Bytes = self.pop_bytes().await;
                 let value: Bytes = self.pop_bytes().await;
                 debug!("atomic_op {:?} {:?} {:?}", key, value, optype);
@@ -1106,7 +1157,7 @@ impl StackMachine {
                     .map(|r| match r {
                         Ok(c) => StackResult {
                             state: trx_name.map(|n| (n, TransactionState::TransactionCommitted(c))),
-                            data: Ok(pack(&RESULT_NOT_PRESENT)),
+                            data: Ok(RESULT_NOT_PRESENT.clone().into_owned()),
                         },
                         Err(c) => {
                             let err = FdbError::from_code(c.code());
@@ -1130,7 +1181,7 @@ impl StackMachine {
             Cancel => {
                 debug!("cancel");
                 let cancelled = trx.take(0).cancel();
-                trx = TransactionState::Transaction(cancelled.reset());
+                trx = TransactionState::TransactionCancelled(cancelled);
             }
 
             // Gets the committed version from the current transaction and stores it in the
@@ -1143,11 +1194,30 @@ impl StackMachine {
                         .committed_version()
                         .expect("failed to get committed version");
                     self.last_version = last_version;
-                    self.push_item(number, &Bytes::from(b"GOT_COMMITTED_VERSION".as_ref()));
+                    self.push(number, GOT_COMMITTED_VERSION.clone().into_owned());
                 } else {
                     warn!("committed_version() called on a non commited transaction");
                     self.last_version = -1;
-                    self.push_item(number, &Bytes::from(b"GOT_COMMITTED_VERSION".as_ref()));
+                    self.push(number, GOT_COMMITTED_VERSION.clone().into_owned());
+                }
+            }
+
+            // Calls get_approximate_size and pushes the byte string "GOT_APPROXIMATE_SIZE"
+            // onto the stack. Note bindings may issue GET_RANGE calls with different
+            // limits, so these bindings can obtain different sizes back.
+            GetApproximateSize => {
+                debug!("get_approximate_size");
+                #[cfg(feature = "fdb-6_2")]
+                {
+                    trx.as_mut()
+                        .get_approximate_size()
+                        .await
+                        .expect("failed to get approximate size");
+                    self.push(number, GOT_APPROXIMATE_SIZE.clone().into_owned());
+                }
+                #[cfg(not(feature = "fdb-6_2"))]
+                {
+                    unimplemented!("get_approximate_size requires fdb620+");
                 }
             }
 
@@ -1164,7 +1234,7 @@ impl StackMachine {
             // stack and packs them as the tuple [item0,item1,...,itemN], and then pushes
             // this single packed value onto the stack.
             TuplePack => {
-                let n: usize = self.pop_item().await;
+                let n: usize = self.pop_usize().await;
                 debug!("tuple_pack {}", n);
                 let mut buf = Vec::new();
                 for _ in 0..n {
@@ -1172,8 +1242,8 @@ impl StackMachine {
                     debug!(" - {:?}", element);
                     buf.push(element);
                 }
-                let packed = pack(&buf);
-                self.push_item(number, &Bytes::from(packed));
+                let tuple = Element::Tuple(buf);
+                self.push(number, Element::Bytes(pack(&tuple).into()));
             }
 
             // Pops the top item off of the stack as a byte string prefix. Pops the next item
@@ -1189,7 +1259,7 @@ impl StackMachine {
             // operation.)
             TuplePackWithVersionstamp => {
                 let prefix = self.pop_bytes().await;
-                let n: usize = self.pop_item().await;
+                let n: usize = self.pop_usize().await;
                 debug!("tuple_pack_with_versionstamp {:?} {}", prefix, n);
                 let mut buf = Vec::new();
                 for _ in 0..n {
@@ -1198,22 +1268,25 @@ impl StackMachine {
                     buf.push(element);
                 }
 
-                let tuple = Element::Tuple(buf);
+                let tuple = Element::Tuple(buf.clone());
                 let i = tuple.count_incomplete_versionstamp();
-
-                self.push_item(
-                    number,
-                    &Bytes::from(if i == 0 {
-                        b"ERROR: NONE".as_ref()
-                    } else if i > 0 {
-                        b"ERROR: MULTIPLE".as_ref()
-                    } else {
-                        b"OK".as_ref()
-                    }),
-                );
-                if i == 1 {
-                    let packed = pack(&tuple);
-                    self.push_item(number, &Bytes::from(packed));
+                let mut vec = prefix.into_owned();
+                let offset = buf.pack_into_vec_with_versionstamp(&mut vec);
+                match offset {
+                    VersionstampOffset::None { size: _ } => {
+                        assert_eq!(i, 0);
+                        self.push(number, ERROR_NONE.clone().into_owned());
+                    }
+                    VersionstampOffset::OneIncomplete { offset: _ } => {
+                        assert_eq!(i, 1);
+                        let data = Element::Bytes(vec.into());
+                        self.push(number, OK.clone().into_owned());
+                        self.push(number, data);
+                    }
+                    VersionstampOffset::MultipleIncomplete => {
+                        assert!(i > 1);
+                        self.push(number, ERROR_MULTIPLE.clone().into_owned());
+                    }
                 }
             }
 
@@ -1226,7 +1299,7 @@ impl StackMachine {
                 let data: Vec<Element> = unpack(&data).unwrap();
                 for element in data {
                     debug!(" - {:?}", element);
-                    self.push_item(number, &Bytes::from(pack(&element)));
+                    self.push(number, Element::Bytes(pack(&(element,)).into()));
                 }
             }
             // Pops the top item off of the stack as N. Pops the next N items off of the
@@ -1234,24 +1307,18 @@ impl StackMachine {
             // structure) to the tuple range method. Pushes the begin and end elements of
             // the returned range onto the stack.
             TupleRange => {
-                let n: usize = self.pop_item().await;
+                let n: usize = self.pop_usize().await;
                 debug!("tuple_range {:?}", n);
                 let mut tup = Vec::new();
                 for _ in 0..n {
-                    let mut data = self.pop_data().await;
-                    tup.append(&mut data);
+                    let element = self.pop_element().await;
+                    tup.push(element);
                 }
 
-                {
-                    let mut data = tup.clone();
-                    data.push(0x00);
-                    self.push_item(number, &Bytes::from(data));
-                }
-                {
-                    let mut data = tup;
-                    data.push(0xff);
-                    self.push_item(number, &Bytes::from(data));
-                }
+                let subspace = Subspace::from(tup);
+                let (start, end) = subspace.range();
+                self.push(number, Element::Bytes(start.into()));
+                self.push(number, Element::Bytes(end.into()));
             }
 
             // Pops the top item off of the stack as N. Pops the next N items off of the
@@ -1262,16 +1329,20 @@ impl StackMachine {
             // use that to sort. Otherwise, it should sort them lexicographically by
             // their byte representation. The choice of function should not affect final sort order.
             TupleSort => {
-                let n: usize = self.pop_item().await;
+                let n: usize = self.pop_usize().await;
                 debug!("tuple_sort {:?}", n);
-                let mut tup = Vec::new();
+                let mut tup = Vec::<Element>::new();
                 for _ in 0..n {
-                    let data = self.pop_data().await;
-                    tup.push(Bytes::from(data));
+                    let packed = self.pop_bytes().await;
+                    let element: Element = unpack(&packed).unwrap();
+                    debug!("- {:?}", element);
+                    tup.push(element.into_owned());
                 }
                 tup.sort();
-                for data in tup {
-                    self.push(number, data.into_owned());
+                debug!("tuple_sorted");
+                for element in tup {
+                    debug!("- {:?}", element);
+                    self.push(number, Element::Bytes(pack(&element).into()));
                 }
             }
 
@@ -1284,7 +1355,7 @@ impl StackMachine {
                 let mut arr = [0; 4];
                 arr.copy_from_slice(&bytes);
                 let f = f32::from_bits(u32::from_be_bytes(arr));
-                self.push_item(number, &f);
+                self.push(number, Element::Float(f));
             }
             // Pops the top item off of the stack. This will be a byte-string of length 8
             // containing the IEEE 754 encoding of a double in big-endian order.
@@ -1295,25 +1366,35 @@ impl StackMachine {
                 let mut arr = [0; 8];
                 arr.copy_from_slice(&bytes);
                 let f = f64::from_bits(u64::from_be_bytes(arr));
-                self.push_item(number, &f);
+                self.push(number, Element::Double(f));
             }
             // Pops the top item off of the stack. This will be a single-precision float.
             // This is converted into a (4 byte) byte-string of its IEEE 754 representation
             // in big-endian order, and pushed onto the stack.
             DecodeFloat => {
-                let f: f32 = self.pop_item().await;
+                let f: f32 = match self.pop_element().await {
+                    Element::Float(v) => v,
+                    element => panic!("float was expected, found {:?}", element),
+                };
                 debug!("decode_float {}", f);
-                let packed = pack(&Bytes::from(f.to_bits().to_be_bytes().as_ref()));
-                self.push_item(number, &Bytes::from(packed));
+                self.push(
+                    number,
+                    Element::Bytes(f.to_bits().to_be_bytes().to_vec().into()),
+                );
             }
             // Pops the top item off of the stack. This will be a double-precision float.
             // This is converted into a (8 byte) byte-string its IEEE 754 representation
             // in big-endian order, and pushed onto the stack.
             DecodeDouble => {
-                let f: f64 = self.pop_item().await;
+                let f: f64 = match self.pop_element().await {
+                    Element::Double(v) => v,
+                    element => panic!("double was expected, found {:?}", element),
+                };
                 debug!("decode_double {}", f);
-                let packed = pack(&Bytes::from(f.to_bits().to_be_bytes().as_ref()));
-                self.push_item(number, &Bytes::from(packed));
+                self.push(
+                    number,
+                    Element::Bytes(f.to_bits().to_be_bytes().to_vec().into()),
+                );
             }
 
             // Pops the top item off of the stack as PREFIX. Creates a new stack machine
@@ -1372,7 +1453,7 @@ impl StackMachine {
                     )
                     .await;
                 self.check(number, r)?;
-                self.push_item(number, &Bytes::from(b"WAITED_FOR_EMPTY".as_ref()));
+                self.push(number, WAITED_FOR_EMPTY.clone().into_owned());
             }
 
             UnitTests => {
@@ -1435,7 +1516,7 @@ impl StackMachine {
         if is_db && mutation {
             let r = trx.take(0).commit().await.map_err(|e| e.into());
             self.check(number, r)?;
-            self.push_item(number, &RESULT_NOT_PRESENT);
+            self.push(number, RESULT_NOT_PRESENT.clone().into_owned());
         } else if !self.transactions.contains_key(&self.cur_transaction) {
             self.transactions.insert(self.cur_transaction.clone(), trx);
         }

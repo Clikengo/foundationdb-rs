@@ -104,6 +104,7 @@ jobs:
 
     env:
       CARGO_INCREMENTAL: 0
+      RUST_BACKTRACE: 1
 
     steps:
       - name: Checkout repository
@@ -163,6 +164,11 @@ jobs:
     name: Code coverage
     runs-on: ubuntu-latest
 
+    env:
+      CARGO_INCREMENTAL: "0"
+      RUST_BACKTRACE: 1
+      RUSTFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Cpanic=abort -Zpanic_abort_tests"
+
     steps:
       - uses: actions/checkout@v1
 
@@ -179,19 +185,13 @@ jobs:
         with:
           command: build
           args: -p bindingtester --target x86_64-unknown-linux-gnu
-        env:
-          CARGO_INCREMENTAL: "0"
-          RUSTFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Cpanic=abort -Zpanic_abort_tests"
 
       - name: Test
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --no-fail-fast --target x86_64-unknown-linux-gnu
-        env:
-          CARGO_INCREMENTAL: "0"
-          RUST_BACKTRACE: 1
-          RUSTFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Cpanic=abort -Zpanic_abort_tests"
+          # doc tests are disabled fow now as they do not compile with -Cpanic=abort
+          args: --tests --no-fail-fast --target x86_64-unknown-linux-gnu
 
       - name: Run bindingtester
         run: scripts/run_bindingtester.sh target/x86_64-unknown-linux-gnu/debug/bindingtester

@@ -8,7 +8,6 @@
 
 //! Error types for the Fdb crate
 
-use std;
 use std::ffi::CStr;
 use std::fmt;
 
