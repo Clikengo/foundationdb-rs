@@ -208,7 +208,10 @@ pub fn pack_into<T: TuplePack>(v: &T, output: &mut Vec<u8>) {
 ///
 /// Panics if there is multiple versionstamp present or if the encoded data size doesn't fit in `u32`.
 pub fn pack_into_with_versionstamp<T: TuplePack>(v: &T, output: &mut Vec<u8>) {
-    v.pack_into_vec_with_versionstamp(output)
+    let offset = v.pack_into_vec_with_versionstamp(output);
+    if let VersionstampOffset::MultipleIncomplete = offset {
+        panic!("pack_into_with_versionstamp does not allow multiple versionstamps");
+    }
 }
 
 /// Unpack input

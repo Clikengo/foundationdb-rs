@@ -7,8 +7,8 @@ use std::mem;
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub enum VersionstampOffset {
     None { size: u32 },
-    One { offset: u32 },
-    Multiple,
+    OneIncomplete { offset: u32 },
+    MultipleIncomplete,
 }
 impl std::ops::AddAssign<u32> for VersionstampOffset {
     fn add_assign(&mut self, r: u32) {
@@ -23,14 +23,18 @@ impl std::ops::AddAssign for VersionstampOffset {
             (VersionstampOffset::None { size }, VersionstampOffset::None { size: r }) => {
                 *size += r;
             }
-            (VersionstampOffset::None { size }, VersionstampOffset::One { offset }) => {
-                *self = VersionstampOffset::One {
+            (VersionstampOffset::None { size }, VersionstampOffset::OneIncomplete { offset }) => {
+                *self = VersionstampOffset::OneIncomplete {
                     offset: *size + offset,
                 };
             }
-            (VersionstampOffset::One { .. }, VersionstampOffset::One { .. })
-            | (VersionstampOffset::One { .. }, VersionstampOffset::Multiple) => {
-                *self = VersionstampOffset::Multiple;
+            (
+                VersionstampOffset::OneIncomplete { .. },
+                VersionstampOffset::OneIncomplete { .. },
+            )
+            | (VersionstampOffset::None { .. }, VersionstampOffset::MultipleIncomplete)
+            | (VersionstampOffset::OneIncomplete { .. }, VersionstampOffset::MultipleIncomplete) => {
+                *self = VersionstampOffset::MultipleIncomplete;
             }
             _ => {}
         }
@@ -69,7 +73,10 @@ pub trait TuplePack {
     /// Panics if there is multiple versionstamp present or if the encoded data size doesn't fit in `u32`.
     fn pack_to_vec_with_versionstamp(&self) -> Vec<u8> {
         let mut vec = Vec::new();
-        self.pack_into_vec_with_versionstamp(&mut vec);
+        let offset = self.pack_into_vec_with_versionstamp(&mut vec);
+        if let VersionstampOffset::MultipleIncomplete = offset {
+            panic!("pack_to_vec_with_versionstamp does not allow multiple versionstamps");
+        }
         vec
     }
 
@@ -86,21 +93,16 @@ pub trait TuplePack {
     ///
     /// # Panics
     ///
-    /// Panics if there is multiple versionstamp present or if the encoded data size doesn't fit in `u32`.
-    fn pack_into_vec_with_versionstamp(&self, output: &mut Vec<u8>) {
+    /// Panics if the encoded data size doesn't fit in `u32`.
+    fn pack_into_vec_with_versionstamp(&self, output: &mut Vec<u8>) -> VersionstampOffset {
         let mut offset = VersionstampOffset::None {
             size: u32::try_from(output.len()).expect(PACK_ERR_MSG),
         };
         offset += self.pack_root(output).expect(PACK_ERR_MSG);
-        match offset {
-            VersionstampOffset::None { size: _ } => {}
-            VersionstampOffset::One { offset } => {
-                output.extend_from_slice(&offset.to_le_bytes());
-            }
-            VersionstampOffset::Multiple => {
-                panic!("pack_into_with_versionstamp does not allow multiple versionstamps");
-            }
+        if let VersionstampOffset::OneIncomplete { offset } = offset {
+            output.extend_from_slice(&offset.to_le_bytes());
         }
+        offset
     }
 }
 
@@ -342,14 +344,16 @@ macro_rules! impl_ux {
                 const SZ: usize = mem::size_of::<$ux>();
                 let u = *self;
                 let n = SZ - (u.leading_zeros() as usize) / 8;
+                let mut offset = VersionstampOffset::None { size: n as u32 + 1 };
                 if SZ <= MAX_SZ || n <= MAX_SZ {
                     w.write_all(&[INTZERO + n as u8])?;
                 } else {
                     w.write_all(&[POSINTEND, n as u8])?;
-                }
+                    offset += 1;
+                };
                 w.write_all(&u.to_be_bytes()[SZ - n..])?;
 
-                Ok(VersionstampOffset::None { size: n as u32 + 1 })
+                Ok(offset)
             }
         }
 
@@ -393,11 +397,13 @@ macro_rules! impl_ix {
                 let i = *self;
                 let u = self.wrapping_abs() as $ux;
                 let n = SZ - (u.leading_zeros() as usize) / 8;
+                let mut offset = VersionstampOffset::None { size: n as u32 + 1 };
                 let arr = if i >= 0 {
                     if SZ <= MAX_SZ || n <= MAX_SZ {
                         w.write_all(&[INTZERO + n as u8])?;
                     } else {
                         w.write_all(&[POSINTEND, n as u8])?;
+                        offset += 1;
                     }
                     (u.to_be_bytes())
                 } else {
@@ -405,12 +411,13 @@ macro_rules! impl_ix {
                         w.write_all(&[INTZERO - n as u8])?;
                     } else {
                         w.write_all(&[NEGINTSTART, n as u8 ^ 0xff])?;
+                        offset += 1;
                     }
                     (i.wrapping_sub(1).to_be_bytes())
                 };
                 w.write_all(&arr[SZ - n..])?;
 
-                Ok(VersionstampOffset::None { size: n as u32 + 1 })
+                Ok(offset)
             }
         }
 
@@ -470,7 +477,7 @@ macro_rules! impl_fx {
                 w.write_all(&[$code])?;
                 w.write_all(&bytes)?;
                 Ok(VersionstampOffset::None {
-                    size: std::mem::size_of::<$fx>() as u32 / 8 + 1,
+                    size: std::mem::size_of::<$fx>() as u32 + 1,
                 })
             }
         }
@@ -558,12 +565,14 @@ mod bigint {
             }
             let (sign, mut bytes) = self.to_bytes_be();
             let n = bytes.len();
+            let mut offset = VersionstampOffset::None { size: n as u32 + 1 };
             match sign {
                 Sign::Minus => {
                     if n <= MAX_SZ {
                         w.write_all(&[INTZERO - n as u8])?;
                     } else {
                         w.write_all(&[NEGINTSTART, bigint_n(n)? ^ 0xff])?;
+                        offset += 1;
                     }
                     invert(&mut bytes);
                     w.write_all(&bytes)?;
@@ -574,12 +583,13 @@ mod bigint {
                         w.write_all(&[INTZERO + n as u8])?;
                     } else {
                         w.write_all(&[POSINTEND, bigint_n(n)?])?;
+                        offset += 1;
                     }
                     w.write_all(&bytes)?;
                 }
-            };
+            }
 
-            Ok(VersionstampOffset::None { size: n as u32 + 1 })
+            Ok(offset)
         }
     }
 
@@ -626,14 +636,16 @@ mod bigint {
             }
             let bytes = self.to_bytes_be();
             let n = bytes.len();
+            let mut offset = VersionstampOffset::None { size: n as u32 + 1 };
             if n <= MAX_SZ {
                 w.write_all(&[INTZERO + n as u8])?;
             } else {
                 w.write_all(&[POSINTEND, bigint_n(n)?])?;
+                offset += 1;
             }
             w.write_all(&bytes)?;
 
-            Ok(VersionstampOffset::None { size: n as u32 + 1 })
+            Ok(offset)
         }
     }
 
@@ -995,10 +1007,11 @@ impl<'de> TupleUnpack<'de> for Element<'de> {
                 (input, Element::Uuid(v))
             }
             found => {
+                dbg!(Bytes::from(input));
                 return Err(PackError::BadCode {
                     found,
                     expected: None,
-                })
+                });
             }
         };
 
@@ -1025,7 +1038,11 @@ impl TuplePack for Versionstamp {
     ) -> io::Result<VersionstampOffset> {
         w.write_all(&[VERSIONSTAMP])?;
         w.write_all(self.as_bytes())?;
-        Ok(VersionstampOffset::One { offset: 1 })
+        if self.is_complete() {
+            Ok(VersionstampOffset::None { size: 1 + 12 })
+        } else {
+            Ok(VersionstampOffset::OneIncomplete { offset: 1 })
+        }
     }
 }
 

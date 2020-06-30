@@ -23,11 +23,14 @@ static RESULT_NOT_PRESENT: Element = Element::Bytes(Bytes(Cow::Borrowed(b"RESULT
 static GOT_READ_VERSION: Element = Element::Bytes(Bytes(Cow::Borrowed(b"GOT_READ_VERSION")));
 static GOT_COMMITTED_VERSION: Element =
     Element::Bytes(Bytes(Cow::Borrowed(b"GOT_COMMITTED_VERSION")));
+static GOT_APPROXIMATE_SIZE: Element =
+    Element::Bytes(Bytes(Cow::Borrowed(b"GOT_APPROXIMATE_SIZE")));
 static ERROR_NONE: Element = Element::Bytes(Bytes(Cow::Borrowed(b"ERROR: NONE")));
 static ERROR_MULTIPLE: Element = Element::Bytes(Bytes(Cow::Borrowed(b"ERROR: MULTIPLE")));
 static OK: Element = Element::Bytes(Bytes(Cow::Borrowed(b"OK")));
 
 use crate::fdb::options::{MutationType, StreamingMode};
+use tuple::VersionstampOffset;
 fn mutation_from_str(s: &str) -> MutationType {
     match s {
         "ADD" => MutationType::Add,
@@ -163,6 +166,7 @@ enum InstrCode {
     Reset,
     Cancel,
     GetCommittedVersion,
+    GetApproximateSize,
     WaitFuture,
 
     TuplePack,
@@ -238,6 +242,7 @@ impl Instr {
             "RESET" => Reset,
             "CANCEL" => Cancel,
             "GET_COMMITTED_VERSION" => GetCommittedVersion,
+            "GET_APPROXIMATE_SIZE" => GetApproximateSize,
             "WAIT_FUTURE" => WaitFuture,
 
             "TUPLE_PACK" => TuplePack,
@@ -399,7 +404,6 @@ impl TransactionState {
     fn as_mut(&mut self) -> &mut Transaction {
         use TransactionState as S;
 
-        println!("as_mut {:?}", self);
         self.reset();
         match *self {
             S::Transaction(ref mut tr) => tr,
@@ -414,7 +418,6 @@ impl TransactionState {
     fn take(&mut self, id: usize) -> Transaction {
         use TransactionState as S;
 
-        println!("take {:?}", self);
         self.reset();
         match std::mem::replace(self, S::Dead) {
             S::Transaction(tr) => {
@@ -1190,6 +1193,18 @@ impl StackMachine {
                 }
             }
 
+            // Calls get_approximate_size and pushes the byte string "GOT_APPROXIMATE_SIZE"
+            // onto the stack. Note bindings may issue GET_RANGE calls with different
+            // limits, so these bindings can obtain different sizes back.
+            GetApproximateSize => {
+                debug!("get_approximate_size");
+                trx.as_mut()
+                    .get_approximate_size()
+                    .await
+                    .expect("failed to get approximate size");
+                self.push(number, GOT_APPROXIMATE_SIZE.clone().into_owned());
+            }
+
             // Pops the top item off the stack and pushes it back on. If the top item on
             // the stack is a future, this will have the side effect of waiting on the
             // result of the future and pushing the result on the stack. Does not change
@@ -1212,7 +1227,6 @@ impl StackMachine {
                     buf.push(element);
                 }
                 let tuple = Element::Tuple(buf);
-                debug!("tuple_packed {}", Bytes::from(pack(&tuple)));
                 self.push(number, Element::Bytes(pack(&tuple).into()));
             }
 
@@ -1238,21 +1252,25 @@ impl StackMachine {
                     buf.push(element);
                 }
 
-                let tuple = Element::Tuple(buf);
+                let tuple = Element::Tuple(buf.clone());
                 let i = tuple.count_incomplete_versionstamp();
-
-                self.push(
-                    number,
-                    if i == 0 {
-                        ERROR_NONE.clone().into_owned()
-                    } else if i > 0 {
-                        ERROR_MULTIPLE.clone().into_owned()
-                    } else {
-                        OK.clone().into_owned()
-                    },
-                );
-                if i == 1 {
-                    self.push(number, Element::Bytes(pack(&tuple).into()));
+                let mut vec = prefix.into_owned();
+                let offset = buf.pack_into_vec_with_versionstamp(&mut vec);
+                match offset {
+                    VersionstampOffset::None { size: _ } => {
+                        assert_eq!(i, 0);
+                        self.push(number, ERROR_NONE.clone().into_owned());
+                    }
+                    VersionstampOffset::OneIncomplete { offset: _ } => {
+                        assert_eq!(i, 1);
+                        let data = Element::Bytes(vec.into());
+                        self.push(number, OK.clone().into_owned());
+                        self.push(number, data);
+                    }
+                    VersionstampOffset::MultipleIncomplete => {
+                        assert!(i > 1);
+                        self.push(number, ERROR_MULTIPLE.clone().into_owned());
+                    }
                 }
             }
 
