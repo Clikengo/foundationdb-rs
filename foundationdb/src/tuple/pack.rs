@@ -1031,7 +1031,6 @@ impl<'de> TupleUnpack<'de> for Element<'de> {
                 (input, Element::Uuid(v))
             }
             found => {
-                dbg!(Bytes::from(input));
                 return Err(PackError::BadCode {
                     found,
                     expected: None,
