@@ -757,6 +757,7 @@ impl StackMachine {
                 let mut stack_idx = self.stack.len();
                 let trx_id = self.next_trx_id();
                 let mut t = trx.take(trx_id);
+                let mut n = 0;
                 while let Some(stack_item) = self.maybe_pop().await {
                     stack_idx -= 1;
                     let mut key = prefix.clone().into_owned();
@@ -765,8 +766,13 @@ impl StackMachine {
 
                     let value = pack(&stack_item.data.unwrap());
                     t.set(&key, &value[..value.len().min(40000)]);
-                    t = t.commit().await.unwrap().reset();
+                    n += 1;
+                    if n == 100 {
+                        t = t.commit().await.unwrap().reset();
+                        n = 0;
+                    }
                 }
+                t = t.commit().await.unwrap().reset();
                 trx = TransactionState::Transaction(t);
             }
 
