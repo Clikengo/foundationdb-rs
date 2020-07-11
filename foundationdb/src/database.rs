@@ -133,8 +133,8 @@ impl Database {
         let mut trx = self.create_trx()?;
         let mut can_retry = move || {
             tries += 1;
-            retry_limit.filter(|&limit| tries < limit).is_none()
-                && time_out.filter(|&t| Instant::now() < t).is_none()
+            retry_limit.filter(|&limit| tries > limit).is_none()
+                && time_out.filter(|&t| Instant::now() > t).is_none()
         };
         loop {
             let r = f.transact(trx).await;
