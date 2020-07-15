@@ -224,6 +224,8 @@ pub trait DatabaseTransact: Sized {
     fn transact(self, trx: Transaction) -> Self::Future;
 }
 
+#[allow(clippy::needless_lifetimes)]
+#[allow(clippy::type_complexity)]
 mod boxed {
     use super::*;
 
@@ -275,6 +277,8 @@ mod boxed {
     }
 }
 
+#[allow(clippy::needless_lifetimes)]
+#[allow(clippy::type_complexity)]
 mod boxed_local {
     use super::*;
 

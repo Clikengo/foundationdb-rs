@@ -343,6 +343,7 @@ pub struct FdbValuesIter {
 impl Iterator for FdbValuesIter {
     type Item = FdbValue;
     fn next(&mut self) -> Option<Self::Item> {
+        #[allow(clippy::iter_nth_zero)]
         self.nth(0)
     }
 

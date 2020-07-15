@@ -412,7 +412,7 @@ impl TransactionState {
             S::Transaction(ref mut tr) => tr,
             S::TransactionCancelled(ref mut tr) => unsafe {
                 // rust binding prevent accessing cancelled transaction
-                std::mem::transmute(tr)
+                &mut *(tr as *mut TransactionCancelled as *mut Transaction)
             },
             _ => panic!("transaction is owned by a future that is still not done"),
         }

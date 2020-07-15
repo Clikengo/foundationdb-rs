@@ -61,7 +61,7 @@ impl Bench {
             let counter = counter.clone();
             let b = self.clone();
             let handle = std::thread::spawn(move || {
-                futures::executor::block_on(b.clone().run_range(range, counter))
+                futures::executor::block_on(b.run_range(range, counter))
             });
             handles.push(handle);
 
