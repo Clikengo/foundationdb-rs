@@ -220,7 +220,7 @@
             <span class="kw">let</span> <span class="ident">counter</span> <span class="op">=</span> <span class="ident">counter</span>.<span class="ident">clone</span>();
             <span class="kw">let</span> <span class="ident">b</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">clone</span>();
             <span class="kw">let</span> <span class="ident">handle</span> <span class="op">=</span> <span class="ident">std</span>::<span class="ident">thread</span>::<span class="ident">spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
-                <span class="ident">futures</span>::<span class="ident">executor</span>::<span class="ident">block_on</span>(<span class="ident">b</span>.<span class="ident">clone</span>().<span class="ident">run_range</span>(<span class="ident">range</span>, <span class="ident">counter</span>))
+                <span class="ident">futures</span>::<span class="ident">executor</span>::<span class="ident">block_on</span>(<span class="ident">b</span>.<span class="ident">run_range</span>(<span class="ident">range</span>, <span class="ident">counter</span>))
             });
             <span class="ident">handles</span>.<span class="ident">push</span>(<span class="ident">handle</span>);
 
