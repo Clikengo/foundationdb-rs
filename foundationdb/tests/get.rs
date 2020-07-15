@@ -19,6 +19,8 @@ fn test_get() {
         futures::executor::block_on(test_set_conflict_async()).expect("failed to run");
         futures::executor::block_on(test_set_conflict_snapshot_async()).expect("failed to run");
         futures::executor::block_on(test_transact_async()).expect("failed to run");
+        futures::executor::block_on(test_transact_limit()).expect("failed to run");
+        futures::executor::block_on(test_transact_timeout()).expect("failed to run");
         futures::executor::block_on(test_versionstamp_async()).expect("failed to run");
         futures::executor::block_on(test_read_version_async()).expect("failed to run");
         futures::executor::block_on(test_set_read_version_async()).expect("failed to run");
@@ -163,6 +165,86 @@ async fn test_transact_async() -> FdbResult<()> {
     // `TransactionOption::RetryCount` does not count first try, so `try_count` should be equal to
     // `RETRY_COUNT+1`
     assert_eq!(try_count.load(Ordering::SeqCst), RETRY_COUNT + 1);
+
+    Ok(())
+}
+
+async fn test_transact_limit() -> FdbResult<()> {
+    const KEY: &[u8] = b"test_transact_limit";
+    async fn async_body(
+        db: &Database,
+        trx: &Transaction,
+        try_count0: Arc<AtomicUsize>,
+    ) -> FdbResult<()> {
+        // increment try counter
+        try_count0.fetch_add(1, Ordering::SeqCst);
+
+        // update conflict range
+        trx.get(KEY, false).await?;
+
+        // make current transaction invalid by making conflict
+        make_dirty(&db, KEY).await?;
+
+        trx.set(KEY, common::random_str(10).as_bytes());
+
+        // `Database::transact` will handle commit by itself, so returns without commit
+        Ok(())
+    }
+
+    let try_count = Arc::new(AtomicUsize::new(0));
+    let db = common::database().await?;
+    let res = db
+        .transact_boxed(
+            &db,
+            |trx, db| async_body(db, trx, try_count.clone()).boxed(),
+            TransactOption {
+                retry_limit: Some(5),
+                ..TransactOption::default()
+            },
+        )
+        .await;
+    assert!(res.is_err(), "should not be able to commit");
+
+    assert_eq!(try_count.load(Ordering::SeqCst), 5);
+
+    Ok(())
+}
+
+async fn test_transact_timeout() -> FdbResult<()> {
+    const KEY: &[u8] = b"test_transact_timeout";
+    async fn async_body(
+        db: &Database,
+        trx: &Transaction,
+        try_count0: Arc<AtomicUsize>,
+    ) -> FdbResult<()> {
+        // increment try counter
+        try_count0.fetch_add(1, Ordering::SeqCst);
+
+        // update conflict range
+        trx.get(KEY, false).await?;
+
+        // make current transaction invalid by making conflict
+        make_dirty(&db, KEY).await?;
+
+        trx.set(KEY, common::random_str(10).as_bytes());
+
+        // `Database::transact` will handle commit by itself, so returns without commit
+        Ok(())
+    }
+
+    let try_count = Arc::new(AtomicUsize::new(0));
+    let db = common::database().await?;
+    let res = db
+        .transact_boxed(
+            &db,
+            |trx, db| async_body(db, trx, try_count.clone()).boxed(),
+            TransactOption {
+                time_out: Some(std::time::Duration::from_millis(250)),
+                ..TransactOption::default()
+            },
+        )
+        .await;
+    assert!(res.is_err(), "should not be able to commit");
 
     Ok(())
 }
