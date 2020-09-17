@@ -5,8 +5,14 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## 0.5.0
 
-- #179, #182: Fix possible runloop undefined behaviors
-  (`fdb_stop_network` **MUST** be called before the program exits, see issues #170, #181).
+- #203: Defaults to foundationdb 6.2.x API version
+- #194: Add support for pack with versionstamp
+- #194: Fix a bug in the unpacking of signed integers
+- #194: Add support for BigInt on Element
+- #194: Element now implement Ord and matches the packed ordering
+- #194: Bindingtester output now matches official python output
+- #179, #182, #202, #204: Fix possible runloop undefined behaviors
+  (`fdb_stop_network` **MUST** be called before the program exits, see issues #170, #181, #202).
   Fixing it required a breaking change with the `foundationdb::boot()` API
 - #177: Add support for NEGINTSTART, POSINTEND encoding (@garrensmith)
 - #178: Add support for `num-bigint`

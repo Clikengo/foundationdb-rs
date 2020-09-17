@@ -13,34 +13,34 @@ Install FoundationDB on your system, see [FoundationDB Local Development](https:
 - Ubuntu Linux (this may work on the Linux subsystem for Windows as well)
 
 ```console
-$> curl -O https://www.foundationdb.org/downloads/6.1.12/ubuntu/installers/foundationdb-clients_6.1.12-1_amd64.deb
-$> curl -O https://www.foundationdb.org/downloads/6.1.12/ubuntu/installers/foundationdb-server_6.1.12-1_amd64.deb
-$> sudo dpkg -i foundationdb-clients_6.1.12-1_amd64.deb
-$> sudo dpkg -i foundationdb-server_6.1.12-1_amd64.deb
+$> curl -O https://www.foundationdb.org/downloads/6.2.15/ubuntu/installers/foundationdb-clients_6.2.25-1_amd64.deb
+$> curl -O https://www.foundationdb.org/downloads/6.2.15/ubuntu/installers/foundationdb-server_6.2.25-1_amd64.deb
+$> sudo dpkg -i foundationdb-clients_6.2.25-1_amd64.deb
+$> sudo dpkg -i foundationdb-server_6.2.25-1_amd64.deb
 ```
 
 - macOS
 
 ```console
-$> curl -O https://www.foundationdb.org/downloads/6.1.12/macOS/installers/FoundationDB-6.1.12.pkg
-$> sudo installer -pkg FoundationDB-6.1.12.pkg -target /
+$> curl -O https://www.foundationdb.org/downloads/6.2.25/macOS/installers/FoundationDB-6.2.25.pkg
+$> sudo installer -pkg FoundationDB-6.2.25.pkg -target /
 ```
 
 - Windows
 
-https://www.foundationdb.org/downloads/6.1.12/windows/installers/foundationdb-6.1.12-x64.msi
+https://www.foundationdb.org/downloads/6.2.25/windows/installers/foundationdb-6.2.25-x64.msi
 
 ## Add dependencies on foundationdb-rs
 
 ```toml
 [dependencies]
-foundationdb = "0.4.0"
+foundationdb = "0.5"
 futures = "0.3"
 ```
 
 ## Initialization
 
-Due to limitations in the C API, the Client and it's associated Network can only be initialized and run once per the life of a process. Generally the `foundationdb::boot` function will be enough to initialize the Client. See `foundationdb::default_api` and `foundationdb::builder` for more configuration options of the Fdb Client.
+Due to limitations in the C API, the Client and it's associated Network can only be initialized and run once per the life of a process. Generally the `foundationdb::run` function will be enough to initialize the Client. See `foundationdb::default_api` and `foundationdb::builder` for more configuration options of the Fdb Client.
 
 ## Example
 
@@ -65,9 +65,23 @@ async fn async_main() -> foundationdb::FdbResult<()> {
     Ok(())
 }
 
-foundationdb::run(|| {
-    futures::executor::block_on(async_main()).expect("failed to run");
-});
+// Safe because drop is called before the program exits
+let network = unsafe { foundationdb::boot() };
+futures::executor::block_on(async_main()).expect("failed to run");
+drop(network);
+```
+
+```rust
+#[tokio::main]
+async fn main() {
+    // Safe because drop is called before the program exits
+    let network = unsafe { foundationdb::boot() };
+
+    // Have fun with the FDB API
+
+    // shutdown the client
+    drop(network);
+}
 ```
 
 ## Migration from 0.4 to 0.5
@@ -87,24 +101,13 @@ drop(network);
 This can be converted to:
 
 ```rust
-foundationdb::boot(|| {
-    futures::executor::block_on(async_main()).expect("failed to run");
-}).expect("failed to boot fdb");
-```
+// Safe because drop is called before the program exits
+let network = unsafe { foundationdb::boot() };
 
-or
+futures::executor::block_on(async_main()).expect("failed to run");
 
-```rust
-#[tokio::main]
-async fn main() {
-    // Safe because drop is called before the program exits
-    let network = unsafe { foundationdb::boot() }.expect("failed to initialize Fdb");
-
-    // Have fun with the FDB API
-
-    // shutdown the client
-    drop(network);
-}
+// cleanly shutdown the client
+drop(network);
 ```
 
 ## API stability
