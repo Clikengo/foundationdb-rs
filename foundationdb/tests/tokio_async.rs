@@ -9,7 +9,8 @@ async fn test_tokio_send() {
     boot_async(|| async {
         do_transact().await;
         do_trx().await;
-    }).await
+    })
+    .await
 }
 
 async fn do_transact() {
