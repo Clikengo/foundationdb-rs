@@ -364,11 +364,10 @@ async fn run_sim(db: &Database, students: usize, ops_per_student: usize) {
 }
 
 fn main() {
-    fdb::run(|| {
-        let db = futures::executor::block_on(fdb::Database::new_compat(None))
-            .expect("failed to get database");
-        futures::executor::block_on(init(&db, &*ALL_CLASSES));
-        println!("Initialized");
-        futures::executor::block_on(run_sim(&db, 10, 10));
-    });
+    let _guard = unsafe { fdb::boot() };
+    let db = futures::executor::block_on(fdb::Database::new_compat(None))
+        .expect("failed to get database");
+    futures::executor::block_on(init(&db, &*ALL_CLASSES));
+    println!("Initialized");
+    futures::executor::block_on(run_sim(&db, 10, 10));
 }

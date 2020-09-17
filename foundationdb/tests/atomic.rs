@@ -12,7 +12,8 @@ mod common;
 
 #[test]
 fn test_atomic() {
-    run(|| futures::executor::block_on(test_atomic_async()).expect("failed to run"));
+    let _guard = unsafe { foundationdb::boot() };
+    futures::executor::block_on(test_atomic_async()).expect("failed to run");
 }
 
 async fn atomic_add(db: &Database, key: &[u8], value: i64) -> FdbResult<()> {

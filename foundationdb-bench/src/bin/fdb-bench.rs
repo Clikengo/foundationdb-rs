@@ -146,13 +146,12 @@ fn main() {
     let opt = Opt::from_args();
     info!("opt: {:?}", opt);
 
-    fdb::run(|| {
-        let db = Arc::new(
-            futures::executor::block_on(fdb::Database::new_compat(None))
-                .expect("failed to get database"),
-        );
+    let _guard = unsafe { foundationdb::boot() };
+    let db = Arc::new(
+        futures::executor::block_on(fdb::Database::new_compat(None))
+            .expect("failed to get database"),
+    );
 
-        let bench = Bench { db, opt };
-        bench.run();
-    });
+    let bench = Bench { db, opt };
+    bench.run();
 }

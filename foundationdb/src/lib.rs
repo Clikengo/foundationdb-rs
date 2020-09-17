@@ -18,28 +18,28 @@
 //! - Ubuntu Linux (this may work on the Linux subsystem for Windows as well)
 //!
 //! ```console
-//! $> curl -O https://www.foundationdb.org/downloads/6.1.12/ubuntu/installers/foundationdb-clients_6.1.12-1_amd64.deb
-//! $> curl -O https://www.foundationdb.org/downloads/6.1.12/ubuntu/installers/foundationdb-server_6.1.12-1_amd64.deb
-//! $> sudo dpkg -i foundationdb-clients_6.1.12-1_amd64.deb
-//! $> sudo dpkg -i foundationdb-server_6.1.12-1_amd64.deb
+//! $> curl -O https://www.foundationdb.org/downloads/6.2.25/ubuntu/installers/foundationdb-clients_6.2.25-1_amd64.deb
+//! $> curl -O https://www.foundationdb.org/downloads/6.2.25/ubuntu/installers/foundationdb-server_6.2.25-1_amd64.deb
+//! $> sudo dpkg -i foundationdb-clients_6.2.25-1_amd64.deb
+//! $> sudo dpkg -i foundationdb-server_6.2.25-1_amd64.deb
 //! ```
 //!
 //! - macOS
 //!
 //! ```console
-//! $> curl -O https://www.foundationdb.org/downloads/6.1.12/macOS/installers/FoundationDB-6.1.12.pkg
-//! $> sudo installer -pkg FoundationDB-6.1.12.pkg -target /
+//! $> curl -O https://www.foundationdb.org/downloads/6.2.25/macOS/installers/FoundationDB-6.2.25.pkg
+//! $> sudo installer -pkg FoundationDB-6.2.25.pkg -target /
 //! ```
 //!
 //! - Windows
 //!
-//! Install [foundationdb-6.1.12-x64.msi](https://www.foundationdb.org/downloads/6.1.12/windows/installers/foundationdb-6.1.12-x64.msi)
+//! Install [foundationdb-6.2.25-x64.msi](https://www.foundationdb.org/downloads/6.2.25/windows/installers/foundationdb-6.2.25-x64.msi)
 //!
 //! ## Add dependencies on foundationdb-rs
 //!
 //! ```toml
 //! [dependencies]
-//! foundationdb = "0.4"
+//! foundationdb = "0.5"
 //! futures = "0.3"
 //! ```
 //!
@@ -70,9 +70,23 @@
 //!     Ok(())
 //! }
 //!
-//! foundationdb::run(|| {
-//!     futures::executor::block_on(async_main()).expect("failed to run");
-//! });
+//! // Safe because drop is called before the program exits
+//! let network = unsafe { foundationdb::boot() };
+//! futures::executor::block_on(async_main()).expect("failed to run");
+//! drop(network);
+//! ```
+//!
+//! ```rust
+//! #[tokio::main]
+//! async fn main() {
+//!     // Safe because drop is called before the program exits
+//!     let network = unsafe { foundationdb::boot() };
+//!
+//!     // Have fun with the FDB API
+//!
+//!     // shutdown the client
+//!     drop(network);
+//! }
 //! ```
 //!
 //! ## API stability
@@ -103,23 +117,6 @@ pub use crate::error::FdbError;
 pub use crate::error::FdbResult;
 pub use crate::keyselector::*;
 pub use crate::transaction::*;
-
-/// Execute `f` with the FoundationDB Client API ready, this can only be called once per process.
-///
-/// # Examples
-///
-/// ```rust
-/// foundationdb::run(|| {
-///     // do some interesting things with the API...
-/// });
-/// ```
-pub fn run<T>(f: impl FnOnce() -> T) -> T {
-    api::FdbApiBuilder::default()
-        .build()
-        .expect("foundationdb API to be initialized")
-        .run(f)
-        .expect("foundationdb network to be setup")
-}
 
 /// Initialize the FoundationDB Client API, this can only be called once per process.
 ///

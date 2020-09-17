@@ -90,9 +90,9 @@ impl Default for FdbApiBuilder {
 /// use foundationdb::api::FdbApiBuilder;
 ///
 /// let network_builder = FdbApiBuilder::default().build().expect("fdb api initialized");
-/// network_builder.run(|| {
-///     // do some work with foundationDB
-/// }).expect("fdb network to run");
+/// let guard = unsafe { network_builder.boot() };
+/// // do some work with foundationDB
+/// drop(guard);
 /// ```
 pub struct NetworkBuilder {
     _private: (),
@@ -142,30 +142,6 @@ impl NetworkBuilder {
         Ok((NetworkRunner { cond: cond.clone() }, NetworkWait { cond }))
     }
 
-    /// Execute `f` with the FoundationDB Client API ready, this can only be called once per process.
-    /// Once this method returns, the FoundationDB Client API is stopped and cannot be restarted.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use foundationdb::api::FdbApiBuilder;
-    ///
-    /// let network_builder = FdbApiBuilder::default().build().expect("fdb api initialized");
-    /// network_builder.run(|| {
-    ///     // do some interesting things with the API...
-    /// });
-    /// ```
-    pub fn run<T>(self, f: impl FnOnce() -> T) -> FdbResult<T> {
-        // Safe because the returned object is dropped before this function returns
-        let must_drop = unsafe { self.boot()? };
-
-        let t = f();
-
-        drop(must_drop);
-
-        Ok(t)
-    }
-
     /// Initialize the FoundationDB Client API, this can only be called once per process.
     ///
     /// # Returns
@@ -186,7 +162,7 @@ impl NetworkBuilder {
     /// use foundationdb::api::FdbApiBuilder;
     ///
     /// let network_builder = FdbApiBuilder::default().build().expect("fdb api initialized");
-    /// let network = unsafe { network_builder.boot() }.expect("fdb network running");
+    /// let network = unsafe { network_builder.boot() };
     /// // do some interesting things with the API...
     /// drop(network);
     /// ```
@@ -197,7 +173,7 @@ impl NetworkBuilder {
     /// #[tokio::main]
     /// async fn main() {
     ///     let network_builder = FdbApiBuilder::default().build().expect("fdb api initialized");
-    ///     let network = unsafe { network_builder.boot() }.expect("fdb network running");
+    ///     let network = unsafe { network_builder.boot() };
     ///     // do some interesting things with the API...
     ///     drop(network);
     /// }
