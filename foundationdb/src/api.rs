@@ -18,8 +18,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 
-use futures::prelude::*;
-
 use crate::options::NetworkOption;
 use crate::{error, FdbResult};
 use foundationdb_sys as fdb_sys;
@@ -92,9 +90,9 @@ impl Default for FdbApiBuilder {
 /// use foundationdb::api::FdbApiBuilder;
 ///
 /// let network_builder = FdbApiBuilder::default().build().expect("fdb api initialized");
-/// network_builder.boot(|| {
-///     // do some work with foundationDB
-/// }).expect("fdb network to run");
+/// let guard = unsafe { network_builder.boot() };
+/// // do some work with foundationDB
+/// drop(guard);
 /// ```
 pub struct NetworkBuilder {
     _private: (),
@@ -110,7 +108,7 @@ impl NetworkBuilder {
     /// Finalizes the initialization of the Network
     ///
     /// It's not recommended to use this method unless you really know what you are doing.
-    /// Otherwise, the `boot` method is the **safe** and easiest way to do it.
+    /// Otherwise, the `run` method is the **safe** and easiest way to do it.
     ///
     /// In order to start the network you have to call the unsafe `NetworkRunner::run()` method.
     /// This method starts the foundationdb network runloop, once started, the `NetworkStop::stop()`
@@ -144,7 +142,19 @@ impl NetworkBuilder {
         Ok((NetworkRunner { cond: cond.clone() }, NetworkWait { cond }))
     }
 
-    /// Execute `f` with the FoundationDB Client API ready, this can only be called once per process.
+    /// Initialize the FoundationDB Client API, this can only be called once per process.
+    ///
+    /// # Returns
+    ///
+    /// A `NetworkAutoStop` handle which must be dropped before the program exits.
+    ///
+    /// # Safety
+    ///
+    /// This method used to be safe in version `0.4`. But because `drop` on the returned object
+    /// might not be called before the program exits, it was found unsafe.
+    /// You should prefer the safe `run` variant.
+    /// If you still want to use this, you *MUST* ensure drop is called on the returned object
+    /// before the program exits. This is not required if the program is aborted.
     ///
     /// # Examples
     ///
@@ -152,82 +162,39 @@ impl NetworkBuilder {
     /// use foundationdb::api::FdbApiBuilder;
     ///
     /// let network_builder = FdbApiBuilder::default().build().expect("fdb api initialized");
-    /// network_builder.boot(|| {
-    ///     // do some interesting things with the API...
-    /// });
+    /// let network = unsafe { network_builder.boot() };
+    /// // do some interesting things with the API...
+    /// drop(network);
     /// ```
-    pub fn boot<T>(self, f: impl (FnOnce() -> T) + panic::UnwindSafe) -> FdbResult<T> {
-        let (runner, cond) = self.build()?;
-
-        let net_thread = thread::spawn(move || {
-            unsafe { runner.run() }.expect("failed to run");
-        });
-
-        let network = cond.wait();
-
-        let res = panic::catch_unwind(f);
-
-        if let Err(err) = network.stop() {
-            eprintln!("failed to stop network: {}", err);
-            // Not aborting can probably cause undefined behavior
-            std::process::abort();
-        }
-        net_thread.join().expect("failed to join fdb thread");
-
-        match res {
-            Err(payload) => panic::resume_unwind(payload),
-            Ok(v) => Ok(v),
-        }
-    }
-
-    /// Async execute `f` with the FoundationDB Client API ready, this can only be called once per process.
-    ///
-    /// # Examples
     ///
     /// ```rust
     /// use foundationdb::api::FdbApiBuilder;
     ///
-    /// let network_builder = FdbApiBuilder::default().build().expect("fdb api initialized");
-    /// network_builder.boot_async(|| async {
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let network_builder = FdbApiBuilder::default().build().expect("fdb api initialized");
+    ///     let network = unsafe { network_builder.boot() };
     ///     // do some interesting things with the API...
-    /// });
+    ///     drop(network);
+    /// }
     /// ```
-    pub async fn boot_async<F, Fut, T>(self, f: F) -> FdbResult<T>
-    where
-        F: (FnOnce() -> Fut) + panic::UnwindSafe,
-        Fut: Future<Output = T> + panic::UnwindSafe,
-    {
+    pub unsafe fn boot(self) -> FdbResult<NetworkAutoStop> {
         let (runner, cond) = self.build()?;
 
-        let net_thread = thread::spawn(move || {
-            unsafe { runner.run() }.expect("failed to run");
-        });
+        let net_thread = runner.spawn();
 
         let network = cond.wait();
 
-        let res = panic::catch_unwind(f);
-        let res = match res {
-            Ok(fut) => fut.catch_unwind().await,
-            Err(err) => Err(err),
-        };
-
-        if let Err(err) = network.stop() {
-            eprintln!("failed to stop network: {}", err);
-            // Not aborting can probably cause undefined behavior
-            std::process::abort();
-        }
-        net_thread.join().expect("failed to join fdb thread");
-
-        match res {
-            Err(payload) => panic::resume_unwind(payload),
-            Ok(v) => Ok(v),
-        }
+        Ok(NetworkAutoStop {
+            handle: Some(net_thread),
+            network: Some(network),
+        })
     }
 }
 
 /// A foundationDB network event loop runner
 ///
-/// Most of the time you should never need to use this directly and use `NetworkBuilder::boot()`.
+/// Most of the time you should never need to use this directly and use `NetworkBuilder::run()`.
 pub struct NetworkRunner {
     cond: Arc<(Mutex<bool>, Condvar)>,
 }
@@ -257,11 +224,17 @@ impl NetworkRunner {
 
         error::eval(unsafe { fdb_sys::fdb_run_network() })
     }
+
+    unsafe fn spawn(self) -> thread::JoinHandle<()> {
+        thread::spawn(move || {
+            self.run().expect("failed to run network thread");
+        })
+    }
 }
 
 /// A condition object that can wait for the associated `NetworkRunner` to actually run.
 ///
-/// Most of the time you should never need to use this directly and use `NetworkBuilder::boot()`.
+/// Most of the time you should never need to use this directly and use `NetworkBuilder::run()`.
 pub struct NetworkWait {
     cond: Arc<(Mutex<bool>, Condvar)>,
 }
@@ -284,7 +257,7 @@ impl NetworkWait {
 
 /// Allow to stop the associated and running `NetworkRunner`.
 ///
-/// Most of the time you should never need to use this directly and use `NetworkBuilder::boot()`.
+/// Most of the time you should never need to use this directly and use `NetworkBuilder::run()`.
 pub struct NetworkStop {
     _private: (),
 }
@@ -293,6 +266,26 @@ impl NetworkStop {
     /// Signals the event loop invoked by `Network::run` to terminate.
     pub fn stop(self) -> FdbResult<()> {
         error::eval(unsafe { fdb_sys::fdb_stop_network() })
+    }
+}
+
+/// Stop the associated `NetworkRunner` and thread if dropped
+pub struct NetworkAutoStop {
+    network: Option<NetworkStop>,
+    handle: Option<std::thread::JoinHandle<()>>,
+}
+impl Drop for NetworkAutoStop {
+    fn drop(&mut self) {
+        if let Err(err) = self.network.take().unwrap().stop() {
+            eprintln!("failed to stop network: {}", err);
+            // Not aborting can probably cause undefined behavior
+            std::process::abort();
+        }
+        self.handle
+            .take()
+            .unwrap()
+            .join()
+            .expect("failed to join fdb thread");
     }
 }
 

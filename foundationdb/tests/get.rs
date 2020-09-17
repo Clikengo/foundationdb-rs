@@ -13,19 +13,18 @@ mod common;
 
 #[test]
 fn test_get() {
-    boot(|| {
-        futures::executor::block_on(test_set_get_async()).expect("failed to run");
-        futures::executor::block_on(test_get_multi_async()).expect("failed to run");
-        futures::executor::block_on(test_set_conflict_async()).expect("failed to run");
-        futures::executor::block_on(test_set_conflict_snapshot_async()).expect("failed to run");
-        futures::executor::block_on(test_transact_async()).expect("failed to run");
-        futures::executor::block_on(test_transact_limit()).expect("failed to run");
-        futures::executor::block_on(test_transact_timeout()).expect("failed to run");
-        futures::executor::block_on(test_versionstamp_async()).expect("failed to run");
-        futures::executor::block_on(test_read_version_async()).expect("failed to run");
-        futures::executor::block_on(test_set_read_version_async()).expect("failed to run");
-        futures::executor::block_on(test_get_addresses_for_key_async()).expect("failed to run");
-    });
+    let _guard = unsafe { foundationdb::boot() };
+    futures::executor::block_on(test_set_get_async()).expect("failed to run");
+    futures::executor::block_on(test_get_multi_async()).expect("failed to run");
+    futures::executor::block_on(test_set_conflict_async()).expect("failed to run");
+    futures::executor::block_on(test_set_conflict_snapshot_async()).expect("failed to run");
+    futures::executor::block_on(test_transact_async()).expect("failed to run");
+    futures::executor::block_on(test_transact_limit()).expect("failed to run");
+    futures::executor::block_on(test_transact_timeout()).expect("failed to run");
+    futures::executor::block_on(test_versionstamp_async()).expect("failed to run");
+    futures::executor::block_on(test_read_version_async()).expect("failed to run");
+    futures::executor::block_on(test_set_read_version_async()).expect("failed to run");
+    futures::executor::block_on(test_get_addresses_for_key_async()).expect("failed to run");
 }
 
 async fn test_set_get_async() -> FdbResult<()> {

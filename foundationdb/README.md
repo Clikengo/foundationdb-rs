@@ -65,9 +65,46 @@ async fn async_main() -> foundationdb::FdbResult<()> {
     Ok(())
 }
 
-foundationdb::boot(|| {
+foundationdb::run(|| {
     futures::executor::block_on(async_main()).expect("failed to run");
 });
+```
+
+## Migration from 0.4 to 0.5
+
+The initialization of foundationdb API has changed due to undefined behavior being possible with only safe code (issues #170, #181, pulls #179, #182).
+
+Previously you had to wrote:
+
+```rust
+let network = foundationdb::boot().expect("failed to initialize Fdb");
+
+futures::executor::block_on(async_main()).expect("failed to run");
+// cleanly shutdown the client
+drop(network);
+```
+
+This can be converted to:
+
+```rust
+foundationdb::boot(|| {
+    futures::executor::block_on(async_main()).expect("failed to run");
+}).expect("failed to boot fdb");
+```
+
+or
+
+```rust
+#[tokio::main]
+async fn main() {
+    // Safe because drop is called before the program exits
+    let network = unsafe { foundationdb::boot() }.expect("failed to initialize Fdb");
+
+    // Have fun with the FDB API
+
+    // shutdown the client
+    drop(network);
+}
 ```
 
 ## API stability

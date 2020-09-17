@@ -18,28 +18,28 @@
 //! - Ubuntu Linux (this may work on the Linux subsystem for Windows as well)
 //!
 //! ```console
-//! $> curl -O https://www.foundationdb.org/downloads/6.1.12/ubuntu/installers/foundationdb-clients_6.1.12-1_amd64.deb
-//! $> curl -O https://www.foundationdb.org/downloads/6.1.12/ubuntu/installers/foundationdb-server_6.1.12-1_amd64.deb
-//! $> sudo dpkg -i foundationdb-clients_6.1.12-1_amd64.deb
-//! $> sudo dpkg -i foundationdb-server_6.1.12-1_amd64.deb
+//! $> curl -O https://www.foundationdb.org/downloads/6.2.25/ubuntu/installers/foundationdb-clients_6.2.25-1_amd64.deb
+//! $> curl -O https://www.foundationdb.org/downloads/6.2.25/ubuntu/installers/foundationdb-server_6.2.25-1_amd64.deb
+//! $> sudo dpkg -i foundationdb-clients_6.2.25-1_amd64.deb
+//! $> sudo dpkg -i foundationdb-server_6.2.25-1_amd64.deb
 //! ```
 //!
 //! - macOS
 //!
 //! ```console
-//! $> curl -O https://www.foundationdb.org/downloads/6.1.12/macOS/installers/FoundationDB-6.1.12.pkg
-//! $> sudo installer -pkg FoundationDB-6.1.12.pkg -target /
+//! $> curl -O https://www.foundationdb.org/downloads/6.2.25/macOS/installers/FoundationDB-6.2.25.pkg
+//! $> sudo installer -pkg FoundationDB-6.2.25.pkg -target /
 //! ```
 //!
 //! - Windows
 //!
-//! Install [foundationdb-6.1.12-x64.msi](https://www.foundationdb.org/downloads/6.1.12/windows/installers/foundationdb-6.1.12-x64.msi)
+//! Install [foundationdb-6.2.25-x64.msi](https://www.foundationdb.org/downloads/6.2.25/windows/installers/foundationdb-6.2.25-x64.msi)
 //!
 //! ## Add dependencies on foundationdb-rs
 //!
 //! ```toml
 //! [dependencies]
-//! foundationdb = "0.4"
+//! foundationdb = "0.5"
 //! futures = "0.3"
 //! ```
 //!
@@ -70,9 +70,23 @@
 //!     Ok(())
 //! }
 //!
-//! foundationdb::boot(|| {
-//!     futures::executor::block_on(async_main()).expect("failed to run");
-//! });
+//! // Safe because drop is called before the program exits
+//! let network = unsafe { foundationdb::boot() };
+//! futures::executor::block_on(async_main()).expect("failed to run");
+//! drop(network);
+//! ```
+//!
+//! ```rust
+//! #[tokio::main]
+//! async fn main() {
+//!     // Safe because drop is called before the program exits
+//!     let network = unsafe { foundationdb::boot() };
+//!
+//!     // Have fun with the FDB API
+//!
+//!     // shutdown the client
+//!     drop(network);
+//! }
 //! ```
 //!
 //! ## API stability
@@ -104,43 +118,41 @@ pub use crate::error::FdbResult;
 pub use crate::keyselector::*;
 pub use crate::transaction::*;
 
-/// Execute `f` with the FoundationDB Client API ready, this can only be called once per process.
+/// Initialize the FoundationDB Client API, this can only be called once per process.
+///
+/// # Returns
+///
+/// A `NetworkAutoStop` handle which must be dropped before the program exits.
+///
+/// # Safety
+///
+/// This method used to be safe in version `0.4`. But because `drop` on the returned object
+/// might not be called before the program exits, it was found unsafe.
+/// You should prefer the safe `run` variant.
+/// If you still want to use this, you *MUST* ensure drop is called on the returned object
+/// before the program exits. This is not required if the program is aborted.
 ///
 /// # Examples
 ///
 /// ```rust
-/// foundationdb::boot(|| {
-///     // do some interesting things with the API...
-/// });
+/// let network = unsafe { foundationdb::boot() };
+/// // do some interesting things with the API...
+/// drop(network);
 /// ```
-pub fn boot<T>(f: impl (FnOnce() -> T) + std::panic::UnwindSafe) -> T {
-    api::FdbApiBuilder::default()
-        .build()
-        .expect("foundationdb API to be initialized")
-        .boot(f)
-        .expect("foundationdb network to be setup")
-}
-
-/// Async execute `f` with the FoundationDB Client API ready, this can only be called once per process.
-///
-/// # Examples
 ///
 /// ```rust
-/// foundationdb::boot_async(|| async {
+/// #[tokio::main]
+/// async fn main() {
+///     let network = unsafe { foundationdb::boot() };
 ///     // do some interesting things with the API...
-/// });
+///     drop(network);
+/// }
 /// ```
-pub async fn boot_async<F, Fut, T>(f: F) -> T
-where
-    F: (FnOnce() -> Fut) + std::panic::UnwindSafe,
-    Fut: std::future::Future<Output = T> + std::panic::UnwindSafe,
-{
-    api::FdbApiBuilder::default()
+pub unsafe fn boot() -> api::NetworkAutoStop {
+    let network_builder = api::FdbApiBuilder::default()
         .build()
-        .expect("foundationdb API to be initialized")
-        .boot_async(f)
-        .await
-        .expect("foundationdb network to be setup")
+        .expect("foundationdb API to be initialized");
+    network_builder.boot().expect("fdb network running")
 }
 
 /// Returns the default Fdb cluster configuration file path

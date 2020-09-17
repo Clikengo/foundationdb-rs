@@ -11,10 +11,9 @@ mod common;
 
 #[test]
 fn test_watch() {
-    boot(|| {
-        futures::executor::block_on(test_watch_async()).expect("failed to run");
-        futures::executor::block_on(test_watch_without_commit_async()).expect("failed to run");
-    });
+    let _guard = unsafe { foundationdb::boot() };
+    futures::executor::block_on(test_watch_async()).expect("failed to run");
+    futures::executor::block_on(test_watch_without_commit_async()).expect("failed to run");
 }
 
 async fn test_watch_async() -> FdbResult<()> {
