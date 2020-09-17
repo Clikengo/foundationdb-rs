@@ -70,7 +70,7 @@
 //!     Ok(())
 //! }
 //!
-//! foundationdb::boot(|| {
+//! foundationdb::run(|| {
 //!     futures::executor::block_on(async_main()).expect("failed to run");
 //! });
 //! ```
@@ -109,38 +109,53 @@ pub use crate::transaction::*;
 /// # Examples
 ///
 /// ```rust
-/// foundationdb::boot(|| {
+/// foundationdb::run(|| {
 ///     // do some interesting things with the API...
 /// });
 /// ```
-pub fn boot<T>(f: impl (FnOnce() -> T) + std::panic::UnwindSafe) -> T {
+pub fn run<T>(f: impl FnOnce() -> T) -> T {
     api::FdbApiBuilder::default()
         .build()
         .expect("foundationdb API to be initialized")
-        .boot(f)
+        .run(f)
         .expect("foundationdb network to be setup")
 }
 
-/// Async execute `f` with the FoundationDB Client API ready, this can only be called once per process.
+/// Initialize the FoundationDB Client API, this can only be called once per process.
+///
+/// # Returns
+///
+/// A `NetworkAutoStop` handle which must be dropped before the program exits.
+///
+/// # Safety
+///
+/// This method used to be safe in version `0.4`. But because `drop` on the returned object
+/// might not be called before the program exits, it was found unsafe.
+/// You should prefer the safe `run` variant.
+/// If you still want to use this, you *MUST* ensure drop is called on the returned object
+/// before the program exits. This is not required if the program is aborted.
 ///
 /// # Examples
 ///
 /// ```rust
-/// foundationdb::boot_async(|| async {
-///     // do some interesting things with the API...
-/// });
+/// let network = unsafe { foundationdb::boot() };
+/// // do some interesting things with the API...
+/// drop(network);
 /// ```
-pub async fn boot_async<F, Fut, T>(f: F) -> T
-where
-    F: (FnOnce() -> Fut) + std::panic::UnwindSafe,
-    Fut: std::future::Future<Output = T> + std::panic::UnwindSafe,
-{
-    api::FdbApiBuilder::default()
+///
+/// ```rust
+/// #[tokio::main]
+/// async fn main() {
+///     let network = unsafe { foundationdb::boot() };
+///     // do some interesting things with the API...
+///     drop(network);
+/// }
+/// ```
+pub unsafe fn boot() -> api::NetworkAutoStop {
+    let network_builder = api::FdbApiBuilder::default()
         .build()
-        .expect("foundationdb API to be initialized")
-        .boot_async(f)
-        .await
-        .expect("foundationdb network to be setup")
+        .expect("foundationdb API to be initialized");
+    network_builder.boot().expect("fdb network running")
 }
 
 /// Returns the default Fdb cluster configuration file path

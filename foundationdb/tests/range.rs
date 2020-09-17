@@ -14,7 +14,7 @@ mod common;
 
 #[test]
 fn test_range() {
-    foundationdb::boot(|| {
+    foundationdb::run(|| {
         futures::executor::block_on(test_get_range_async()).expect("failed to run");
         futures::executor::block_on(test_range_option_async()).expect("failed to run");
         futures::executor::block_on(test_get_ranges_async()).expect("failed to run");

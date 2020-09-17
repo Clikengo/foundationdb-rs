@@ -7,7 +7,7 @@ mod common;
 
 #[test]
 fn test_tokio_send() {
-    boot(|| {
+    run(|| {
         let mut rt = Runtime::new().unwrap();
         rt.block_on(async {
             do_transact().await;

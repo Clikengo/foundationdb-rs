@@ -1586,7 +1586,7 @@ fn main() {
         .set_runtime_version(api_version)
         .build()
         .expect("failed to initialize FoundationDB API")
-        .boot(|| {
+        .run(|| {
             let db = Arc::new(
                 futures::executor::block_on(fdb::Database::new_compat(cluster_path))
                     .expect("failed to get database"),

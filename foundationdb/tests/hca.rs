@@ -16,7 +16,7 @@ mod common;
 
 #[test]
 fn test_hca_many_sequential_allocations() {
-    foundationdb::boot(|| {
+    foundationdb::run(|| {
         futures::executor::block_on(test_hca_many_sequential_allocations_async())
             .expect("failed to run");
         futures::executor::block_on(test_hca_concurrent_allocations_async())

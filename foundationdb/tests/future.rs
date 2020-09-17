@@ -32,7 +32,7 @@ where
 
 #[test]
 fn test_future_discard() {
-    boot(|| futures::executor::block_on(test_future_discard_async()).expect("failed to run"));
+    run(|| futures::executor::block_on(test_future_discard_async()).expect("failed to run"));
 }
 
 async fn test_future_discard_async() -> FdbResult<()> {

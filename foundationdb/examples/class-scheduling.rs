@@ -364,7 +364,7 @@ async fn run_sim(db: &Database, students: usize, ops_per_student: usize) {
 }
 
 fn main() {
-    fdb::boot(|| {
+    fdb::run(|| {
         let db = futures::executor::block_on(fdb::Database::new_compat(None))
             .expect("failed to get database");
         futures::executor::block_on(init(&db, &*ALL_CLASSES));

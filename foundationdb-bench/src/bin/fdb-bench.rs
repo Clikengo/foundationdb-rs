@@ -146,7 +146,7 @@ fn main() {
     let opt = Opt::from_args();
     info!("opt: {:?}", opt);
 
-    fdb::boot(|| {
+    fdb::run(|| {
         let db = Arc::new(
             futures::executor::block_on(fdb::Database::new_compat(None))
                 .expect("failed to get database"),
