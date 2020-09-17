@@ -1,6 +1,7 @@
 use std::panic;
 
 #[test]
+#[ignore]
 fn test_run() {
     let old = panic::take_hook();
     panic::set_hook(Box::new(|_| {}));
