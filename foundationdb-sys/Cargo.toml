@@ -21,20 +21,20 @@ categories = ["database"]
 license = "MIT/Apache-2.0"
 
 [package.metadata.docs.rs]
-features = [ "embedded-fdb-include" ]
+features = ["embedded-fdb-include"]
 
 [badges]
 codecov = { repository = "Clikengo/foundationdb-rs", branch = "master", service = "github" }
 
 [features]
-default = [ "fdb-6_1" ]
+default = ["fdb-6_2"]
 # Use the locally embedded foundationdb fdb_c.h file
-embedded-fdb-include = [ ]
-fdb-5_1 = [ ]
-fdb-5_2 = [ ]
-fdb-6_0 = [ ]
-fdb-6_1 = [ ]
-fdb-6_2 = [ ]
+embedded-fdb-include = []
+fdb-5_1 = []
+fdb-5_2 = []
+fdb-6_0 = []
+fdb-6_1 = []
+fdb-6_2 = []
 
 [dependencies]
 
