@@ -105,7 +105,7 @@ impl NetworkBuilder {
         Ok(self)
     }
 
-    /// Finalizes the initialization of the Network and returns a way to run/wait/stop the 
+    /// Finalizes the initialization of the Network and returns a way to run/wait/stop the
     /// FoundationDB run loop.
     ///
     /// It's not recommended to use this method directly, you probably want the `boot()` method.
@@ -115,7 +115,7 @@ impl NetworkBuilder {
     ///  - wait for the thread to start `NetworkWait::wait`
     ///
     /// In order for the sequence to be safe, you **MUST** as stated in the `NetworkRunner::run()` method
-    /// ensure that `NetworkStop::stop()` is called before the process exit. 
+    /// ensure that `NetworkStop::stop()` is called before the process exit.
     /// Aborting the process is still safe.
     ///
     /// # Example
@@ -165,7 +165,7 @@ impl NetworkBuilder {
     ///
     /// # Panics
     ///
-    /// Panics if the dedicated thread cannot be spawned or the internal condition primitive is 
+    /// Panics if the dedicated thread cannot be spawned or the internal condition primitive is
     /// poisonned.
     ///
     /// # Examples
