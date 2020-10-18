@@ -10,7 +10,7 @@
 <span class="comment">// do some work with foundationDB</span>
 <span class="ident">drop</span>(<span class="ident">guard</span>);</pre></div>
 </div><h2 id='implementations' class='small-section-header'>Implementations<a href='#implementations' class='anchor'></a></h2><h3 id='impl' class='impl'><code class='in-band'>impl <a class="struct" href="../../foundationdb/api/struct.NetworkBuilder.html" title="struct foundationdb::api::NetworkBuilder">NetworkBuilder</a></code><a href='#impl' class='anchor'></a><a class='srclink' href='../../src/foundationdb/api.rs.html#101-205' title='goto source code'>[src]</a></h3><div class='impl-items'><h4 id='method.set_option' class="method"><code>pub fn <a href='#method.set_option' class='fnname'>set_option</a>(self, option: <a class="enum" href="../../foundationdb/options/enum.NetworkOption.html" title="enum foundationdb::options::NetworkOption">NetworkOption</a>) -&gt; <a class="type" href="../../foundationdb/type.FdbResult.html" title="type foundationdb::FdbResult">FdbResult</a>&lt;Self&gt;</code><a class='srclink' href='../../src/foundationdb/api.rs.html#103-106' title='goto source code'>[src]</a></h4><div class='docblock'><p>Set network options.</p>
-</div><h4 id='method.build' class="method"><code>pub fn <a href='#method.build' class='fnname'>build</a>(self) -&gt; <a class="type" href="../../foundationdb/type.FdbResult.html" title="type foundationdb::FdbResult">FdbResult</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.tuple.html">(</a><a class="struct" href="../../foundationdb/api/struct.NetworkRunner.html" title="struct foundationdb::api::NetworkRunner">NetworkRunner</a>, <a class="struct" href="../../foundationdb/api/struct.NetworkWait.html" title="struct foundationdb::api::NetworkWait">NetworkWait</a><a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.tuple.html">)</a>&gt;</code><a class='srclink' href='../../src/foundationdb/api.rs.html#144-149' title='goto source code'>[src]</a></h4><div class='docblock'><p>Finalizes the initialization of the Network and returns a way to run/wait/stop the 
+</div><h4 id='method.build' class="method"><code>pub fn <a href='#method.build' class='fnname'>build</a>(self) -&gt; <a class="type" href="../../foundationdb/type.FdbResult.html" title="type foundationdb::FdbResult">FdbResult</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.tuple.html">(</a><a class="struct" href="../../foundationdb/api/struct.NetworkRunner.html" title="struct foundationdb::api::NetworkRunner">NetworkRunner</a>, <a class="struct" href="../../foundationdb/api/struct.NetworkWait.html" title="struct foundationdb::api::NetworkWait">NetworkWait</a><a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.tuple.html">)</a>&gt;</code><a class='srclink' href='../../src/foundationdb/api.rs.html#144-149' title='goto source code'>[src]</a></h4><div class='docblock'><p>Finalizes the initialization of the Network and returns a way to run/wait/stop the
 FoundationDB run loop.</p>
 <p>It's not recommended to use this method directly, you probably want the <code>boot()</code> method.</p>
 <p>In order to start the network you have to:</p>
@@ -19,7 +19,7 @@ FoundationDB run loop.</p>
 <li>wait for the thread to start <code>NetworkWait::wait</code></li>
 </ul>
 <p>In order for the sequence to be safe, you <strong>MUST</strong> as stated in the <code>NetworkRunner::run()</code> method
-ensure that <code>NetworkStop::stop()</code> is called before the process exit. 
+ensure that <code>NetworkStop::stop()</code> is called before the process exit.
 Aborting the process is still safe.</p>
 <h1 id="example" class="section-header"><a href="#example">Example</a></h1>
 <div class="example-wrap"><pre class="rust rust-example-rendered">
@@ -51,7 +51,7 @@ This is not required if the program is aborted.</p>
 <p>This method used to be safe in version <code>0.4</code>. But because <code>drop</code> on the returned object
 might not be called before the program exits, it was found unsafe.</p>
 <h1 id="panics" class="section-header"><a href="#panics">Panics</a></h1>
-<p>Panics if the dedicated thread cannot be spawned or the internal condition primitive is 
+<p>Panics if the dedicated thread cannot be spawned or the internal condition primitive is
 poisonned.</p>
 <h1 id="examples" class="section-header"><a href="#examples">Examples</a></h1>
 <div class="example-wrap"><pre class="rust rust-example-rendered">
