@@ -126,11 +126,11 @@ pub use crate::transaction::*;
 ///
 /// # Safety
 ///
+/// You *MUST* ensure drop is called on the returned object before the program exits.
+/// This is not required if the program is aborted.
+///
 /// This method used to be safe in version `0.4`. But because `drop` on the returned object
 /// might not be called before the program exits, it was found unsafe.
-/// You should prefer the safe `run` variant.
-/// If you still want to use this, you *MUST* ensure drop is called on the returned object
-/// before the program exits. This is not required if the program is aborted.
 ///
 /// # Examples
 ///

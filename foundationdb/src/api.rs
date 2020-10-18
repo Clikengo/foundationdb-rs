@@ -105,14 +105,20 @@ impl NetworkBuilder {
         Ok(self)
     }
 
-    /// Finalizes the initialization of the Network
+    /// Finalizes the initialization of the Network and returns a way to run/wait/stop the 
+    /// FoundationDB run loop.
     ///
-    /// It's not recommended to use this method unless you really know what you are doing.
-    /// Otherwise, the `run` method is the **safe** and easiest way to do it.
+    /// It's not recommended to use this method directly, you probably want the `boot()` method.
     ///
-    /// In order to start the network you have to call the unsafe `NetworkRunner::run()` method.
-    /// This method starts the foundationdb network runloop, once started, the `NetworkStop::stop()`
-    /// method **MUST** be called before the process exit. Aborting the process is still safe.
+    /// In order to start the network you have to:
+    ///  - call the unsafe `NetworkRunner::run()` method, most likely in a dedicated thread
+    ///  - wait for the thread to start `NetworkWait::wait`
+    ///
+    /// In order for the sequence to be safe, you **MUST** as stated in the `NetworkRunner::run()` method
+    /// ensure that `NetworkStop::stop()` is called before the process exit. 
+    /// Aborting the process is still safe.
+    ///
+    /// # Example
     ///
     /// ```
     /// use foundationdb::api::FdbApiBuilder;
@@ -142,7 +148,8 @@ impl NetworkBuilder {
         Ok((NetworkRunner { cond: cond.clone() }, NetworkWait { cond }))
     }
 
-    /// Initialize the FoundationDB Client API, this can only be called once per process.
+    /// Starts the FoundationDB run loop in a dedicated thread.
+    /// This finish initializing the FoundationDB Client API and can only be called once per process.
     ///
     /// # Returns
     ///
@@ -150,11 +157,16 @@ impl NetworkBuilder {
     ///
     /// # Safety
     ///
+    /// You *MUST* ensure `drop` is called on the returned object before the program exits.
+    /// This is not required if the program is aborted.
+    ///
     /// This method used to be safe in version `0.4`. But because `drop` on the returned object
     /// might not be called before the program exits, it was found unsafe.
-    /// You should prefer the safe `run` variant.
-    /// If you still want to use this, you *MUST* ensure drop is called on the returned object
-    /// before the program exits. This is not required if the program is aborted.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the dedicated thread cannot be spawned or the internal condition primitive is 
+    /// poisonned.
     ///
     /// # Examples
     ///
@@ -194,7 +206,7 @@ impl NetworkBuilder {
 
 /// A foundationDB network event loop runner
 ///
-/// Most of the time you should never need to use this directly and use `NetworkBuilder::run()`.
+/// Most of the time you should never need to use this directly and use `boot()`.
 pub struct NetworkRunner {
     cond: Arc<(Mutex<bool>, Condvar)>,
 }
@@ -234,13 +246,17 @@ impl NetworkRunner {
 
 /// A condition object that can wait for the associated `NetworkRunner` to actually run.
 ///
-/// Most of the time you should never need to use this directly and use `NetworkBuilder::run()`.
+/// Most of the time you should never need to use this directly and use `boot()`.
 pub struct NetworkWait {
     cond: Arc<(Mutex<bool>, Condvar)>,
 }
 
 impl NetworkWait {
     /// Wait for the associated `NetworkRunner` to actually run.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal lock cannot is poisoned
     pub fn wait(self) -> NetworkStop {
         // Wait for the thread to start up.
         {
@@ -257,7 +273,7 @@ impl NetworkWait {
 
 /// Allow to stop the associated and running `NetworkRunner`.
 ///
-/// Most of the time you should never need to use this directly and use `NetworkBuilder::run()`.
+/// Most of the time you should never need to use this directly and use `boot()`.
 pub struct NetworkStop {
     _private: (),
 }
@@ -270,6 +286,13 @@ impl NetworkStop {
 }
 
 /// Stop the associated `NetworkRunner` and thread if dropped
+///
+/// If trying to stop the FoundationDB run loop results in an error.
+/// The error is printed in `stderr` and the process aborts.
+///
+/// # Panics
+///
+/// Panics if the network thread cannot be joined.
 pub struct NetworkAutoStop {
     network: Option<NetworkStop>,
     handle: Option<std::thread::JoinHandle<()>>,
