@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## 0.5.1
+
+- #207: Better documentation of API init methods
+
 ## 0.5.0
 
 - #203: Defaults to foundationdb 6.2.x API version
