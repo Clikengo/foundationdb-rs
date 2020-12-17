@@ -28,7 +28,7 @@ use std::fmt;
 use std::sync::{Mutex, PoisonError};
 
 use futures::future;
-use rand::Rng;
+use rand::{self, rngs::SmallRng, Error as RandError, Rng, SeedableRng};
 
 use crate::options::{ConflictRangeType, MutationType, TransactionOption};
 use crate::tuple::{PackError, Subspace};
@@ -41,6 +41,7 @@ pub enum HcaError {
     PackError(PackError),
     InvalidDirectoryLayerMetadata,
     PoisonError,
+    RandError(RandError),
 }
 
 impl fmt::Debug for HcaError {
@@ -52,6 +53,7 @@ impl fmt::Debug for HcaError {
                 write!(f, "invalid directory layer metadata")
             }
             HcaError::PoisonError => write!(f, "mutex poisoned"),
+            HcaError::RandError(err) => err.fmt(f),
         }
     }
 }
@@ -69,6 +71,11 @@ impl From<PackError> for HcaError {
 impl<T> From<PoisonError<T>> for HcaError {
     fn from(_err: PoisonError<T>) -> Self {
         Self::PoisonError
+    }
+}
+impl From<RandError> for HcaError {
+    fn from(err: RandError) -> Self {
+        Self::RandError(err)
     }
 }
 
@@ -114,7 +121,7 @@ impl HighContentionAllocator {
             reverse: true,
             ..RangeOption::default()
         };
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::from_rng(&mut rand::thread_rng())?;
 
         loop {
             let kvs = trx.get_range(&counters_range, 1, true).await?;
@@ -130,17 +137,18 @@ impl HighContentionAllocator {
             let window = loop {
                 let counters_start = self.counters.subspace(&start);
 
-                let mutex_guard = self.allocation_mutex.lock()?;
-                if window_advanced {
-                    trx.clear_range(self.counters.bytes(), counters_start.bytes());
-                    trx.set_option(TransactionOption::NextWriteNoWriteConflictRange)?;
-                    trx.clear_range(self.recent.bytes(), self.recent.subspace(&start).bytes());
-                }
+                let count_future = {
+                    let _mutex_guard = self.allocation_mutex.lock()?;
+                    if window_advanced {
+                        trx.clear_range(self.counters.bytes(), counters_start.bytes());
+                        trx.set_option(TransactionOption::NextWriteNoWriteConflictRange)?;
+                        trx.clear_range(self.recent.bytes(), self.recent.subspace(&start).bytes());
+                    };
 
-                // Increment the allocation count for the current window
-                trx.atomic_op(counters_start.bytes(), ONE_BYTES, MutationType::Add);
-                let count_future = trx.get(counters_start.bytes(), true);
-                drop(mutex_guard);
+                    // Increment the allocation count for the current window
+                    trx.atomic_op(counters_start.bytes(), ONE_BYTES, MutationType::Add);
+                    trx.get(counters_start.bytes(), true)
+                };
 
                 let count_value = count_future.await?;
                 let count = if let Some(count_value) = count_value {
@@ -171,12 +179,14 @@ impl HighContentionAllocator {
                 let candidate: i64 = rng.gen_range(start, start + window);
                 let recent_candidate = self.recent.subspace(&candidate);
 
-                let mutex_guard = self.allocation_mutex.lock()?;
-                let latest_counter = trx.get_range(&counters_range, 1, true);
-                let candidate_value = trx.get(recent_candidate.bytes(), false);
-                trx.set_option(TransactionOption::NextWriteNoWriteConflictRange)?;
-                trx.set(recent_candidate.bytes(), &[]);
-                drop(mutex_guard);
+                let (latest_counter, candidate_value) = {
+                    let _mutex_guard = self.allocation_mutex.lock()?;
+                    let latest_counter = trx.get_range(&counters_range, 1, true);
+                    let candidate_value = trx.get(recent_candidate.bytes(), false);
+                    trx.set_option(TransactionOption::NextWriteNoWriteConflictRange)?;
+                    trx.set(recent_candidate.bytes(), &[]);
+                    (latest_counter, candidate_value)
+                };
 
                 let (latest_counter, candidate_value) =
                     future::try_join(latest_counter, candidate_value).await?;
