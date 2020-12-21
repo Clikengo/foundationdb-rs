@@ -1,4 +1,6 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `foundationdb/src/tuple/pack.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>pack.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="shortcut icon" href="../../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../foundationdb/index.html'><div class='logo-container rust-logo'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><span class="help-button">?</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `foundationdb/src/tuple/pack.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>pack.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../favicon.svg">
+<link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png">
+<link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../foundationdb/index.html'><div class='logo-container rust-logo'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><span class="help-button">?</span>
                 <a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">   1</span>
 <span id="2">   2</span>
 <span id="3">   3</span>
@@ -1122,17 +1124,17 @@
 <span class="kw">impl</span> <span class="ident">std</span>::<span class="ident">ops</span>::<span class="ident">AddAssign</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">VersionstampOffset</span> {
     <span class="kw">fn</span> <span class="ident">add_assign</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">r</span>: <span class="ident">u32</span>) {
         <span class="kw">if</span> <span class="kw">let</span> <span class="ident">VersionstampOffset</span>::<span class="prelude-val">None</span> { <span class="ident">size</span> } <span class="op">=</span> <span class="self">self</span> {
-            <span class="kw-2">*</span><span class="ident">size</span> <span class="op">+=</span> <span class="ident">r</span>;
+            <span class="kw-2">*</span><span class="ident">size</span> <span class="op">+</span><span class="op">=</span> <span class="ident">r</span>;
         }
     }
 }
 <span class="kw">impl</span> <span class="ident">std</span>::<span class="ident">ops</span>::<span class="ident">AddAssign</span> <span class="kw">for</span> <span class="ident">VersionstampOffset</span> {
     <span class="kw">fn</span> <span class="ident">add_assign</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">rhs</span>: <span class="self">Self</span>) {
         <span class="kw">match</span> (<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="self">self</span>, <span class="ident">rhs</span>) {
-            (<span class="ident">VersionstampOffset</span>::<span class="prelude-val">None</span> { <span class="ident">size</span> }, <span class="ident">VersionstampOffset</span>::<span class="prelude-val">None</span> { <span class="ident">size</span>: <span class="ident">r</span> }) <span class="op">=&gt;</span> {
-                <span class="kw-2">*</span><span class="ident">size</span> <span class="op">+=</span> <span class="ident">r</span>;
+            (<span class="ident">VersionstampOffset</span>::<span class="prelude-val">None</span> { <span class="ident">size</span> }, <span class="ident">VersionstampOffset</span>::<span class="prelude-val">None</span> { <span class="ident">size</span>: <span class="ident">r</span> }) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw-2">*</span><span class="ident">size</span> <span class="op">+</span><span class="op">=</span> <span class="ident">r</span>;
             }
-            (<span class="ident">VersionstampOffset</span>::<span class="prelude-val">None</span> { <span class="ident">size</span> }, <span class="ident">VersionstampOffset</span>::<span class="ident">OneIncomplete</span> { <span class="ident">offset</span> }) <span class="op">=&gt;</span> {
+            (<span class="ident">VersionstampOffset</span>::<span class="prelude-val">None</span> { <span class="ident">size</span> }, <span class="ident">VersionstampOffset</span>::<span class="ident">OneIncomplete</span> { <span class="ident">offset</span> }) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">VersionstampOffset</span>::<span class="ident">OneIncomplete</span> {
                     <span class="ident">offset</span>: <span class="kw-2">*</span><span class="ident">size</span> <span class="op">+</span> <span class="ident">offset</span>,
                 };
@@ -1142,10 +1144,10 @@
                 <span class="ident">VersionstampOffset</span>::<span class="ident">OneIncomplete</span> { .. },
             )
             <span class="op">|</span> (<span class="ident">VersionstampOffset</span>::<span class="prelude-val">None</span> { .. }, <span class="ident">VersionstampOffset</span>::<span class="ident">MultipleIncomplete</span>)
-            <span class="op">|</span> (<span class="ident">VersionstampOffset</span>::<span class="ident">OneIncomplete</span> { .. }, <span class="ident">VersionstampOffset</span>::<span class="ident">MultipleIncomplete</span>) <span class="op">=&gt;</span> {
+            <span class="op">|</span> (<span class="ident">VersionstampOffset</span>::<span class="ident">OneIncomplete</span> { .. }, <span class="ident">VersionstampOffset</span>::<span class="ident">MultipleIncomplete</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">VersionstampOffset</span>::<span class="ident">MultipleIncomplete</span>;
             }
-            <span class="kw">_</span> <span class="op">=&gt;</span> {}
+            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {}
         }
     }
 }
@@ -1158,9 +1160,9 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">w</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span>,
         <span class="ident">tuple_depth</span>: <span class="ident">TupleDepth</span>,
-    ) <span class="op">-&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span>;
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span>;
 
-    <span class="kw">fn</span> <span class="ident">pack_root</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">io</span>::<span class="ident">Write</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">w</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span>) <span class="op">-&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">pack_root</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">io</span>::<span class="ident">Write</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">w</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">TupleDepth</span>::<span class="ident">new</span>())
     }
 
@@ -1169,7 +1171,7 @@
     <span class="doccomment">/// # Panics</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Panics if the encoded data size doesn&#39;t fit in `u32`.</span>
-    <span class="kw">fn</span> <span class="ident">pack_to_vec</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">pack_to_vec</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">vec</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">new</span>();
         <span class="self">self</span>.<span class="ident">pack_into_vec</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">vec</span>);
         <span class="ident">vec</span>
@@ -1180,7 +1182,7 @@
     <span class="doccomment">/// # Panics</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Panics if there is multiple versionstamp present or if the encoded data size doesn&#39;t fit in `u32`.</span>
-    <span class="kw">fn</span> <span class="ident">pack_to_vec_with_versionstamp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">pack_to_vec_with_versionstamp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">vec</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">new</span>();
         <span class="kw">let</span> <span class="ident">offset</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pack_into_vec_with_versionstamp</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">vec</span>);
         <span class="kw">if</span> <span class="kw">let</span> <span class="ident">VersionstampOffset</span>::<span class="ident">MultipleIncomplete</span> <span class="op">=</span> <span class="ident">offset</span> {
@@ -1203,11 +1205,11 @@
     <span class="doccomment">/// # Panics</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Panics if the encoded data size doesn&#39;t fit in `u32`.</span>
-    <span class="kw">fn</span> <span class="ident">pack_into_vec_with_versionstamp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">output</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>) <span class="op">-&gt;</span> <span class="ident">VersionstampOffset</span> {
+    <span class="kw">fn</span> <span class="ident">pack_into_vec_with_versionstamp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">output</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">VersionstampOffset</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">offset</span> <span class="op">=</span> <span class="ident">VersionstampOffset</span>::<span class="prelude-val">None</span> {
             <span class="ident">size</span>: <span class="ident">u32</span>::<span class="ident">try_from</span>(<span class="ident">output</span>.<span class="ident">len</span>()).<span class="ident">expect</span>(<span class="ident">PACK_ERR_MSG</span>),
         };
-        <span class="ident">offset</span> <span class="op">+=</span> <span class="self">self</span>.<span class="ident">pack_root</span>(<span class="ident">output</span>).<span class="ident">expect</span>(<span class="ident">PACK_ERR_MSG</span>);
+        <span class="ident">offset</span> <span class="op">+</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">pack_root</span>(<span class="ident">output</span>).<span class="ident">expect</span>(<span class="ident">PACK_ERR_MSG</span>);
         <span class="kw">if</span> <span class="kw">let</span> <span class="ident">VersionstampOffset</span>::<span class="ident">OneIncomplete</span> { <span class="ident">offset</span> } <span class="op">=</span> <span class="ident">offset</span> {
             <span class="ident">output</span>.<span class="ident">extend_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">offset</span>.<span class="ident">to_le_bytes</span>());
         }
@@ -1217,9 +1219,9 @@
 
 <span class="doccomment">/// A type that can be unpacked</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">TupleUnpack</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span>: <span class="ident">Sized</span> {
-    <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="ident">tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="ident">tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span>;
 
-    <span class="kw">fn</span> <span class="ident">unpack_root</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>]) <span class="op">-&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">unpack_root</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
         <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">this</span>) <span class="op">=</span> <span class="self">Self</span>::<span class="ident">unpack</span>(<span class="ident">input</span>, <span class="ident">TupleDepth</span>::<span class="ident">new</span>())<span class="question-mark">?</span>;
         <span class="kw">if</span> <span class="op">!</span><span class="ident">input</span>.<span class="ident">is_empty</span>() {
             <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">PackError</span>::<span class="ident">TrailingBytes</span>);
@@ -1236,13 +1238,13 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">w</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span>,
         <span class="ident">tuple_depth</span>: <span class="ident">TupleDepth</span>,
-    ) <span class="op">-&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
         (<span class="kw-2">*</span><span class="self">self</span>).<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>)
     }
 }
 
 <span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">fn</span> <span class="ident">parse_bytes</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">num</span>: <span class="ident">usize</span>) <span class="op">-&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="kw-2">&amp;</span>[<span class="ident">u8</span>])<span class="op">&gt;</span> {
+<span class="kw">fn</span> <span class="ident">parse_bytes</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">num</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="kw-2">&amp;</span>[<span class="ident">u8</span>])<span class="op">&gt;</span> {
     <span class="kw">if</span> <span class="ident">input</span>.<span class="ident">len</span>() <span class="op">&lt;</span> <span class="ident">num</span> {
         <span class="prelude-val">Err</span>(<span class="ident">PackError</span>::<span class="ident">MissingBytes</span>)
     } <span class="kw">else</span> {
@@ -1251,7 +1253,7 @@
 }
 
 <span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">fn</span> <span class="ident">parse_byte</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">u8</span>)<span class="op">&gt;</span> {
+<span class="kw">fn</span> <span class="ident">parse_byte</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">u8</span>)<span class="op">&gt;</span> {
     <span class="kw">if</span> <span class="ident">input</span>.<span class="ident">is_empty</span>() {
         <span class="prelude-val">Err</span>(<span class="ident">PackError</span>::<span class="ident">MissingBytes</span>)
     } <span class="kw">else</span> {
@@ -1259,9 +1261,9 @@
     }
 }
 
-<span class="kw">fn</span> <span class="ident">parse_code</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">expected</span>: <span class="ident">u8</span>) <span class="op">-&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span><span class="kw-2">&amp;</span>[<span class="ident">u8</span>]<span class="op">&gt;</span> {
+<span class="kw">fn</span> <span class="ident">parse_code</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">expected</span>: <span class="ident">u8</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span><span class="kw-2">&amp;</span>[<span class="ident">u8</span>]<span class="op">&gt;</span> {
     <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">found</span>) <span class="op">=</span> <span class="ident">parse_byte</span>(<span class="ident">input</span>)<span class="question-mark">?</span>;
-    <span class="kw">if</span> <span class="ident">found</span> <span class="op">==</span> <span class="ident">expected</span> {
+    <span class="kw">if</span> <span class="ident">found</span> <span class="op">=</span><span class="op">=</span> <span class="ident">expected</span> {
         <span class="prelude-val">Ok</span>(<span class="ident">input</span>)
     } <span class="kw">else</span> {
         <span class="prelude-val">Err</span>(<span class="ident">PackError</span>::<span class="ident">BadCode</span> {
@@ -1271,36 +1273,36 @@
     }
 }
 
-<span class="kw">fn</span> <span class="ident">write_bytes</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">io</span>::<span class="ident">Write</span><span class="op">&gt;</span>(<span class="ident">w</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span>, <span class="ident">v</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
+<span class="kw">fn</span> <span class="ident">write_bytes</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">io</span>::<span class="ident">Write</span><span class="op">&gt;</span>(<span class="ident">w</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span>, <span class="ident">v</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">size</span> <span class="op">=</span>
         <span class="ident">u32</span>::<span class="ident">try_from</span>(<span class="ident">v</span>.<span class="ident">len</span>()).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">err</span><span class="op">|</span> <span class="ident">io</span>::<span class="ident">Error</span>::<span class="ident">new</span>(<span class="ident">io</span>::<span class="ident">ErrorKind</span>::<span class="ident">InvalidData</span>, <span class="ident">err</span>))<span class="question-mark">?</span>;
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">pos</span> <span class="op">=</span> <span class="number">0</span>;
     <span class="kw">for</span> <span class="ident">idx</span> <span class="kw">in</span> <span class="ident">memchr_iter</span>(<span class="ident">NIL</span>, <span class="ident">v</span>) {
         <span class="kw">let</span> <span class="ident">next_idx</span> <span class="op">=</span> <span class="ident">idx</span> <span class="op">+</span> <span class="number">1</span>;
-        <span class="ident">size</span> <span class="op">+=</span> <span class="number">1</span>;
+        <span class="ident">size</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
         <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span><span class="ident">v</span>[<span class="ident">pos</span>..<span class="ident">next_idx</span>])<span class="question-mark">?</span>;
         <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="ident">ESCAPE</span>])<span class="question-mark">?</span>;
         <span class="ident">pos</span> <span class="op">=</span> <span class="ident">next_idx</span>;
     }
     <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span><span class="ident">v</span>[<span class="ident">pos</span>..])<span class="question-mark">?</span>;
     <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="ident">NIL</span>])<span class="question-mark">?</span>;
-    <span class="ident">size</span> <span class="op">+=</span> <span class="number">2</span>;
+    <span class="ident">size</span> <span class="op">+</span><span class="op">=</span> <span class="number">2</span>;
     <span class="prelude-val">Ok</span>(<span class="ident">VersionstampOffset</span>::<span class="prelude-val">None</span> { <span class="ident">size</span> })
 }
 
-<span class="kw">fn</span> <span class="ident">parse_slice</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>]) <span class="op">-&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="ident">Cow</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span>, [<span class="ident">u8</span>]<span class="op">&gt;</span>)<span class="op">&gt;</span> {
+<span class="kw">fn</span> <span class="ident">parse_slice</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="ident">Cow</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span>, [<span class="ident">u8</span>]<span class="op">&gt;</span>)<span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">new</span>();
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">pos</span> <span class="op">=</span> <span class="number">0</span>;
     <span class="kw">for</span> <span class="ident">idx</span> <span class="kw">in</span> <span class="ident">memchr_iter</span>(<span class="ident">NIL</span>, <span class="ident">input</span>) {
         <span class="kw">let</span> <span class="ident">next_idx</span> <span class="op">=</span> <span class="ident">idx</span> <span class="op">+</span> <span class="number">1</span>;
-        <span class="kw">if</span> <span class="ident">input</span>.<span class="ident">get</span>(<span class="ident">next_idx</span>) <span class="op">==</span> <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">ESCAPE</span>) {
+        <span class="kw">if</span> <span class="ident">input</span>.<span class="ident">get</span>(<span class="ident">next_idx</span>) <span class="op">=</span><span class="op">=</span> <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">ESCAPE</span>) {
             <span class="ident">bytes</span>.<span class="ident">extend_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">input</span>[<span class="ident">pos</span>..<span class="ident">next_idx</span>]);
             <span class="ident">pos</span> <span class="op">=</span> <span class="ident">next_idx</span> <span class="op">+</span> <span class="number">1</span>;
         } <span class="kw">else</span> {
             <span class="kw">let</span> <span class="ident">slice</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">input</span>[<span class="ident">pos</span>..<span class="ident">idx</span>];
             <span class="kw">return</span> <span class="prelude-val">Ok</span>((
                 <span class="kw-2">&amp;</span><span class="ident">input</span>[<span class="ident">next_idx</span>..],
-                (<span class="kw">if</span> <span class="ident">pos</span> <span class="op">==</span> <span class="number">0</span> {
+                (<span class="kw">if</span> <span class="ident">pos</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
                     <span class="ident">Cow</span>::<span class="ident">Borrowed</span>(<span class="ident">slice</span>)
                 } <span class="kw">else</span> {
                     <span class="ident">bytes</span>.<span class="ident">extend_from_slice</span>(<span class="ident">slice</span>);
@@ -1312,15 +1314,15 @@
     <span class="prelude-val">Err</span>(<span class="ident">PackError</span>::<span class="ident">MissingBytes</span>)
 }
 
-<span class="kw">fn</span> <span class="ident">parse_string</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>]) <span class="op">-&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="ident">Cow</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span>, <span class="ident">str</span><span class="op">&gt;</span>)<span class="op">&gt;</span> {
+<span class="kw">fn</span> <span class="ident">parse_string</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="ident">Cow</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span>, <span class="ident">str</span><span class="op">&gt;</span>)<span class="op">&gt;</span> {
     <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">slice</span>) <span class="op">=</span> <span class="ident">parse_slice</span>(<span class="ident">input</span>)<span class="question-mark">?</span>;
     <span class="prelude-val">Ok</span>((
         <span class="ident">input</span>,
         <span class="kw">match</span> <span class="ident">slice</span> {
-            <span class="ident">Cow</span>::<span class="ident">Borrowed</span>(<span class="ident">slice</span>) <span class="op">=&gt;</span> {
+            <span class="ident">Cow</span>::<span class="ident">Borrowed</span>(<span class="ident">slice</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="ident">Cow</span>::<span class="ident">Borrowed</span>(<span class="ident">std</span>::<span class="ident">str</span>::<span class="ident">from_utf8</span>(<span class="ident">slice</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">PackError</span>::<span class="ident">BadStringFormat</span>)<span class="question-mark">?</span>)
             }
-            <span class="ident">Cow</span>::<span class="ident">Owned</span>(<span class="ident">vec</span>) <span class="op">=&gt;</span> {
+            <span class="ident">Cow</span>::<span class="ident">Owned</span>(<span class="ident">vec</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="ident">Cow</span>::<span class="ident">Owned</span>(<span class="ident">String</span>::<span class="ident">from_utf8</span>(<span class="ident">vec</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">PackError</span>::<span class="ident">BadStringFormat</span>)<span class="question-mark">?</span>)
             }
         },
@@ -1332,7 +1334,7 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">w</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span>,
         <span class="ident">tuple_depth</span>: <span class="ident">TupleDepth</span>,
-    ) <span class="op">-&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="ident">tuple_depth</span>.<span class="ident">depth</span>() <span class="op">&gt;</span> <span class="number">0</span> {
             <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="ident">NESTED</span>, <span class="ident">NIL</span>])<span class="question-mark">?</span>;
             <span class="prelude-val">Ok</span>(<span class="ident">VersionstampOffset</span>::<span class="prelude-val">None</span> { <span class="ident">size</span>: <span class="number">2</span> })
@@ -1343,7 +1345,7 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="ident">TupleUnpack</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="kw">for</span> () {
-    <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="kw-2">mut</span> <span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="kw-2">mut</span> <span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="ident">tuple_depth</span>.<span class="ident">depth</span>() <span class="op">&gt;</span> <span class="number">0</span> {
             <span class="ident">input</span> <span class="op">=</span> <span class="ident">parse_code</span>(<span class="ident">input</span>, <span class="ident">NESTED</span>)<span class="question-mark">?</span>;
             <span class="ident">input</span> <span class="op">=</span> <span class="ident">parse_code</span>(<span class="ident">input</span>, <span class="ident">NIL</span>)<span class="question-mark">?</span>;
@@ -1353,26 +1355,26 @@
 }
 
 <span class="macro">macro_rules</span><span class="macro">!</span> <span class="ident">tuple_impls</span> {
-    ($(($(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">n</span>:<span class="ident">tt</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">v</span>:<span class="ident">ident</span>)<span class="op">+</span>))<span class="op">+</span>) <span class="op">=&gt;</span> {
+    ($(($(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">n</span>:<span class="ident">tt</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">v</span>:<span class="ident">ident</span>)<span class="op">+</span>))<span class="op">+</span>) <span class="op">=</span><span class="op">&gt;</span> {
         $(
             <span class="kw">impl</span><span class="op">&lt;</span>$(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>),<span class="op">+</span><span class="op">&gt;</span> <span class="ident">TuplePack</span> <span class="kw">for</span> ($(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>,)<span class="op">+</span>)
             <span class="kw">where</span>
                 $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="ident">TuplePack</span>,)<span class="op">+</span>
             {
-                <span class="kw">fn</span> <span class="ident">pack</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">io</span>::<span class="ident">Write</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">w</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span>, <span class="ident">tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
+                <span class="kw">fn</span> <span class="ident">pack</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">io</span>::<span class="ident">Write</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">w</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span>, <span class="ident">tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
                     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">offset</span> <span class="op">=</span> <span class="ident">VersionstampOffset</span>::<span class="prelude-val">None</span> { <span class="ident">size</span>: <span class="number">0</span> };
                     <span class="kw">if</span> <span class="ident">tuple_depth</span>.<span class="ident">depth</span>() <span class="op">&gt;</span> <span class="number">0</span> {
                         <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="ident">NESTED</span>])<span class="question-mark">?</span>;
-                        <span class="ident">offset</span> <span class="op">+=</span> <span class="number">1</span>;
+                        <span class="ident">offset</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
                     }
 
                     $(
-                        <span class="ident">offset</span> <span class="op">+=</span> <span class="self">self</span>.<span class="macro-nonterminal">$</span><span class="macro-nonterminal">n</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>.<span class="ident">increment</span>())<span class="question-mark">?</span>;
+                        <span class="ident">offset</span> <span class="op">+</span><span class="op">=</span> <span class="self">self</span>.<span class="macro-nonterminal">$</span><span class="macro-nonterminal">n</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>.<span class="ident">increment</span>())<span class="question-mark">?</span>;
                     )<span class="op">*</span>
 
                     <span class="kw">if</span> <span class="ident">tuple_depth</span>.<span class="ident">depth</span>() <span class="op">&gt;</span> <span class="number">0</span> {
                         <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="ident">NIL</span>])<span class="question-mark">?</span>;
-                        <span class="ident">offset</span> <span class="op">+=</span> <span class="number">1</span>;
+                        <span class="ident">offset</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
                     }
                     <span class="prelude-val">Ok</span>(<span class="ident">offset</span>)
                 }
@@ -1382,7 +1384,7 @@
             <span class="kw">where</span>
                 $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="ident">TupleUnpack</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span>,)<span class="op">+</span>
             {
-                <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="ident">tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
+                <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="ident">tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
                     <span class="kw">let</span> <span class="ident">input</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">tuple_depth</span>.<span class="ident">depth</span>() <span class="op">&gt;</span> <span class="number">0</span> { <span class="ident">parse_code</span>(<span class="ident">input</span>, <span class="ident">NESTED</span>)<span class="question-mark">?</span> } <span class="kw">else</span> { <span class="ident">input</span> };
 
                     $(
@@ -1417,13 +1419,13 @@
 <span class="kw">const</span> <span class="ident">MAX_SZ</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">8</span>;
 
 <span class="macro">macro_rules</span><span class="macro">!</span> <span class="ident">sign_bit</span> {
-    (<span class="macro-nonterminal">$</span><span class="kw">type</span>:<span class="macro-nonterminal">ident</span>) <span class="op">=&gt;</span> {
-        (<span class="number">1</span> <span class="op">&lt;&lt;</span> (<span class="ident">mem</span>::<span class="ident">size_of</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="kw">type</span><span class="op">&gt;</span>() <span class="op">*</span> <span class="number">8</span> <span class="op">-</span> <span class="number">1</span>))
+    (<span class="macro-nonterminal">$</span><span class="kw">type</span>:<span class="macro-nonterminal">ident</span>) <span class="op">=</span><span class="op">&gt;</span> {
+        (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> (<span class="ident">mem</span>::<span class="ident">size_of</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="kw">type</span><span class="op">&gt;</span>() <span class="op">*</span> <span class="number">8</span> <span class="op">-</span> <span class="number">1</span>))
     };
 }
 
-<span class="macro-nonterminal">macro_rules</span><span class="op">!</span> <span class="ident">unpack_ux</span> {
-    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">input</span>: <span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">n</span>: <span class="ident">expr</span>) <span class="op">=&gt;</span> {{
+<span class="macro">macro_rules</span><span class="macro">!</span> <span class="macro-nonterminal">unpack_ux</span> {
+    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">input</span>: <span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">n</span>: <span class="ident">expr</span>) <span class="op">=</span><span class="op">&gt;</span> {{
         <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">bytes</span>) <span class="op">=</span> <span class="ident">parse_bytes</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">input</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">n</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">arr</span> <span class="op">=</span> [<span class="number">0u8</span>; ::<span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">size_of</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span><span class="op">&gt;</span>()];
         (<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">arr</span>[(::<span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">size_of</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span><span class="op">&gt;</span>() <span class="op">-</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">n</span>)..]).<span class="ident">copy_from_slice</span>(<span class="ident">bytes</span>);
@@ -1432,7 +1434,7 @@
 }
 
 <span class="macro">macro_rules</span><span class="macro">!</span> <span class="ident">unpack_px</span> {
-    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ix</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">input</span>: <span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">n</span>: <span class="ident">expr</span>) <span class="op">=&gt;</span> {{
+    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ix</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">input</span>: <span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">n</span>: <span class="ident">expr</span>) <span class="op">=</span><span class="op">&gt;</span> {{
         <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">bytes</span>) <span class="op">=</span> <span class="ident">parse_bytes</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">input</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">n</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">arr</span> <span class="op">=</span> [<span class="number">0u8</span>; ::<span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">size_of</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span><span class="op">&gt;</span>()];
         (<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">arr</span>[(::<span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">size_of</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span><span class="op">&gt;</span>() <span class="op">-</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">n</span>)..]).<span class="ident">copy_from_slice</span>(<span class="ident">bytes</span>);
@@ -1445,7 +1447,7 @@
     }};
 }
 <span class="macro">macro_rules</span><span class="macro">!</span> <span class="ident">unpack_nx</span> {
-    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ix</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">input</span>: <span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">n</span>: <span class="ident">expr</span>) <span class="op">=&gt;</span> {{
+    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ix</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">input</span>: <span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">n</span>: <span class="ident">expr</span>) <span class="op">=</span><span class="op">&gt;</span> {{
         <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">bytes</span>) <span class="op">=</span> <span class="ident">parse_bytes</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">input</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">n</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">arr</span> <span class="op">=</span> [<span class="number">0xffu8</span>; ::<span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">size_of</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">ix</span><span class="op">&gt;</span>()];
         (<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">arr</span>[(::<span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">size_of</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">ix</span><span class="op">&gt;</span>() <span class="op">-</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">n</span>)..]).<span class="ident">copy_from_slice</span>(<span class="ident">bytes</span>);
@@ -1459,25 +1461,25 @@
 }
 
 <span class="macro">macro_rules</span><span class="macro">!</span> <span class="ident">impl_ux</span> {
-    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>: <span class="ident">ident</span>) <span class="op">=&gt;</span> {
+    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>: <span class="ident">ident</span>) <span class="op">=</span><span class="op">&gt;</span> {
         <span class="macro">impl_ux</span><span class="macro">!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>, <span class="ident">mem</span>::<span class="ident">size_of</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span><span class="op">&gt;</span>());
     };
-    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">max_sz</span>:<span class="ident">expr</span>) <span class="op">=&gt;</span> {
+    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">max_sz</span>:<span class="ident">expr</span>) <span class="op">=</span><span class="op">&gt;</span> {
         <span class="kw">impl</span> <span class="ident">TuplePack</span> <span class="kw">for</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span> {
             <span class="kw">fn</span> <span class="ident">pack</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">io</span>::<span class="ident">Write</span><span class="op">&gt;</span>(
                 <span class="kw-2">&amp;</span><span class="self">self</span>,
                 <span class="ident">w</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span>,
                 <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>,
-            ) <span class="op">-&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
+            ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
                 <span class="kw">const</span> <span class="ident">SZ</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">mem</span>::<span class="ident">size_of</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span><span class="op">&gt;</span>();
                 <span class="kw">let</span> <span class="ident">u</span> <span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>;
                 <span class="kw">let</span> <span class="ident">n</span> <span class="op">=</span> <span class="ident">SZ</span> <span class="op">-</span> (<span class="ident">u</span>.<span class="ident">leading_zeros</span>() <span class="kw">as</span> <span class="ident">usize</span>) <span class="op">/</span> <span class="number">8</span>;
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">offset</span> <span class="op">=</span> <span class="ident">VersionstampOffset</span>::<span class="prelude-val">None</span> { <span class="ident">size</span>: <span class="ident">n</span> <span class="kw">as</span> <span class="ident">u32</span> <span class="op">+</span> <span class="number">1</span> };
-                <span class="kw">if</span> <span class="ident">SZ</span> <span class="op">&lt;=</span> <span class="ident">MAX_SZ</span> <span class="op">||</span> <span class="ident">n</span> <span class="op">&lt;=</span> <span class="ident">MAX_SZ</span> {
+                <span class="kw">if</span> <span class="ident">SZ</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">MAX_SZ</span> <span class="op">|</span><span class="op">|</span> <span class="ident">n</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">MAX_SZ</span> {
                     <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="ident">INTZERO</span> <span class="op">+</span> <span class="ident">n</span> <span class="kw">as</span> <span class="ident">u8</span>])<span class="question-mark">?</span>;
                 } <span class="kw">else</span> {
                     <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="ident">POSINTEND</span>, <span class="ident">n</span> <span class="kw">as</span> <span class="ident">u8</span>])<span class="question-mark">?</span>;
-                    <span class="ident">offset</span> <span class="op">+=</span> <span class="number">1</span>;
+                    <span class="ident">offset</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
                 };
                 <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span><span class="ident">u</span>.<span class="ident">to_be_bytes</span>()[<span class="ident">SZ</span> <span class="op">-</span> <span class="ident">n</span>..])<span class="question-mark">?</span>;
 
@@ -1486,13 +1488,13 @@
         }
 
         <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="ident">TupleUnpack</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span> {
-            <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
+            <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
                 <span class="kw">const</span> <span class="ident">SZ</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">mem</span>::<span class="ident">size_of</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span><span class="op">&gt;</span>();
                 <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">found</span>) <span class="op">=</span> <span class="ident">parse_byte</span>(<span class="ident">input</span>)<span class="question-mark">?</span>;
-                <span class="kw">if</span> <span class="ident">INTZERO</span> <span class="op">&lt;=</span> <span class="ident">found</span> <span class="op">&amp;&amp;</span> <span class="ident">found</span> <span class="op">&lt;=</span> <span class="ident">INTZERO</span> <span class="op">+</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">max_sz</span> <span class="kw">as</span> <span class="ident">u8</span> {
+                <span class="kw">if</span> <span class="ident">INTZERO</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">found</span> <span class="op">&amp;&amp;</span> <span class="ident">found</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">INTZERO</span> <span class="op">+</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">max_sz</span> <span class="kw">as</span> <span class="ident">u8</span> {
                     <span class="kw">let</span> <span class="ident">n</span> <span class="op">=</span> (<span class="ident">found</span> <span class="op">-</span> <span class="ident">INTZERO</span>) <span class="kw">as</span> <span class="ident">usize</span>;
                     <span class="prelude-val">Ok</span>(<span class="macro">unpack_ux</span><span class="macro">!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>, <span class="ident">input</span>, <span class="ident">n</span>))
-                } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">found</span> <span class="op">==</span> <span class="ident">POSINTEND</span> {
+                } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">found</span> <span class="op">=</span><span class="op">=</span> <span class="ident">POSINTEND</span> {
                     <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">raw_length</span>) <span class="op">=</span> <span class="ident">parse_byte</span>(<span class="ident">input</span>)<span class="question-mark">?</span>;
                     <span class="kw">let</span> <span class="ident">n</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">usize</span>::<span class="ident">from</span>(<span class="ident">raw_length</span>);
                     <span class="kw">if</span> <span class="ident">n</span> <span class="op">&gt;</span> <span class="ident">SZ</span> {
@@ -1511,35 +1513,35 @@
 }
 
 <span class="macro">macro_rules</span><span class="macro">!</span> <span class="ident">impl_ix</span> {
-    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ix</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>: <span class="ident">ident</span>) <span class="op">=&gt;</span> {
+    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ix</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>: <span class="ident">ident</span>) <span class="op">=</span><span class="op">&gt;</span> {
         <span class="macro">impl_ix</span><span class="macro">!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ix</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>, <span class="ident">mem</span>::<span class="ident">size_of</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">ix</span><span class="op">&gt;</span>());
     };
-    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ix</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">max_sz</span>:<span class="ident">expr</span>) <span class="op">=&gt;</span> {
+    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ix</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">max_sz</span>:<span class="ident">expr</span>) <span class="op">=</span><span class="op">&gt;</span> {
         <span class="kw">impl</span> <span class="ident">TuplePack</span> <span class="kw">for</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ix</span> {
             <span class="kw">fn</span> <span class="ident">pack</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">io</span>::<span class="ident">Write</span><span class="op">&gt;</span>(
                 <span class="kw-2">&amp;</span><span class="self">self</span>,
                 <span class="ident">w</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span>,
                 <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>,
-            ) <span class="op">-&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
+            ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
                 <span class="kw">const</span> <span class="ident">SZ</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">mem</span>::<span class="ident">size_of</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">ix</span><span class="op">&gt;</span>();
                 <span class="kw">let</span> <span class="ident">i</span> <span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>;
                 <span class="kw">let</span> <span class="ident">u</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">wrapping_abs</span>() <span class="kw">as</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>;
                 <span class="kw">let</span> <span class="ident">n</span> <span class="op">=</span> <span class="ident">SZ</span> <span class="op">-</span> (<span class="ident">u</span>.<span class="ident">leading_zeros</span>() <span class="kw">as</span> <span class="ident">usize</span>) <span class="op">/</span> <span class="number">8</span>;
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">offset</span> <span class="op">=</span> <span class="ident">VersionstampOffset</span>::<span class="prelude-val">None</span> { <span class="ident">size</span>: <span class="ident">n</span> <span class="kw">as</span> <span class="ident">u32</span> <span class="op">+</span> <span class="number">1</span> };
-                <span class="kw">let</span> <span class="ident">arr</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">i</span> <span class="op">&gt;=</span> <span class="number">0</span> {
-                    <span class="kw">if</span> <span class="ident">SZ</span> <span class="op">&lt;=</span> <span class="ident">MAX_SZ</span> <span class="op">||</span> <span class="ident">n</span> <span class="op">&lt;=</span> <span class="ident">MAX_SZ</span> {
+                <span class="kw">let</span> <span class="ident">arr</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">i</span> <span class="op">&gt;</span><span class="op">=</span> <span class="number">0</span> {
+                    <span class="kw">if</span> <span class="ident">SZ</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">MAX_SZ</span> <span class="op">|</span><span class="op">|</span> <span class="ident">n</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">MAX_SZ</span> {
                         <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="ident">INTZERO</span> <span class="op">+</span> <span class="ident">n</span> <span class="kw">as</span> <span class="ident">u8</span>])<span class="question-mark">?</span>;
                     } <span class="kw">else</span> {
                         <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="ident">POSINTEND</span>, <span class="ident">n</span> <span class="kw">as</span> <span class="ident">u8</span>])<span class="question-mark">?</span>;
-                        <span class="ident">offset</span> <span class="op">+=</span> <span class="number">1</span>;
+                        <span class="ident">offset</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
                     }
                     (<span class="ident">u</span>.<span class="ident">to_be_bytes</span>())
                 } <span class="kw">else</span> {
-                    <span class="kw">if</span> <span class="ident">SZ</span> <span class="op">&lt;=</span> <span class="ident">MAX_SZ</span> <span class="op">||</span> <span class="ident">n</span> <span class="op">&lt;=</span> <span class="ident">MAX_SZ</span> {
+                    <span class="kw">if</span> <span class="ident">SZ</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">MAX_SZ</span> <span class="op">|</span><span class="op">|</span> <span class="ident">n</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">MAX_SZ</span> {
                         <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="ident">INTZERO</span> <span class="op">-</span> <span class="ident">n</span> <span class="kw">as</span> <span class="ident">u8</span>])<span class="question-mark">?</span>;
                     } <span class="kw">else</span> {
                         <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="ident">NEGINTSTART</span>, <span class="ident">n</span> <span class="kw">as</span> <span class="ident">u8</span> <span class="op">^</span> <span class="number">0xff</span>])<span class="question-mark">?</span>;
-                        <span class="ident">offset</span> <span class="op">+=</span> <span class="number">1</span>;
+                        <span class="ident">offset</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
                     }
                     (<span class="ident">i</span>.<span class="ident">wrapping_sub</span>(<span class="number">1</span>).<span class="ident">to_be_bytes</span>())
                 };
@@ -1550,23 +1552,23 @@
         }
 
         <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="ident">TupleUnpack</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ix</span> {
-            <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
+            <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
                 <span class="kw">const</span> <span class="ident">SZ</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">mem</span>::<span class="ident">size_of</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">ix</span><span class="op">&gt;</span>();
                 <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">found</span>) <span class="op">=</span> <span class="ident">parse_byte</span>(<span class="ident">input</span>)<span class="question-mark">?</span>;
-                <span class="kw">if</span> <span class="ident">INTZERO</span> <span class="op">&lt;=</span> <span class="ident">found</span> <span class="op">&amp;&amp;</span> <span class="ident">found</span> <span class="op">&lt;=</span> <span class="ident">INTZERO</span> <span class="op">+</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">max_sz</span> <span class="kw">as</span> <span class="ident">u8</span> {
+                <span class="kw">if</span> <span class="ident">INTZERO</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">found</span> <span class="op">&amp;&amp;</span> <span class="ident">found</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">INTZERO</span> <span class="op">+</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">max_sz</span> <span class="kw">as</span> <span class="ident">u8</span> {
                     <span class="kw">let</span> <span class="ident">n</span> <span class="op">=</span> (<span class="ident">found</span> <span class="op">-</span> <span class="ident">INTZERO</span>) <span class="kw">as</span> <span class="ident">usize</span>;
                     <span class="macro">unpack_px</span><span class="macro">!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ix</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>, <span class="ident">input</span>, <span class="ident">n</span>)
-                } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">INTZERO</span> <span class="op">-</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">max_sz</span> <span class="kw">as</span> <span class="ident">u8</span> <span class="op">&lt;=</span> <span class="ident">found</span> <span class="op">&amp;&amp;</span> <span class="ident">found</span> <span class="op">&lt;</span> <span class="ident">INTZERO</span> {
+                } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">INTZERO</span> <span class="op">-</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">max_sz</span> <span class="kw">as</span> <span class="ident">u8</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">found</span> <span class="op">&amp;&amp;</span> <span class="ident">found</span> <span class="op">&lt;</span> <span class="ident">INTZERO</span> {
                     <span class="kw">let</span> <span class="ident">n</span> <span class="op">=</span> (<span class="ident">INTZERO</span> <span class="op">-</span> <span class="ident">found</span>) <span class="kw">as</span> <span class="ident">usize</span>;
                     <span class="macro">unpack_nx</span><span class="macro">!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ix</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>, <span class="ident">input</span>, <span class="ident">n</span>)
-                } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">found</span> <span class="op">==</span> <span class="ident">NEGINTSTART</span> {
+                } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">found</span> <span class="op">=</span><span class="op">=</span> <span class="ident">NEGINTSTART</span> {
                     <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">raw_length</span>) <span class="op">=</span> <span class="ident">parse_byte</span>(<span class="ident">input</span>)<span class="question-mark">?</span>;
                     <span class="kw">let</span> <span class="ident">n</span> <span class="op">=</span> <span class="ident">usize</span>::<span class="ident">from</span>(<span class="ident">raw_length</span> <span class="op">^</span> <span class="number">0xff</span>);
                     <span class="kw">if</span> <span class="ident">n</span> <span class="op">&gt;</span> <span class="ident">SZ</span> {
                         <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">PackError</span>::<span class="ident">UnsupportedIntLength</span>);
                     }
                     <span class="macro">unpack_nx</span><span class="macro">!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ix</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>, <span class="ident">input</span>, <span class="ident">n</span>)
-                } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">found</span> <span class="op">==</span> <span class="ident">POSINTEND</span> {
+                } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">found</span> <span class="op">=</span><span class="op">=</span> <span class="ident">POSINTEND</span> {
                     <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">raw_length</span>) <span class="op">=</span> <span class="ident">parse_byte</span>(<span class="ident">input</span>)<span class="question-mark">?</span>;
                     <span class="kw">let</span> <span class="ident">n</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">usize</span>::<span class="ident">from</span>(<span class="ident">raw_length</span>);
                     <span class="kw">if</span> <span class="ident">n</span> <span class="op">&gt;</span> <span class="ident">SZ</span> {
@@ -1585,9 +1587,9 @@
 }
 
 <span class="macro">macro_rules</span><span class="macro">!</span> <span class="ident">impl_fx</span> {
-    ( <span class="macro-nonterminal">$</span><span class="macro-nonterminal">fx</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">fx_to_ux_be_bytes</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux_width</span>: <span class="ident">tt</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">parse_ux</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">code</span>: <span class="ident">ident</span>) <span class="op">=&gt;</span> {
+    ( <span class="macro-nonterminal">$</span><span class="macro-nonterminal">fx</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">fx_to_ux_be_bytes</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux_width</span>: <span class="ident">tt</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">parse_ux</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">code</span>: <span class="ident">ident</span>) <span class="op">=</span><span class="op">&gt;</span> {
         <span class="attribute">#[<span class="ident">inline</span>]</span>
-        <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">fx_to_ux_be_bytes</span>(<span class="ident">f</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">fx</span>) <span class="op">-&gt;</span> [<span class="ident">u8</span>; <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux_width</span>] {
+        <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">fx_to_ux_be_bytes</span>(<span class="ident">f</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">fx</span>) <span class="op">-</span><span class="op">&gt;</span> [<span class="ident">u8</span>; <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux_width</span>] {
             <span class="kw">let</span> <span class="ident">u</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">f</span>.<span class="ident">is_sign_negative</span>() {
                 <span class="ident">f</span>.<span class="ident">to_bits</span>() <span class="op">^</span> ::<span class="ident">std</span>::<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>::<span class="ident">MAX</span>
             } <span class="kw">else</span> {
@@ -1600,7 +1602,7 @@
                 <span class="kw-2">&amp;</span><span class="self">self</span>,
                 <span class="ident">w</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span>,
                 <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>,
-            ) <span class="op">-&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
+            ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">fx_to_ux_be_bytes</span>(<span class="kw-2">*</span><span class="self">self</span>);
                 <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">code</span>])<span class="question-mark">?</span>;
                 <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span><span class="ident">bytes</span>)<span class="question-mark">?</span>;
@@ -1610,19 +1612,19 @@
             }
         }
 
-        <span class="kw">fn</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">parse_ux</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>)<span class="op">&gt;</span> {
+        <span class="kw">fn</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">parse_ux</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>)<span class="op">&gt;</span> {
             <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">bytes</span>) <span class="op">=</span> <span class="ident">parse_bytes</span>(<span class="ident">input</span>, <span class="ident">mem</span>::<span class="ident">size_of</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span><span class="op">&gt;</span>())<span class="question-mark">?</span>;
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">arr</span> <span class="op">=</span> [<span class="number">0u8</span>; <span class="ident">mem</span>::<span class="ident">size_of</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span><span class="op">&gt;</span>()];
             <span class="ident">arr</span>.<span class="ident">copy_from_slice</span>(<span class="ident">bytes</span>);
             <span class="prelude-val">Ok</span>((<span class="ident">input</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>::<span class="ident">from_be_bytes</span>(<span class="ident">arr</span>)))
         }
         <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="ident">TupleUnpack</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">fx</span> {
-            <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
+            <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
                 <span class="kw">let</span> <span class="ident">input</span> <span class="op">=</span> <span class="ident">parse_code</span>(<span class="ident">input</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">code</span>)<span class="question-mark">?</span>;
                 <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">u</span>) <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">parse_ux</span>(<span class="ident">input</span>)<span class="question-mark">?</span>;
                 <span class="prelude-val">Ok</span>((
                     <span class="ident">input</span>,
-                    <span class="macro-nonterminal">$</span><span class="macro-nonterminal">fx</span>::<span class="ident">from_bits</span>(<span class="kw">if</span> (<span class="ident">u</span> <span class="op">&amp;</span> <span class="macro">sign_bit</span><span class="macro">!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>)) <span class="op">==</span> <span class="number">0</span> {
+                    <span class="macro-nonterminal">$</span><span class="macro-nonterminal">fx</span>::<span class="ident">from_bits</span>(<span class="kw">if</span> (<span class="ident">u</span> <span class="op">&amp;</span> <span class="macro">sign_bit</span><span class="macro">!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>)) <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
                         <span class="ident">u</span> <span class="op">^</span> ::<span class="ident">std</span>::<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>::<span class="ident">MAX</span>
                     } <span class="kw">else</span> {
                         <span class="ident">u</span> <span class="op">^</span> <span class="macro">sign_bit</span><span class="macro">!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ux</span>)
@@ -1665,14 +1667,14 @@
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">inverted</span>(<span class="ident">bytes</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">inverted</span>(<span class="ident">bytes</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> {
         <span class="comment">// The ones&#39; complement of a binary number is defined as the value</span>
         <span class="comment">// obtained by inverting all the bits in the binary representation</span>
         <span class="comment">// of the number (swapping 0s for 1s and vice versa).</span>
         <span class="ident">bytes</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">byte</span><span class="op">|</span> <span class="op">!</span><span class="kw-2">*</span><span class="ident">byte</span>).<span class="ident">collect</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">bigint_n</span>(<span class="ident">n</span>: <span class="ident">usize</span>) <span class="op">-&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">bigint_n</span>(<span class="ident">n</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> {
         <span class="ident">u8</span>::<span class="ident">try_from</span>(<span class="ident">n</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> {
             <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Error</span>::<span class="ident">new</span>(
                 <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">ErrorKind</span>::<span class="ident">InvalidInput</span>,
@@ -1686,8 +1688,8 @@
             <span class="kw-2">&amp;</span><span class="self">self</span>,
             <span class="ident">w</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span>,
             <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>,
-        ) <span class="op">-&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">sign</span>() <span class="op">==</span> <span class="ident">Sign</span>::<span class="ident">NoSign</span> {
+        ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
+            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">sign</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">Sign</span>::<span class="ident">NoSign</span> {
                 <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="ident">INTZERO</span>])<span class="question-mark">?</span>;
                 <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">VersionstampOffset</span>::<span class="prelude-val">None</span> { <span class="ident">size</span>: <span class="number">1</span> });
             }
@@ -1695,23 +1697,23 @@
             <span class="kw">let</span> <span class="ident">n</span> <span class="op">=</span> <span class="ident">bytes</span>.<span class="ident">len</span>();
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">offset</span> <span class="op">=</span> <span class="ident">VersionstampOffset</span>::<span class="prelude-val">None</span> { <span class="ident">size</span>: <span class="ident">n</span> <span class="kw">as</span> <span class="ident">u32</span> <span class="op">+</span> <span class="number">1</span> };
             <span class="kw">match</span> <span class="ident">sign</span> {
-                <span class="ident">Sign</span>::<span class="ident">Minus</span> <span class="op">=&gt;</span> {
-                    <span class="kw">if</span> <span class="ident">n</span> <span class="op">&lt;=</span> <span class="ident">MAX_SZ</span> {
+                <span class="ident">Sign</span>::<span class="ident">Minus</span> <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="kw">if</span> <span class="ident">n</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">MAX_SZ</span> {
                         <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="ident">INTZERO</span> <span class="op">-</span> <span class="ident">n</span> <span class="kw">as</span> <span class="ident">u8</span>])<span class="question-mark">?</span>;
                     } <span class="kw">else</span> {
                         <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="ident">NEGINTSTART</span>, <span class="ident">bigint_n</span>(<span class="ident">n</span>)<span class="question-mark">?</span> <span class="op">^</span> <span class="number">0xff</span>])<span class="question-mark">?</span>;
-                        <span class="ident">offset</span> <span class="op">+=</span> <span class="number">1</span>;
+                        <span class="ident">offset</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
                     }
                     <span class="ident">invert</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">bytes</span>);
                     <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span><span class="ident">bytes</span>)<span class="question-mark">?</span>;
                 }
-                <span class="ident">Sign</span>::<span class="ident">NoSign</span> <span class="op">=&gt;</span> <span class="macro">unreachable</span><span class="macro">!</span>(),
-                <span class="ident">Sign</span>::<span class="ident">Plus</span> <span class="op">=&gt;</span> {
-                    <span class="kw">if</span> <span class="ident">n</span> <span class="op">&lt;=</span> <span class="ident">MAX_SZ</span> {
+                <span class="ident">Sign</span>::<span class="ident">NoSign</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unreachable</span><span class="macro">!</span>(),
+                <span class="ident">Sign</span>::<span class="ident">Plus</span> <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="kw">if</span> <span class="ident">n</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">MAX_SZ</span> {
                         <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="ident">INTZERO</span> <span class="op">+</span> <span class="ident">n</span> <span class="kw">as</span> <span class="ident">u8</span>])<span class="question-mark">?</span>;
                     } <span class="kw">else</span> {
                         <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="ident">POSINTEND</span>, <span class="ident">bigint_n</span>(<span class="ident">n</span>)<span class="question-mark">?</span>])<span class="question-mark">?</span>;
-                        <span class="ident">offset</span> <span class="op">+=</span> <span class="number">1</span>;
+                        <span class="ident">offset</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
                     }
                     <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span><span class="ident">bytes</span>)<span class="question-mark">?</span>;
                 }
@@ -1722,22 +1724,22 @@
     }
 
     <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="ident">TupleUnpack</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">BigInt</span> {
-        <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
+        <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
             <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">found</span>) <span class="op">=</span> <span class="ident">parse_byte</span>(<span class="ident">input</span>)<span class="question-mark">?</span>;
-            <span class="kw">if</span> <span class="ident">INTZERO</span> <span class="op">&lt;=</span> <span class="ident">found</span> <span class="op">&amp;&amp;</span> <span class="ident">found</span> <span class="op">&lt;=</span> <span class="ident">INTZERO</span> <span class="op">+</span> <span class="ident">MAX_SZ</span> <span class="kw">as</span> <span class="ident">u8</span> {
+            <span class="kw">if</span> <span class="ident">INTZERO</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">found</span> <span class="op">&amp;&amp;</span> <span class="ident">found</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">INTZERO</span> <span class="op">+</span> <span class="ident">MAX_SZ</span> <span class="kw">as</span> <span class="ident">u8</span> {
                 <span class="kw">let</span> <span class="ident">n</span> <span class="op">=</span> (<span class="ident">found</span> <span class="op">-</span> <span class="ident">INTZERO</span>) <span class="kw">as</span> <span class="ident">usize</span>;
                 <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">bytes</span>) <span class="op">=</span> <span class="ident">parse_bytes</span>(<span class="ident">input</span>, <span class="ident">n</span>)<span class="question-mark">?</span>;
                 <span class="prelude-val">Ok</span>((<span class="ident">input</span>, <span class="self">Self</span>::<span class="ident">from_bytes_be</span>(<span class="ident">Sign</span>::<span class="ident">Plus</span>, <span class="ident">bytes</span>)))
-            } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">INTZERO</span> <span class="op">-</span> <span class="ident">MAX_SZ</span> <span class="kw">as</span> <span class="ident">u8</span> <span class="op">&lt;=</span> <span class="ident">found</span> <span class="op">&amp;&amp;</span> <span class="ident">found</span> <span class="op">&lt;</span> <span class="ident">INTZERO</span> {
+            } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">INTZERO</span> <span class="op">-</span> <span class="ident">MAX_SZ</span> <span class="kw">as</span> <span class="ident">u8</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">found</span> <span class="op">&amp;&amp;</span> <span class="ident">found</span> <span class="op">&lt;</span> <span class="ident">INTZERO</span> {
                 <span class="kw">let</span> <span class="ident">n</span> <span class="op">=</span> (<span class="ident">INTZERO</span> <span class="op">-</span> <span class="ident">found</span>) <span class="kw">as</span> <span class="ident">usize</span>;
                 <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">bytes</span>) <span class="op">=</span> <span class="ident">parse_bytes</span>(<span class="ident">input</span>, <span class="ident">n</span>)<span class="question-mark">?</span>;
                 <span class="prelude-val">Ok</span>((<span class="ident">input</span>, <span class="self">Self</span>::<span class="ident">from_bytes_be</span>(<span class="ident">Sign</span>::<span class="ident">Minus</span>, <span class="kw-2">&amp;</span><span class="ident">inverted</span>(<span class="ident">bytes</span>))))
-            } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">found</span> <span class="op">==</span> <span class="ident">NEGINTSTART</span> {
+            } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">found</span> <span class="op">=</span><span class="op">=</span> <span class="ident">NEGINTSTART</span> {
                 <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">raw_length</span>) <span class="op">=</span> <span class="ident">parse_byte</span>(<span class="ident">input</span>)<span class="question-mark">?</span>;
                 <span class="kw">let</span> <span class="ident">n</span> <span class="op">=</span> <span class="ident">usize</span>::<span class="ident">from</span>(<span class="ident">raw_length</span> <span class="op">^</span> <span class="number">0xff</span>);
                 <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">bytes</span>) <span class="op">=</span> <span class="ident">parse_bytes</span>(<span class="ident">input</span>, <span class="ident">n</span>)<span class="question-mark">?</span>;
                 <span class="prelude-val">Ok</span>((<span class="ident">input</span>, <span class="self">Self</span>::<span class="ident">from_bytes_be</span>(<span class="ident">Sign</span>::<span class="ident">Minus</span>, <span class="kw-2">&amp;</span><span class="ident">inverted</span>(<span class="ident">bytes</span>))))
-            } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">found</span> <span class="op">==</span> <span class="ident">POSINTEND</span> {
+            } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">found</span> <span class="op">=</span><span class="op">=</span> <span class="ident">POSINTEND</span> {
                 <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">raw_length</span>) <span class="op">=</span> <span class="ident">parse_byte</span>(<span class="ident">input</span>)<span class="question-mark">?</span>;
                 <span class="kw">let</span> <span class="ident">n</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">usize</span>::<span class="ident">from</span>(<span class="ident">raw_length</span>);
                 <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">bytes</span>) <span class="op">=</span> <span class="ident">parse_bytes</span>(<span class="ident">input</span>, <span class="ident">n</span>)<span class="question-mark">?</span>;
@@ -1756,20 +1758,20 @@
             <span class="kw-2">&amp;</span><span class="self">self</span>,
             <span class="ident">w</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span>,
             <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>,
-        ) <span class="op">-&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
+        ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
             <span class="kw">let</span> <span class="ident">n</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">bits</span>();
-            <span class="kw">if</span> <span class="ident">n</span> <span class="op">==</span> <span class="number">0</span> {
+            <span class="kw">if</span> <span class="ident">n</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
                 <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="ident">INTZERO</span>])<span class="question-mark">?</span>;
                 <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">VersionstampOffset</span>::<span class="prelude-val">None</span> { <span class="ident">size</span>: <span class="number">1</span> });
             }
             <span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">to_bytes_be</span>();
             <span class="kw">let</span> <span class="ident">n</span> <span class="op">=</span> <span class="ident">bytes</span>.<span class="ident">len</span>();
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">offset</span> <span class="op">=</span> <span class="ident">VersionstampOffset</span>::<span class="prelude-val">None</span> { <span class="ident">size</span>: <span class="ident">n</span> <span class="kw">as</span> <span class="ident">u32</span> <span class="op">+</span> <span class="number">1</span> };
-            <span class="kw">if</span> <span class="ident">n</span> <span class="op">&lt;=</span> <span class="ident">MAX_SZ</span> {
+            <span class="kw">if</span> <span class="ident">n</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">MAX_SZ</span> {
                 <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="ident">INTZERO</span> <span class="op">+</span> <span class="ident">n</span> <span class="kw">as</span> <span class="ident">u8</span>])<span class="question-mark">?</span>;
             } <span class="kw">else</span> {
                 <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="ident">POSINTEND</span>, <span class="ident">bigint_n</span>(<span class="ident">n</span>)<span class="question-mark">?</span>])<span class="question-mark">?</span>;
-                <span class="ident">offset</span> <span class="op">+=</span> <span class="number">1</span>;
+                <span class="ident">offset</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
             }
             <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span><span class="ident">bytes</span>)<span class="question-mark">?</span>;
 
@@ -1778,13 +1780,13 @@
     }
 
     <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="ident">TupleUnpack</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">BigUint</span> {
-        <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
+        <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
             <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">found</span>) <span class="op">=</span> <span class="ident">parse_byte</span>(<span class="ident">input</span>)<span class="question-mark">?</span>;
-            <span class="kw">if</span> <span class="ident">INTZERO</span> <span class="op">&lt;=</span> <span class="ident">found</span> <span class="op">&amp;&amp;</span> <span class="ident">found</span> <span class="op">&lt;=</span> <span class="ident">INTZERO</span> <span class="op">+</span> <span class="ident">MAX_SZ</span> <span class="kw">as</span> <span class="ident">u8</span> {
+            <span class="kw">if</span> <span class="ident">INTZERO</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">found</span> <span class="op">&amp;&amp;</span> <span class="ident">found</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">INTZERO</span> <span class="op">+</span> <span class="ident">MAX_SZ</span> <span class="kw">as</span> <span class="ident">u8</span> {
                 <span class="kw">let</span> <span class="ident">n</span> <span class="op">=</span> (<span class="ident">found</span> <span class="op">-</span> <span class="ident">INTZERO</span>) <span class="kw">as</span> <span class="ident">usize</span>;
                 <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">bytes</span>) <span class="op">=</span> <span class="ident">parse_bytes</span>(<span class="ident">input</span>, <span class="ident">n</span>)<span class="question-mark">?</span>;
                 <span class="prelude-val">Ok</span>((<span class="ident">input</span>, <span class="self">Self</span>::<span class="ident">from_bytes_be</span>(<span class="ident">bytes</span>)))
-            } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">found</span> <span class="op">==</span> <span class="ident">POSINTEND</span> {
+            } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">found</span> <span class="op">=</span><span class="op">=</span> <span class="ident">POSINTEND</span> {
                 <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">raw_length</span>) <span class="op">=</span> <span class="ident">parse_byte</span>(<span class="ident">input</span>)<span class="question-mark">?</span>;
                 <span class="kw">let</span> <span class="ident">n</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">usize</span>::<span class="ident">from</span>(<span class="ident">raw_length</span>);
                 <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">bytes</span>) <span class="op">=</span> <span class="ident">parse_bytes</span>(<span class="ident">input</span>, <span class="ident">n</span>)<span class="question-mark">?</span>;
@@ -1804,19 +1806,19 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">w</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span>,
         <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>,
-    ) <span class="op">-&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
         <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="kw">if</span> <span class="kw-2">*</span><span class="self">self</span> { <span class="ident">TRUE</span> } <span class="kw">else</span> { <span class="ident">FALSE</span> }])<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(<span class="ident">VersionstampOffset</span>::<span class="prelude-val">None</span> { <span class="ident">size</span>: <span class="number">1</span> })
     }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="ident">TupleUnpack</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">bool</span> {
-    <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
         <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">v</span>) <span class="op">=</span> <span class="ident">parse_byte</span>(<span class="ident">input</span>)<span class="question-mark">?</span>;
         <span class="kw">match</span> <span class="ident">v</span> {
-            <span class="ident">FALSE</span> <span class="op">=&gt;</span> <span class="prelude-val">Ok</span>((<span class="ident">input</span>, <span class="bool-val">false</span>)),
-            <span class="ident">TRUE</span> <span class="op">=&gt;</span> <span class="prelude-val">Ok</span>((<span class="ident">input</span>, <span class="bool-val">true</span>)),
-            <span class="kw">_</span> <span class="op">=&gt;</span> <span class="prelude-val">Err</span>(<span class="ident">PackError</span>::<span class="ident">Message</span>(
+            <span class="ident">FALSE</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>((<span class="ident">input</span>, <span class="bool-val">false</span>)),
+            <span class="ident">TRUE</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>((<span class="ident">input</span>, <span class="bool-val">true</span>)),
+            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="ident">PackError</span>::<span class="ident">Message</span>(
                 <span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;{} is not a valid bool value&quot;</span>, <span class="ident">v</span>).<span class="ident">into_boxed_str</span>(),
             )),
         }
@@ -1831,21 +1833,21 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">w</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span>,
         <span class="ident">tuple_depth</span>: <span class="ident">TupleDepth</span>,
-    ) <span class="op">-&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">offset</span> <span class="op">=</span> <span class="ident">VersionstampOffset</span>::<span class="prelude-val">None</span> { <span class="ident">size</span>: <span class="number">0</span> };
 
         <span class="kw">if</span> <span class="ident">tuple_depth</span>.<span class="ident">depth</span>() <span class="op">&gt;</span> <span class="number">0</span> {
             <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="ident">NESTED</span>])<span class="question-mark">?</span>;
-            <span class="ident">offset</span> <span class="op">+=</span> <span class="number">1</span>;
+            <span class="ident">offset</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
         }
 
         <span class="kw">for</span> <span class="ident">v</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">iter</span>() {
-            <span class="ident">offset</span> <span class="op">+=</span> <span class="ident">v</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>.<span class="ident">increment</span>())<span class="question-mark">?</span>;
+            <span class="ident">offset</span> <span class="op">+</span><span class="op">=</span> <span class="ident">v</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>.<span class="ident">increment</span>())<span class="question-mark">?</span>;
         }
 
         <span class="kw">if</span> <span class="ident">tuple_depth</span>.<span class="ident">depth</span>() <span class="op">&gt;</span> <span class="number">0</span> {
             <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="ident">NIL</span>])<span class="question-mark">?</span>;
-            <span class="ident">offset</span> <span class="op">+=</span> <span class="number">1</span>;
+            <span class="ident">offset</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
         }
         <span class="prelude-val">Ok</span>(<span class="ident">offset</span>)
     }
@@ -1859,17 +1861,17 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">w</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span>,
         <span class="ident">tuple_depth</span>: <span class="ident">TupleDepth</span>,
-    ) <span class="op">-&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">as_slice</span>().<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>)
     }
 }
 
-<span class="kw">fn</span> <span class="ident">is_end_of_tuple</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">nested</span>: <span class="ident">bool</span>) <span class="op">-&gt;</span> <span class="ident">bool</span> {
+<span class="kw">fn</span> <span class="ident">is_end_of_tuple</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">nested</span>: <span class="ident">bool</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
     <span class="kw">match</span> <span class="ident">input</span>.<span class="ident">first</span>() {
-        <span class="prelude-val">None</span> <span class="op">=&gt;</span> <span class="bool-val">true</span>,
-        <span class="kw">_</span> <span class="kw">if</span> <span class="op">!</span><span class="ident">nested</span> <span class="op">=&gt;</span> <span class="bool-val">false</span>,
-        <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">NIL</span>) <span class="op">=&gt;</span> <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">ESCAPE</span>) <span class="op">!=</span> <span class="ident">input</span>.<span class="ident">get</span>(<span class="number">1</span>),
-        <span class="kw">_</span> <span class="op">=&gt;</span> <span class="bool-val">false</span>,
+        <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="bool-val">true</span>,
+        <span class="kw">_</span> <span class="kw">if</span> <span class="op">!</span><span class="ident">nested</span> <span class="op">=</span><span class="op">&gt;</span> <span class="bool-val">false</span>,
+        <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">NIL</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">ESCAPE</span>) <span class="op">!</span><span class="op">=</span> <span class="ident">input</span>.<span class="ident">get</span>(<span class="number">1</span>),
+        <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="bool-val">false</span>,
     }
 }
 
@@ -1877,7 +1879,7 @@
 <span class="kw">where</span>
     <span class="ident">T</span>: <span class="ident">TupleUnpack</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span>,
 {
-    <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="kw-2">mut</span> <span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="ident">tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="kw-2">mut</span> <span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="ident">tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">nested</span> <span class="op">=</span> <span class="ident">tuple_depth</span>.<span class="ident">depth</span>() <span class="op">&gt;</span> <span class="number">0</span>;
         <span class="kw">if</span> <span class="ident">nested</span> {
             <span class="ident">input</span> <span class="op">=</span> <span class="ident">parse_code</span>(<span class="ident">input</span>, <span class="ident">NESTED</span>)<span class="question-mark">?</span>;
@@ -1904,14 +1906,14 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">w</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span>,
         <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>,
-    ) <span class="op">-&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
         <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="ident">BYTES</span>])<span class="question-mark">?</span>;
         <span class="ident">write_bytes</span>(<span class="ident">w</span>, <span class="self">self</span>.<span class="ident">as_ref</span>())
     }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="ident">TupleUnpack</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Bytes</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">input</span> <span class="op">=</span> <span class="ident">parse_code</span>(<span class="ident">input</span>, <span class="ident">BYTES</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">v</span>) <span class="op">=</span> <span class="ident">parse_slice</span>(<span class="ident">input</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>((<span class="ident">input</span>, <span class="ident">Bytes</span>(<span class="ident">v</span>)))
@@ -1923,7 +1925,7 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">w</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span>,
         <span class="ident">tuple_depth</span>: <span class="ident">TupleDepth</span>,
-    ) <span class="op">-&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
         <span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="kw-2">*</span><span class="self">self</span>).<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>)
     }
 }
@@ -1933,13 +1935,13 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">w</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span>,
         <span class="ident">tuple_depth</span>: <span class="ident">TupleDepth</span>,
-    ) <span class="op">-&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
         <span class="ident">Bytes</span>::<span class="ident">from</span>(<span class="self">self</span>.<span class="ident">as_slice</span>()).<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>)
     }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="ident">TupleUnpack</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="ident">tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="ident">tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
         <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">bytes</span>) <span class="op">=</span> <span class="ident">Bytes</span>::<span class="ident">unpack</span>(<span class="ident">input</span>, <span class="ident">tuple_depth</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>((<span class="ident">input</span>, <span class="ident">bytes</span>.<span class="ident">into_owned</span>()))
     }
@@ -1950,7 +1952,7 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">w</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span>,
         <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>,
-    ) <span class="op">-&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
         <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="ident">STRING</span>])<span class="question-mark">?</span>;
         <span class="ident">write_bytes</span>(<span class="ident">w</span>, <span class="self">self</span>.<span class="ident">as_bytes</span>())
     }
@@ -1961,7 +1963,7 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">w</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span>,
         <span class="ident">tuple_depth</span>: <span class="ident">TupleDepth</span>,
-    ) <span class="op">-&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">as_str</span>().<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>)
     }
 }
@@ -1971,13 +1973,13 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">w</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span>,
         <span class="ident">tuple_depth</span>: <span class="ident">TupleDepth</span>,
-    ) <span class="op">-&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">as_ref</span>().<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>)
     }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="ident">TupleUnpack</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Cow</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span>, <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">input</span> <span class="op">=</span> <span class="ident">parse_code</span>(<span class="ident">input</span>, <span class="ident">STRING</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">v</span>) <span class="op">=</span> <span class="ident">parse_string</span>(<span class="ident">input</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>((<span class="ident">input</span>, <span class="ident">v</span>))
@@ -1985,7 +1987,7 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="ident">TupleUnpack</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">String</span> {
-    <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">input</span> <span class="op">=</span> <span class="ident">parse_code</span>(<span class="ident">input</span>, <span class="ident">STRING</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">v</span>) <span class="op">=</span> <span class="ident">parse_string</span>(<span class="ident">input</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>((<span class="ident">input</span>, <span class="ident">v</span>.<span class="ident">into_owned</span>()))
@@ -2000,9 +2002,9 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">w</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span>,
         <span class="ident">tuple_depth</span>: <span class="ident">TupleDepth</span>,
-    ) <span class="op">-&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
         <span class="kw">match</span> <span class="self">self</span> {
-            <span class="prelude-val">None</span> <span class="op">=&gt;</span> {
+            <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">tuple_depth</span>.<span class="ident">depth</span>() <span class="op">&gt;</span> <span class="number">1</span> {
                     <span class="comment">// Empty value in nested tuple is encoded with [NIL, ESCAPE] to</span>
                     <span class="comment">// disambiguate itself with end-of-tuple marker.</span>
@@ -2014,7 +2016,7 @@
                 };
                 <span class="prelude-val">Ok</span>(<span class="ident">VersionstampOffset</span>::<span class="prelude-val">None</span> { <span class="ident">size</span> })
             }
-            <span class="prelude-val">Some</span>(<span class="ident">v</span>) <span class="op">=&gt;</span> <span class="ident">v</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>),
+            <span class="prelude-val">Some</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">v</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>),
         }
     }
 }
@@ -2023,7 +2025,7 @@
 <span class="kw">where</span>
     <span class="ident">T</span>: <span class="ident">TupleUnpack</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span>,
 {
-    <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="kw-2">mut</span> <span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="ident">tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="kw-2">mut</span> <span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="ident">tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">NIL</span>) <span class="op">=</span> <span class="ident">input</span>.<span class="ident">first</span>() {
             <span class="ident">input</span> <span class="op">=</span> <span class="ident">parse_code</span>(<span class="ident">input</span>, <span class="ident">NIL</span>)<span class="question-mark">?</span>;
             <span class="kw">if</span> <span class="ident">tuple_depth</span>.<span class="ident">depth</span>() <span class="op">&gt;</span> <span class="number">1</span> {
@@ -2042,104 +2044,104 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">w</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span>,
         <span class="ident">tuple_depth</span>: <span class="ident">TupleDepth</span>,
-    ) <span class="op">-&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
         <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">Element</span>::<span class="ident">Nil</span> <span class="op">=&gt;</span> <span class="prelude-ty">Option</span>::<span class="op">&lt;</span>()<span class="op">&gt;</span>::<span class="prelude-val">None</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>),
-            <span class="ident">Element</span>::<span class="ident">Bool</span>(<span class="ident">b</span>) <span class="op">=&gt;</span> <span class="ident">b</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>),
-            <span class="ident">Element</span>::<span class="ident">Int</span>(<span class="ident">i</span>) <span class="op">=&gt;</span> <span class="ident">i</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>),
-            <span class="ident">Element</span>::<span class="ident">Float</span>(<span class="ident">f</span>) <span class="op">=&gt;</span> <span class="ident">f</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>),
-            <span class="ident">Element</span>::<span class="ident">Double</span>(<span class="ident">f</span>) <span class="op">=&gt;</span> <span class="ident">f</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>),
-            <span class="ident">Element</span>::<span class="ident">String</span>(<span class="kw-2">ref</span> <span class="ident">c</span>) <span class="op">=&gt;</span> <span class="ident">c</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>),
-            <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="kw-2">ref</span> <span class="ident">b</span>) <span class="op">=&gt;</span> <span class="ident">b</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>),
-            <span class="ident">Element</span>::<span class="ident">Versionstamp</span>(<span class="kw-2">ref</span> <span class="ident">b</span>) <span class="op">=&gt;</span> <span class="ident">b</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>),
-            <span class="ident">Element</span>::<span class="ident">Tuple</span>(<span class="kw-2">ref</span> <span class="ident">v</span>) <span class="op">=&gt;</span> <span class="ident">v</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>),
+            <span class="ident">Element</span>::<span class="ident">Nil</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span>::<span class="op">&lt;</span>()<span class="op">&gt;</span>::<span class="prelude-val">None</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>),
+            <span class="ident">Element</span>::<span class="ident">Bool</span>(<span class="ident">b</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">b</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>),
+            <span class="ident">Element</span>::<span class="ident">Int</span>(<span class="ident">i</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">i</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>),
+            <span class="ident">Element</span>::<span class="ident">Float</span>(<span class="ident">f</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">f</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>),
+            <span class="ident">Element</span>::<span class="ident">Double</span>(<span class="ident">f</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">f</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>),
+            <span class="ident">Element</span>::<span class="ident">String</span>(<span class="kw-2">ref</span> <span class="ident">c</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">c</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>),
+            <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="kw-2">ref</span> <span class="ident">b</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">b</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>),
+            <span class="ident">Element</span>::<span class="ident">Versionstamp</span>(<span class="kw-2">ref</span> <span class="ident">b</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">b</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>),
+            <span class="ident">Element</span>::<span class="ident">Tuple</span>(<span class="kw-2">ref</span> <span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">v</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>),
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;uuid&quot;</span>)]</span>
-            <span class="ident">Element</span>::<span class="ident">Uuid</span>(<span class="ident">v</span>) <span class="op">=&gt;</span> <span class="ident">v</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>),
+            <span class="ident">Element</span>::<span class="ident">Uuid</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">v</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>),
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;num-bigint&quot;</span>)]</span>
-            <span class="ident">Element</span>::<span class="ident">BigInt</span>(<span class="ident">v</span>) <span class="op">=&gt;</span> <span class="ident">v</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>),
+            <span class="ident">Element</span>::<span class="ident">BigInt</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">v</span>.<span class="ident">pack</span>(<span class="ident">w</span>, <span class="ident">tuple_depth</span>),
         }
     }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="ident">TupleUnpack</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Element</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="ident">tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="ident">tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;de</span> [<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
         <span class="kw">const</span> <span class="ident">INTMIN</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="ident">INTZERO</span> <span class="op">-</span> <span class="number">8</span>;
         <span class="kw">const</span> <span class="ident">INTMAX</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="ident">INTZERO</span> <span class="op">+</span> <span class="number">8</span>;
 
         <span class="kw">let</span> <span class="ident">first</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">input</span>.<span class="ident">first</span>() {
-            <span class="prelude-val">None</span> <span class="kw">if</span> <span class="ident">tuple_depth</span>.<span class="ident">depth</span>() <span class="op">==</span> <span class="number">0</span> <span class="op">=&gt;</span> <span class="kw">return</span> <span class="prelude-val">Ok</span>((<span class="ident">input</span>, <span class="ident">Element</span>::<span class="ident">Tuple</span>(<span class="ident">Vec</span>::<span class="ident">new</span>()))),
-            <span class="prelude-val">None</span> <span class="op">=&gt;</span> <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">PackError</span>::<span class="ident">MissingBytes</span>),
-            <span class="prelude-val">Some</span>(<span class="ident">byte</span>) <span class="op">=&gt;</span> <span class="ident">byte</span>,
+            <span class="prelude-val">None</span> <span class="kw">if</span> <span class="ident">tuple_depth</span>.<span class="ident">depth</span>() <span class="op">=</span><span class="op">=</span> <span class="number">0</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">Ok</span>((<span class="ident">input</span>, <span class="ident">Element</span>::<span class="ident">Tuple</span>(<span class="ident">Vec</span>::<span class="ident">new</span>()))),
+            <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">PackError</span>::<span class="ident">MissingBytes</span>),
+            <span class="prelude-val">Some</span>(<span class="ident">byte</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">byte</span>,
         };
 
         <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">input</span>, <span class="kw-2">mut</span> <span class="ident">v</span>) <span class="op">=</span> <span class="kw">match</span> <span class="kw-2">*</span><span class="ident">first</span> {
-            <span class="ident">NIL</span> <span class="op">=&gt;</span> {
+            <span class="ident">NIL</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> (<span class="ident">input</span>, <span class="kw">_</span>) <span class="op">=</span> <span class="prelude-ty">Option</span>::<span class="op">&lt;</span>()<span class="op">&gt;</span>::<span class="ident">unpack</span>(<span class="ident">input</span>, <span class="ident">tuple_depth</span>)<span class="question-mark">?</span>;
                 (<span class="ident">input</span>, <span class="ident">Element</span>::<span class="ident">Nil</span>)
             }
-            <span class="ident">BYTES</span> <span class="op">=&gt;</span> {
+            <span class="ident">BYTES</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">v</span>) <span class="op">=</span> <span class="ident">Bytes</span>::<span class="ident">unpack</span>(<span class="ident">input</span>, <span class="ident">tuple_depth</span>)<span class="question-mark">?</span>;
                 (<span class="ident">input</span>, <span class="ident">Element</span>::<span class="ident">Bytes</span>(<span class="ident">v</span>))
             }
-            <span class="ident">STRING</span> <span class="op">=&gt;</span> {
+            <span class="ident">STRING</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">v</span>) <span class="op">=</span> <span class="ident">Cow</span>::<span class="op">&lt;</span><span class="lifetime">&#39;de</span>, <span class="ident">str</span><span class="op">&gt;</span>::<span class="ident">unpack</span>(<span class="ident">input</span>, <span class="ident">tuple_depth</span>)<span class="question-mark">?</span>;
                 (<span class="ident">input</span>, <span class="ident">Element</span>::<span class="ident">String</span>(<span class="ident">v</span>))
             }
-            <span class="ident">NESTED</span> <span class="op">=&gt;</span> {
+            <span class="ident">NESTED</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">v</span>) <span class="op">=</span> <span class="ident">Vec</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>::<span class="ident">unpack</span>(<span class="ident">input</span>, <span class="ident">tuple_depth</span>)<span class="question-mark">?</span>;
                 (<span class="ident">input</span>, <span class="ident">Element</span>::<span class="ident">Tuple</span>(<span class="ident">v</span>))
             }
-            <span class="ident">INTMIN</span>..<span class="op">=</span><span class="ident">INTMAX</span> <span class="op">=&gt;</span> <span class="kw">match</span> <span class="ident">i64</span>::<span class="ident">unpack</span>(<span class="ident">input</span>, <span class="ident">tuple_depth</span>) {
-                <span class="prelude-val">Ok</span>((<span class="ident">input</span>, <span class="ident">v</span>)) <span class="op">=&gt;</span> (<span class="ident">input</span>, <span class="ident">Element</span>::<span class="ident">Int</span>(<span class="ident">v</span>)),
+            <span class="ident">INTMIN</span>..<span class="op">=</span><span class="ident">INTMAX</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">match</span> <span class="ident">i64</span>::<span class="ident">unpack</span>(<span class="ident">input</span>, <span class="ident">tuple_depth</span>) {
+                <span class="prelude-val">Ok</span>((<span class="ident">input</span>, <span class="ident">v</span>)) <span class="op">=</span><span class="op">&gt;</span> (<span class="ident">input</span>, <span class="ident">Element</span>::<span class="ident">Int</span>(<span class="ident">v</span>)),
                 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;num-bigint&quot;</span>)]</span>
-                <span class="prelude-val">Err</span>(<span class="ident">PackError</span>::<span class="ident">UnsupportedIntLength</span>) <span class="op">=&gt;</span> {
+                <span class="prelude-val">Err</span>(<span class="ident">PackError</span>::<span class="ident">UnsupportedIntLength</span>) <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">v</span>) <span class="op">=</span> <span class="ident">num_bigint</span>::<span class="ident">BigInt</span>::<span class="ident">unpack</span>(<span class="ident">input</span>, <span class="ident">tuple_depth</span>)<span class="question-mark">?</span>;
                     (<span class="ident">input</span>, <span class="ident">Element</span>::<span class="ident">BigInt</span>(<span class="ident">v</span>))
                 }
-                <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=&gt;</span> <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">err</span>),
+                <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">err</span>),
             },
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;num-bigint&quot;</span>)]</span>
-            <span class="ident">NEGINTSTART</span> <span class="op">=&gt;</span> {
+            <span class="ident">NEGINTSTART</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">v</span>) <span class="op">=</span> <span class="ident">num_bigint</span>::<span class="ident">BigInt</span>::<span class="ident">unpack</span>(<span class="ident">input</span>, <span class="ident">tuple_depth</span>)<span class="question-mark">?</span>;
                 (<span class="ident">input</span>, <span class="ident">Element</span>::<span class="ident">BigInt</span>(<span class="ident">v</span>))
             }
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;num-bigint&quot;</span>)]</span>
-            <span class="ident">POSINTEND</span> <span class="op">=&gt;</span> {
+            <span class="ident">POSINTEND</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">v</span>) <span class="op">=</span> <span class="ident">num_bigint</span>::<span class="ident">BigInt</span>::<span class="ident">unpack</span>(<span class="ident">input</span>, <span class="ident">tuple_depth</span>)<span class="question-mark">?</span>;
                 (<span class="ident">input</span>, <span class="ident">Element</span>::<span class="ident">BigInt</span>(<span class="ident">v</span>))
             }
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;num-bigint&quot;</span>))]</span>
-            <span class="ident">NEGINTSTART</span> <span class="op">=&gt;</span> {
+            <span class="ident">NEGINTSTART</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">v</span>) <span class="op">=</span> <span class="ident">i64</span>::<span class="ident">unpack</span>(<span class="ident">input</span>, <span class="ident">tuple_depth</span>)<span class="question-mark">?</span>;
                 (<span class="ident">input</span>, <span class="ident">Element</span>::<span class="ident">Int</span>(<span class="ident">v</span>))
             }
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;num-bigint&quot;</span>))]</span>
-            <span class="ident">POSINTEND</span> <span class="op">=&gt;</span> {
+            <span class="ident">POSINTEND</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">v</span>) <span class="op">=</span> <span class="ident">i64</span>::<span class="ident">unpack</span>(<span class="ident">input</span>, <span class="ident">tuple_depth</span>)<span class="question-mark">?</span>;
                 (<span class="ident">input</span>, <span class="ident">Element</span>::<span class="ident">Int</span>(<span class="ident">v</span>))
             }
-            <span class="ident">FLOAT</span> <span class="op">=&gt;</span> {
+            <span class="ident">FLOAT</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">v</span>) <span class="op">=</span> <span class="ident">f32</span>::<span class="ident">unpack</span>(<span class="ident">input</span>, <span class="ident">tuple_depth</span>)<span class="question-mark">?</span>;
                 (<span class="ident">input</span>, <span class="ident">Element</span>::<span class="ident">Float</span>(<span class="ident">v</span>))
             }
-            <span class="ident">DOUBLE</span> <span class="op">=&gt;</span> {
+            <span class="ident">DOUBLE</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">v</span>) <span class="op">=</span> <span class="ident">f64</span>::<span class="ident">unpack</span>(<span class="ident">input</span>, <span class="ident">tuple_depth</span>)<span class="question-mark">?</span>;
                 (<span class="ident">input</span>, <span class="ident">Element</span>::<span class="ident">Double</span>(<span class="ident">v</span>))
             }
-            <span class="ident">FALSE</span> <span class="op">|</span> <span class="ident">TRUE</span> <span class="op">=&gt;</span> {
+            <span class="ident">FALSE</span> <span class="op">|</span> <span class="ident">TRUE</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">v</span>) <span class="op">=</span> <span class="ident">bool</span>::<span class="ident">unpack</span>(<span class="ident">input</span>, <span class="ident">tuple_depth</span>)<span class="question-mark">?</span>;
                 (<span class="ident">input</span>, <span class="ident">Element</span>::<span class="ident">Bool</span>(<span class="ident">v</span>))
             }
-            <span class="ident">VERSIONSTAMP</span> <span class="op">=&gt;</span> {
+            <span class="ident">VERSIONSTAMP</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">v</span>) <span class="op">=</span> <span class="ident">Versionstamp</span>::<span class="ident">unpack</span>(<span class="ident">input</span>, <span class="ident">tuple_depth</span>)<span class="question-mark">?</span>;
                 (<span class="ident">input</span>, <span class="ident">Element</span>::<span class="ident">Versionstamp</span>(<span class="ident">v</span>))
             }
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;uuid&quot;</span>)]</span>
-            <span class="ident">UUID</span> <span class="op">=&gt;</span> {
+            <span class="ident">UUID</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">v</span>) <span class="op">=</span> <span class="ident">uuid</span>::<span class="ident">Uuid</span>::<span class="ident">unpack</span>(<span class="ident">input</span>, <span class="ident">tuple_depth</span>)<span class="question-mark">?</span>;
                 (<span class="ident">input</span>, <span class="ident">Element</span>::<span class="ident">Uuid</span>(<span class="ident">v</span>))
             }
-            <span class="ident">found</span> <span class="op">=&gt;</span> {
+            <span class="ident">found</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">PackError</span>::<span class="ident">BadCode</span> {
                     <span class="ident">found</span>,
                     <span class="ident">expected</span>: <span class="prelude-val">None</span>,
@@ -2147,7 +2149,7 @@
             }
         };
 
-        <span class="kw">if</span> <span class="ident">tuple_depth</span>.<span class="ident">depth</span>() <span class="op">==</span> <span class="number">0</span> <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">input</span>.<span class="ident">is_empty</span>() {
+        <span class="kw">if</span> <span class="ident">tuple_depth</span>.<span class="ident">depth</span>() <span class="op">=</span><span class="op">=</span> <span class="number">0</span> <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">input</span>.<span class="ident">is_empty</span>() {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tuple</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">new</span>();
             <span class="ident">tuple</span>.<span class="ident">push</span>(<span class="ident">v</span>);
             <span class="kw">while</span> <span class="op">!</span><span class="ident">input</span>.<span class="ident">is_empty</span>() {
@@ -2167,7 +2169,7 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">w</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span>,
         <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>,
-    ) <span class="op">-&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
         <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="ident">VERSIONSTAMP</span>])<span class="question-mark">?</span>;
         <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="self">self</span>.<span class="ident">as_bytes</span>())<span class="question-mark">?</span>;
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_complete</span>() {
@@ -2179,7 +2181,7 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="ident">TupleUnpack</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Versionstamp</span> {
-    <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">input</span> <span class="op">=</span> <span class="ident">parse_code</span>(<span class="ident">input</span>, <span class="ident">VERSIONSTAMP</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">slice</span>) <span class="op">=</span> <span class="ident">parse_bytes</span>(<span class="ident">input</span>, <span class="number">12</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">bytes</span> <span class="op">=</span> [<span class="number">0xff</span>; <span class="number">12</span>];
@@ -2198,7 +2200,7 @@
             <span class="kw-2">&amp;</span><span class="self">self</span>,
             <span class="ident">w</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span>,
             <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>,
-        ) <span class="op">-&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
+        ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VersionstampOffset</span><span class="op">&gt;</span> {
             <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span>[<span class="ident">UUID</span>])<span class="question-mark">?</span>;
             <span class="ident">w</span>.<span class="ident">write_all</span>(<span class="self">self</span>.<span class="ident">as_bytes</span>())<span class="question-mark">?</span>;
             <span class="prelude-val">Ok</span>(<span class="ident">VersionstampOffset</span>::<span class="prelude-val">None</span> { <span class="ident">size</span>: <span class="number">1</span> <span class="op">+</span> <span class="number">16</span> })
@@ -2206,7 +2208,7 @@
     }
 
     <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="ident">TupleUnpack</span><span class="op">&lt;</span><span class="lifetime">&#39;de</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Uuid</span> {
-        <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
+        <span class="kw">fn</span> <span class="ident">unpack</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">_tuple_depth</span>: <span class="ident">TupleDepth</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PackResult</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="self">Self</span>)<span class="op">&gt;</span> {
             <span class="kw">let</span> <span class="ident">input</span> <span class="op">=</span> <span class="ident">parse_code</span>(<span class="ident">input</span>, <span class="ident">UUID</span>)<span class="question-mark">?</span>;
             <span class="kw">let</span> (<span class="ident">input</span>, <span class="ident">slice</span>) <span class="op">=</span> <span class="ident">parse_bytes</span>(<span class="ident">input</span>, <span class="number">16</span>)<span class="question-mark">?</span>;
             <span class="kw">let</span> <span class="ident">uuid</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">from_slice</span>(<span class="ident">slice</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">PackError</span>::<span class="ident">BadUuid</span>)<span class="question-mark">?</span>;
