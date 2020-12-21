@@ -29,6 +29,7 @@ jobs:
         run: |
           curl -fsSL -o LLVM9.exe https://releases.llvm.org/9.0.0/LLVM-9.0.0-win64.exe
           7z x LLVM9.exe -y -o"C:/Program Files/LLVM"
+          echo "LIBCLANG_PATH=C:/Program Files/LLVM/bin" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
