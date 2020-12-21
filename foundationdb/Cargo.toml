@@ -1,6 +1,6 @@
 [package]
 name = "foundationdb"
-version = "0.5.2"
+version = "0.5.1"
 authors = [
     "Benjamin Fry <benjaminfry@me.com>",
     "Vincent Rouillé <vincent@clikengo.com>",
