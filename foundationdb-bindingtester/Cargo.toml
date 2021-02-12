@@ -30,7 +30,7 @@ fdb-6_1 = ["foundationdb/fdb-6_1"]
 fdb-6_2 = ["foundationdb/fdb-6_2"]
 
 [dependencies]
-env_logger = "0.7.1"
+env_logger = "0.8.3"
 foundationdb = { path = "../foundationdb", features = ["uuid", "num-bigint"], default-features = false }
 foundationdb-sys = { version = "0.5.1", path = "../foundationdb-sys", default-features = false }
 futures = "0.3.0"
