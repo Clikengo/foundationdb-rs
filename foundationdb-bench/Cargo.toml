@@ -24,6 +24,6 @@ env_logger = "0.7.1"
 foundationdb = { version = "*", path = "../foundationdb" }
 futures = "0.3.0"
 log = "0.4.8"
-rand = "0.7.2"
+rand = "0.8.4"
 stopwatch = "0.0.7"
 structopt = "0.3.3"
