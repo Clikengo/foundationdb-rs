@@ -297,7 +297,7 @@ async fn simulate_students(student_id: usize, num_ops: usize) {
     for _ in 0..num_ops {
         let mut moods = Vec::<Mood>::new();
 
-        if my_classes.len() > 0 {
+        if !my_classes.is_empty() {
             moods.push(Mood::Ditch);
             moods.push(Mood::Switch);
         }
@@ -306,7 +306,7 @@ async fn simulate_students(student_id: usize, num_ops: usize) {
             moods.push(Mood::Add);
         }
 
-        let mood = moods.choose(&mut rng).map(|mood| *mood).unwrap();
+        let mood = moods.choose(&mut rng).copied().unwrap();
 
         // on errors we recheck for available classes
         if perform_op(

@@ -6,43 +6,91 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
-//! The resulting Subspace generated with a Directory
+//! A resulting Subspace whose prefix is preprended to all of its descendant directories's prefixes.
 
-use crate::directory::directory_layer::DirectoryLayer;
+use crate::directory::directory_layer::{DirectoryLayer, DEFAULT_NODE_PREFIX, PARTITION_LAYER};
+use crate::directory::directory_subspace::DirectorySubspace;
 use crate::directory::error::DirectoryError;
 use crate::directory::{Directory, DirectoryOutput};
-use crate::tuple::{PackResult, Subspace, TuplePack, TupleUnpack};
+use crate::tuple::Subspace;
 use crate::Transaction;
 use async_trait::async_trait;
+use std::ops::Deref;
+use std::sync::Arc;
 
-/// A `DirectorySubspace` represents the contents of a directory, but it also remembers
-/// the path with which it was opened and offers convenience methods to operate on the directory at that path.
-/// An instance of `DirectorySubspace` can be used for all the usual subspace operations.
-/// It can also be used to operate on the directory with which it was opened.
-#[derive(Debug, Clone)]
-pub struct DirectorySubspace {
-    pub(crate) directory_layer: DirectoryLayer,
-    subspace: Subspace,
-    path: Vec<String>,
-    layer: Vec<u8>,
+/// A `DirectoryPartition` is a DirectorySubspace whose prefix is preprended to all of its descendant
+/// directories's prefixes. It cannot be used as a Subspace. Instead, you must create at
+/// least one subdirectory to store content.
+#[derive(Clone)]
+pub struct DirectoryPartition {
+    pub(crate) inner: Arc<DirectoryPartitionInner>,
 }
 
-impl DirectorySubspace {
-    pub fn new(
+#[derive(Debug)]
+pub struct DirectoryPartitionInner {
+    pub(crate) directory_subspace: DirectorySubspace,
+    pub(crate) parent_directory_layer: DirectoryLayer,
+}
+
+impl Deref for DirectoryPartition {
+    type Target = DirectoryPartitionInner;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl std::fmt::Debug for DirectoryPartition {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.inner.fmt(f)
+    }
+}
+
+impl DirectoryPartition {
+    // https://github.com/apple/foundationdb/blob/master/bindings/flow/DirectoryPartition.h#L34-L43
+    pub(crate) fn new(
         path: Vec<String>,
         prefix: Vec<u8>,
-        directory_layer: &DirectoryLayer,
-        layer: Vec<u8>,
+        parent_directory_layer: DirectoryLayer,
     ) -> Self {
-        DirectorySubspace {
-            directory_layer: directory_layer.clone(),
-            subspace: Subspace::from_bytes(&prefix),
-            path,
-            layer,
+        let mut node_subspace_bytes = vec![];
+        node_subspace_bytes.extend_from_slice(&prefix);
+        node_subspace_bytes.extend_from_slice(DEFAULT_NODE_PREFIX);
+
+        let new_directory_layer = DirectoryLayer::new_with_path(
+            Subspace::from_bytes(&node_subspace_bytes),
+            Subspace::from_bytes(prefix.as_slice()),
+            false,
+            path.to_owned(),
+        );
+
+        DirectoryPartition {
+            inner: Arc::new(DirectoryPartitionInner {
+                directory_subspace: DirectorySubspace::new(
+                    path,
+                    prefix,
+                    &new_directory_layer,
+                    Vec::from(PARTITION_LAYER),
+                ),
+                parent_directory_layer,
+            }),
+        }
+    }
+}
+
+impl DirectoryPartition {
+    pub fn get_path(&self) -> Vec<String> {
+        self.inner.directory_subspace.get_path()
+    }
+
+    fn get_directory_layer_for_path(&self, path: &Vec<String>) -> DirectoryLayer {
+        if path.is_empty() {
+            self.parent_directory_layer.clone()
+        } else {
+            self.directory_subspace.directory_layer.clone()
         }
     }
 
-    // https://github.com/apple/foundationdb/blob/master/bindings/flow/DirectorySubspace.cpp#L105
     fn get_partition_subpath(
         &self,
         path: Vec<String>,
@@ -51,8 +99,8 @@ impl DirectorySubspace {
         let mut new_path = vec![];
 
         new_path.extend_from_slice(
-            &self.path[directory_layer
-                .unwrap_or(self.directory_layer.clone())
+            &self.directory_subspace.get_path()[directory_layer
+                .unwrap_or(self.directory_subspace.directory_layer.clone())
                 .path
                 .len()..],
         );
@@ -60,52 +108,14 @@ impl DirectorySubspace {
 
         new_path
     }
-}
-
-impl DirectorySubspace {
-    pub fn subspace<T: TuplePack>(&self, t: &T) -> Subspace {
-        self.subspace.subspace(t)
-    }
-
-    pub fn bytes(&self) -> &[u8] {
-        self.subspace.bytes()
-    }
-
-    pub fn pack<T: TuplePack>(&self, t: &T) -> Vec<u8> {
-        self.subspace.pack(t)
-    }
-
-    pub fn unpack<'de, T: TupleUnpack<'de>>(&self, key: &'de [u8]) -> PackResult<T> {
-        self.subspace.unpack(key)
-    }
-
-    pub fn range(&self) -> (Vec<u8>, Vec<u8>) {
-        self.subspace.range()
-    }
-
-    pub fn get_path(&self) -> Vec<String> {
-        self.path.clone()
-    }
-
-    pub fn set_path(&mut self, path: Vec<String>) {
-        self.path = path;
-    }
 
     pub fn get_layer(&self) -> Vec<u8> {
-        self.layer.clone()
-    }
-
-    pub fn is_start_of(&self, key: &[u8]) -> bool {
-        self.subspace.is_start_of(&key)
-    }
-
-    fn get_directory_layer_for_path(&self, _: &Vec<String>) -> DirectoryLayer {
-        self.directory_layer.clone()
+        String::from("partition").into_bytes()
     }
 }
 
 #[async_trait]
-impl Directory for DirectorySubspace {
+impl Directory for DirectoryPartition {
     async fn create_or_open(
         &self,
         txn: &Transaction,
@@ -113,13 +123,9 @@ impl Directory for DirectorySubspace {
         prefix: Option<Vec<u8>>,
         layer: Option<Vec<u8>>,
     ) -> Result<DirectoryOutput, DirectoryError> {
-        self.directory_layer
-            .create_or_open(
-                txn,
-                self.get_partition_subpath(path.to_owned(), None),
-                prefix,
-                layer,
-            )
+        self.inner
+            .directory_subspace
+            .create_or_open(txn, path, prefix, layer)
             .await
     }
 
@@ -130,13 +136,9 @@ impl Directory for DirectorySubspace {
         prefix: Option<Vec<u8>>,
         layer: Option<Vec<u8>>,
     ) -> Result<DirectoryOutput, DirectoryError> {
-        self.directory_layer
-            .create(
-                txn,
-                self.get_partition_subpath(path.to_owned(), None),
-                prefix,
-                layer,
-            )
+        self.inner
+            .directory_subspace
+            .create(txn, path, prefix, layer)
             .await
     }
 
@@ -146,13 +148,7 @@ impl Directory for DirectorySubspace {
         path: Vec<String>,
         layer: Option<Vec<u8>>,
     ) -> Result<DirectoryOutput, DirectoryError> {
-        self.directory_layer
-            .open(
-                txn,
-                self.get_partition_subpath(path.to_owned(), None),
-                layer,
-            )
-            .await
+        self.inner.directory_subspace.open(txn, path, layer).await
     }
 
     async fn exists(&self, trx: &Transaction, path: Vec<String>) -> Result<bool, DirectoryError> {
@@ -207,12 +203,9 @@ impl Directory for DirectorySubspace {
         old_path: Vec<String>,
         new_path: Vec<String>,
     ) -> Result<DirectoryOutput, DirectoryError> {
-        self.directory_layer
-            .move_to(
-                trx,
-                self.get_partition_subpath(old_path, None),
-                self.get_partition_subpath(new_path, None),
-            )
+        self.inner
+            .directory_subspace
+            .move_to(trx, old_path, new_path)
             .await
     }
 
@@ -245,8 +238,6 @@ impl Directory for DirectorySubspace {
         trx: &Transaction,
         path: Vec<String>,
     ) -> Result<Vec<String>, DirectoryError> {
-        self.directory_layer
-            .list(trx, self.get_partition_subpath(path.to_owned(), None))
-            .await
+        self.inner.directory_subspace.list(trx, path).await
     }
 }
