@@ -413,14 +413,12 @@ impl DirectoryLayer {
             Some(fdb_key_value) => {
                 let previous_prefix: Vec<Element> =
                     self.node_subspace.unpack(fdb_key_value.key())?;
-                match previous_prefix.get(0) {
-                    Some(Element::Bytes(b)) => {
-                        let previous_prefix = b.to_vec();
-                        if key.starts_with(&previous_prefix) {
-                            return Ok(Some(self.node_with_prefix(&previous_prefix)));
-                        };
-                    }
-                    _ => {}
+
+                if let Some(Element::Bytes(b)) = previous_prefix.get(0) {
+                    let previous_prefix = b.to_vec();
+                    if key.starts_with(&previous_prefix) {
+                        return Ok(Some(self.node_with_prefix(&previous_prefix)));
+                    };
                 };
             }
         }

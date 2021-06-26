@@ -1905,16 +1905,15 @@ impl StackMachine {
                             self.directory_index
                         );
                     }
-                    Some(d) => match d {
-                        DirectoryStackItem::Null => {
+                    Some(d) => {
+                        if let DirectoryStackItem::Null = d {
                             self.directory_index = self.error_index;
                             debug!(
                                 "setting directory_index to error index {}: because it is Null",
                                 self.directory_index
                             );
                         }
-                        _ => {}
-                    },
+                    }
                 }
             }
 

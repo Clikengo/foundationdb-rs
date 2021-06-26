@@ -52,7 +52,7 @@ impl DirectorySubspace {
 
         new_path.extend_from_slice(
             &self.path[directory_layer
-                .unwrap_or(self.directory_layer.clone())
+                .unwrap_or_else(|| self.directory_layer.clone())
                 .path
                 .len()..],
         );
@@ -99,7 +99,7 @@ impl DirectorySubspace {
         self.subspace.is_start_of(&key)
     }
 
-    fn get_directory_layer_for_path(&self, _: &Vec<String>) -> DirectoryLayer {
+    fn get_directory_layer_for_path(&self, _: &[String]) -> DirectoryLayer {
         self.directory_layer.clone()
     }
 }
@@ -171,7 +171,7 @@ impl Directory for DirectorySubspace {
         trx: &Transaction,
         new_path: Vec<String>,
     ) -> Result<DirectoryOutput, DirectoryError> {
-        let directory_layer = self.get_directory_layer_for_path(&vec![]);
+        let directory_layer = self.get_directory_layer_for_path(&[]);
         let directory_layer_path = directory_layer.path.to_owned();
 
         if directory_layer_path.len() > new_path.len() {

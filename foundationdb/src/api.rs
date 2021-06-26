@@ -13,7 +13,6 @@
 //! - [API versioning](https://apple.github.io/foundationdb/api-c.html#api-versioning)
 //! - [Network](https://apple.github.io/foundationdb/api-c.html#network)
 
-use std::panic;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
@@ -61,9 +60,9 @@ impl FdbApiBuilder {
     ///
     /// This function will panic if called more than once
     pub fn build(self) -> FdbResult<NetworkBuilder> {
-        if VERSION_SELECTED.compare_and_swap(false, true, Ordering::AcqRel) {
-            panic!("the fdb select api version can only be run once per process");
-        }
+        VERSION_SELECTED
+            .compare_exchange_weak(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .expect("the fdb select api version can only be run once per process");
         error::eval(unsafe {
             fdb_sys::fdb_select_api_version_impl(
                 self.runtime_version,

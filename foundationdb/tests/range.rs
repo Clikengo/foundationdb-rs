@@ -20,6 +20,7 @@ fn test_range() {
     futures::executor::block_on(test_get_ranges_async()).expect("failed to run");
 }
 
+#[allow(clippy::needless_collect)]
 async fn test_get_range_async() -> FdbResult<()> {
     const N: usize = 10000;
 

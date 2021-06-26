@@ -364,9 +364,9 @@ mod tests {
             Vec::from("foundation database 7".as_bytes())
         );
 
-        assert_eq!(strinc(vec![61u8, 62u8, 255u8]), Vec::from(vec![61u8, 63u8]));
+        assert_eq!(strinc(vec![61u8, 62u8, 255u8]), vec![61u8, 63u8]);
         // from seed 3180880087
-        assert_eq!(strinc(vec![253u8, 255u8]), Vec::from(vec![254u8]));
-        assert_eq!(strinc(vec![253u8, 255u8, 255u8]), Vec::from(vec![254u8]));
+        assert_eq!(strinc(vec![253u8, 255u8]), vec![254u8]);
+        assert_eq!(strinc(vec![253u8, 255u8, 255u8]), vec![254u8]);
     }
 }

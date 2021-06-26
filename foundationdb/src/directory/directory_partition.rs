@@ -83,7 +83,7 @@ impl DirectoryPartition {
         self.inner.directory_subspace.get_path()
     }
 
-    fn get_directory_layer_for_path(&self, path: &Vec<String>) -> DirectoryLayer {
+    fn get_directory_layer_for_path(&self, path: &[String]) -> DirectoryLayer {
         if path.is_empty() {
             self.parent_directory_layer.clone()
         } else {
@@ -100,7 +100,7 @@ impl DirectoryPartition {
 
         new_path.extend_from_slice(
             &self.directory_subspace.get_path()[directory_layer
-                .unwrap_or(self.directory_subspace.directory_layer.clone())
+                .unwrap_or_else(|| self.directory_subspace.directory_layer.clone())
                 .path
                 .len()..],
         );
@@ -167,7 +167,7 @@ impl Directory for DirectoryPartition {
         trx: &Transaction,
         new_path: Vec<String>,
     ) -> Result<DirectoryOutput, DirectoryError> {
-        let directory_layer = self.get_directory_layer_for_path(&vec![]);
+        let directory_layer = self.get_directory_layer_for_path(&[]);
         let directory_layer_path = directory_layer.path.to_owned();
 
         if directory_layer_path.len() > new_path.len() {
