@@ -91,9 +91,17 @@ impl TransactError for HcaError {
 /// Represents a High Contention Allocator for a given subspace
 #[derive(Debug)]
 pub struct HighContentionAllocator {
+    // original subspace kept to implement Clone
+    subspace: Subspace,
     counters: Subspace,
     recent: Subspace,
     allocation_mutex: Mutex<()>,
+}
+
+impl Clone for HighContentionAllocator {
+    fn clone(&self) -> Self {
+        HighContentionAllocator::new(self.subspace.to_owned())
+    }
 }
 
 impl HighContentionAllocator {
@@ -101,6 +109,7 @@ impl HighContentionAllocator {
     /// The given subspace should not be used by anything other than the allocator
     pub fn new(subspace: Subspace) -> HighContentionAllocator {
         HighContentionAllocator {
+            subspace: subspace.clone(),
             counters: subspace.subspace(&0i64),
             recent: subspace.subspace(&1i64),
             allocation_mutex: Mutex::new(()),

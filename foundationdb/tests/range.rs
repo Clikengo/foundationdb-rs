@@ -20,6 +20,7 @@ fn test_range() {
     futures::executor::block_on(test_get_ranges_async()).expect("failed to run");
 }
 
+#[allow(clippy::needless_collect)]
 async fn test_get_range_async() -> FdbResult<()> {
     const N: usize = 10000;
 
@@ -51,8 +52,8 @@ async fn test_get_range_async() -> FdbResult<()> {
         let len = range.len();
         let mut i = 0;
         for kv in &range {
-            assert!(kv.key().len() > 0);
-            assert!(kv.value().len() > 0);
+            assert!(!kv.key().is_empty());
+            assert!(!kv.value().is_empty());
             i += 1;
         }
         assert_eq!(i, len);

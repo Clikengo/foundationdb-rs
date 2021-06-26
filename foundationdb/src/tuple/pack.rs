@@ -179,7 +179,7 @@ fn write_bytes<W: io::Write>(w: &mut W, v: &[u8]) -> io::Result<VersionstampOffs
     Ok(VersionstampOffset::None { size })
 }
 
-fn parse_slice<'de>(input: &'de [u8]) -> PackResult<(&'de [u8], Cow<'de, [u8]>)> {
+fn parse_slice(input: &[u8]) -> PackResult<(&[u8], Cow<[u8]>)> {
     let mut bytes = Vec::new();
     let mut pos = 0;
     for idx in memchr_iter(NIL, input) {
@@ -203,7 +203,7 @@ fn parse_slice<'de>(input: &'de [u8]) -> PackResult<(&'de [u8], Cow<'de, [u8]>)>
     Err(PackError::MissingBytes)
 }
 
-fn parse_string<'de>(input: &'de [u8]) -> PackResult<(&'de [u8], Cow<'de, str>)> {
+fn parse_string(input: &[u8]) -> PackResult<(&[u8], Cow<str>)> {
     let (input, slice) = parse_slice(input)?;
     Ok((
         input,

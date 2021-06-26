@@ -5,7 +5,7 @@
 mod element;
 pub mod hca;
 mod pack;
-mod subspace;
+pub mod subspace;
 mod versionstamp;
 
 use std::borrow::Cow;
@@ -274,11 +274,11 @@ mod tests {
 
         // versionstamp
         test_serde(
-            Versionstamp::complete(b"\xaa\xbb\xcc\xdd\xee\xff\x00\x01\x02\x03".clone(), 0),
+            Versionstamp::complete(*b"\xaa\xbb\xcc\xdd\xee\xff\x00\x01\x02\x03", 0),
             b"\x33\xaa\xbb\xcc\xdd\xee\xff\x00\x01\x02\x03\x00\x00",
         );
         test_serde(
-            Versionstamp::complete(b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a".clone(), 657),
+            Versionstamp::complete(*b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a", 657),
             b"\x33\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x02\x91",
         );
 
@@ -349,67 +349,55 @@ mod tests {
         test_serde(i64::min_value(), b"\x0C\x7f\xff\xff\xff\xff\xff\xff\xff");
 
         test_serde(9252427359321063944i128, b"\x1c\x80g9\xa9np\x02\x08");
-        assert!(
-            match unpack::<i64>(b"\x1c\x80g9\xa9np\x02\x08").unwrap_err() {
-                PackError::UnsupportedIntLength => true,
-                _ => false,
-            }
-        );
+        assert!(matches!(
+            unpack::<i64>(b"\x1c\x80g9\xa9np\x02\x08").unwrap_err(),
+            PackError::UnsupportedIntLength
+        ));
 
         test_serde(
             -9252427359321063944i128,
             b"\x0c\x7f\x98\xc6V\x91\x8f\xfd\xf7",
         );
-        assert!(
-            match unpack::<i64>(b"\x0c\x7f\x98\xc6V\x91\x8f\xfd\xf7").unwrap_err() {
-                PackError::UnsupportedIntLength => true,
-                _ => false,
-            }
-        );
+        assert!(matches!(
+            unpack::<i64>(b"\x0c\x7f\x98\xc6V\x91\x8f\xfd\xf7").unwrap_err(),
+            PackError::UnsupportedIntLength
+        ));
 
         test_serde(
             u64::max_value() as i128,
             b"\x1c\xff\xff\xff\xff\xff\xff\xff\xff",
         );
-        assert!(
-            match unpack::<i64>(b"\x1c\xff\xff\xff\xff\xff\xff\xff\xff").unwrap_err() {
-                PackError::UnsupportedIntLength => true,
-                _ => false,
-            }
-        );
+        assert!(matches!(
+            unpack::<i64>(b"\x1c\xff\xff\xff\xff\xff\xff\xff\xff").unwrap_err(),
+            PackError::UnsupportedIntLength
+        ));
 
         test_serde(
             -(u64::max_value() as i128),
             b"\x0c\x00\x00\x00\x00\x00\x00\x00\x00",
         );
-        assert!(
-            match unpack::<i64>(b"\x0c\x00\x00\x00\x00\x00\x00\x00\x00").unwrap_err() {
-                PackError::UnsupportedIntLength => true,
-                _ => false,
-            }
-        );
+        assert!(matches!(
+            unpack::<i64>(b"\x0c\x00\x00\x00\x00\x00\x00\x00\x00").unwrap_err(),
+            PackError::UnsupportedIntLength
+        ));
 
         test_serde(
             (i64::max_value() as i128) + 1,
             b"\x1c\x80\x00\x00\x00\x00\x00\x00\x00",
         );
-        assert!(
-            match unpack::<i64>(b"\x1c\x80\x00\x00\x00\x00\x00\x00\x00").unwrap_err() {
-                PackError::UnsupportedIntLength => true,
-                _ => false,
-            }
-        );
+        assert!(matches!(
+            unpack::<i64>(b"\x1c\x80\x00\x00\x00\x00\x00\x00\x00").unwrap_err(),
+            PackError::UnsupportedIntLength
+        ));
 
         test_serde(
             (i64::min_value() as i128) - 1,
             b"\x0c\x7f\xff\xff\xff\xff\xff\xff\xfe",
         );
-        assert!(
-            match unpack::<i64>(b"\x0c\x7f\xff\xff\xff\xff\xff\xff\xfe").unwrap_err() {
-                PackError::UnsupportedIntLength => true,
-                _ => false,
-            }
-        );
+        assert!(matches!(
+            unpack::<i64>(b"\x0c\x7f\xff\xff\xff\xff\xff\xff\xfe").unwrap_err(),
+            PackError::UnsupportedIntLength
+        ));
     }
 
     #[cfg(feature = "num-bigint")]
@@ -627,21 +615,21 @@ mod tests {
         test_serde(Element::Int(-1), &[0x13, 254]);
         test_serde(
             Element::Versionstamp(Versionstamp::complete(
-                b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a".clone(),
+                *b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a",
                 657,
             )),
             b"\x33\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x02\x91",
         );
         test_serde(
             (Element::Versionstamp(Versionstamp::complete(
-                b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a".clone(),
+                *b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a",
                 657,
             )),),
             b"\x33\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x02\x91",
         );
         test_serde(
             (Element::Versionstamp(Versionstamp::complete(
-                b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a".clone(),
+                *b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a",
                 657,
             )),),
             b"\x33\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x02\x91",
