@@ -22,9 +22,9 @@ esac
   cd ${fdb_builddir:?}
 
   ## Get foundationdb source
-  git clone --depth 1 https://github.com/apple/foundationdb.git -b release-6.1
+  git clone --depth 1 https://github.com/apple/foundationdb.git -b release-6.3
   cd foundationdb
-  git checkout release-6.1
+  git checkout release-6.3
 
   ## need the python api bindings
   make fdb_python
@@ -33,6 +33,6 @@ esac
   echo "testers['rust'] = Tester('rust', '${bindingtester}', 2040, 23, MAX_API_VERSION, types=ALL_TYPES)
 " >> ./bindings/bindingtester/known_testers.py
   ./bindings/bindingtester/bindingtester.py --test-name scripted rust
-  ./bindings/bindingtester/bindingtester.py --num-ops 1000 --api-version 610 --test-name api --compare python rust
-  ./bindings/bindingtester/bindingtester.py --num-ops 1000 --api-version 610 --test-name api --concurrency 5 rust
+  ./bindings/bindingtester/bindingtester.py --num-ops 1000 --api-version 630 --test-name api --compare python rust
+  ./bindings/bindingtester/bindingtester.py --num-ops 1000 --api-version 630 --test-name api --concurrency 5 rust
 )

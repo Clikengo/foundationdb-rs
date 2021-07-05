@@ -596,6 +596,24 @@ impl Transaction {
         }
     }
 
+    /// Get the estimated byte size of the key range based on the byte sample collected by FDB
+    #[cfg(feature = "fdb-6_3")]
+    pub fn get_estimated_range_size_bytes(
+        &self,
+        begin: &[u8],
+        end: &[u8],
+    ) -> impl Future<Output = FdbResult<i64>> + Send + Sync + Unpin {
+        FdbFuture::<i64>::new(unsafe {
+            fdb_sys::fdb_transaction_get_estimated_range_size_bytes(
+                self.inner.as_ptr(),
+                begin.as_ptr(),
+                fdb_len(begin.len(), "begin"),
+                end.as_ptr(),
+                fdb_len(end.len(), "end"),
+            )
+        })
+    }
+
     /// Attempts to commit the sets and clears previously applied to the database snapshot
     /// represented by transaction to the actual database.
     ///
