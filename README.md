@@ -1,6 +1,6 @@
 [![GitHub Workflow Status](https://img.shields.io/github/workflow/status/Clikengo/foundationdb-rs/CI)](https://github.com/Clikengo/foundationdb-rs/actions)
 [![Codecov](https://img.shields.io/codecov/c/github/Clikengo/foundationdb-rs)](https://codecov.io/gh/Clikengo/foundationdb-rs)
-![Rustc 1.40+](https://img.shields.io/badge/rustc-1.40+-lightgrey)
+![Rustc 1.46+](https://img.shields.io/badge/rustc-1.46+-lightgrey)
 [![Dependabot Status](https://api.dependabot.com/badges/status?host=github&repo=Clikengo/foundationdb-rs)](https://dependabot.com)
 
 # FoundationDB Rust Client
@@ -13,7 +13,7 @@ The repo consists of multiple crates
 | [**foundationdb-sys**](foundationdb-sys/README.md) | [![Crates.io](https://img.shields.io/crates/v/foundationdb-sys)](https://crates.io/crates/foundationdb-sys) [![foundationdb-sys](https://docs.rs/foundationdb-sys/badge.svg)](https://docs.rs/foundationdb-sys) | C API bindings for FoundationDB                             |
 | **foundationdb-gen**                               | n/a                                                                                                                                                                                                             | Code generator for common options and types of FoundationDB |
 
-The current version requires rustc 1.40+ to work (async/await feature).
+The current version requires rustc 1.46+ to work.
 The previous version (0.3) is still maintained and is available within the 0.3 branch.
 
 You can access the `master` branch documentation [here](https://clikengo.github.io/foundationdb-rs/foundationdb/index.html).
